@@ -1,0 +1,2274 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+src/
+  main/
+    domain/
+      entities/
+        AudioFile.js
+        BaseFile.js
+        BaseNode.js
+        Device.js
+        HttpFile.js
+        index.js
+        MediaNode.js
+        VideoFile.js
+      value-objects/
+        FileStatus.js
+        index.js
+    infrastructure/
+      logging/
+        ErrorCentralService.js
+        index.js
+        LoggerContext.js
+        logging.constants.js
+      process/
+        index.js
+        process.constants.js
+        ProcessEntity.js
+        ProcessLogFormatter.js
+        ProcessManager.js
+    runtime/
+      processes/
+        container.js
+        ProcessRegistry.js
+        ProcessSupervisor.js
+.c2pconfig
+.gitignore
+package.json
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="src/main/runtime/processes/container.js">
+'use strict';
+
+const ErrorCentralService =
+    require(
+        '../infrastructure/logging'
+    );
+
+const ProcessManager =
+    require(
+        '../infrastructure/process'
+    );
+
+const ProcessRegistry =
+    require(
+        '../runtime/processes/ProcessRegistry'
+    );
+
+const ProcessSupervisor =
+    require(
+        '../runtime/processes/ProcessSupervisor'
+    );
+
+class BootstrapContainer {
+    constructor() {
+        this._services =
+            new Map();
+
+        this._initialized =
+            false;
+    }
+
+    initialize() {
+        if (
+            this._initialized
+        ) {
+            return this;
+        }
+
+        const processRegistry =
+            new ProcessRegistry();
+
+        const processSupervisor =
+            new ProcessSupervisor({
+                processManager:
+                    ProcessManager,
+                processRegistry,
+                logger:
+                    ErrorCentralService
+            });
+
+        this._services.set(
+            'errorCentralService',
+            ErrorCentralService
+        );
+
+        this._services.set(
+            'processManager',
+            ProcessManager
+        );
+
+        this._services.set(
+            'processRegistry',
+            processRegistry
+        );
+
+        this._services.set(
+            'processSupervisor',
+            processSupervisor
+        );
+
+        this._initialized =
+            true;
+
+        return this;
+    }
+
+    resolve(name) {
+        return (
+            this._services.get(
+                name
+            ) || null
+        );
+    }
+}
+
+module.exports =
+    new BootstrapContainer();
+</file>
+
+<file path="src/main/runtime/processes/ProcessRegistry.js">
+'use strict';
+
+class ProcessRegistry {
+    constructor() {
+        this._processes = new Map();
+    }
+
+    register(processId, processData) {
+        this._processes.set(
+            processId,
+            Object.freeze({
+                ...processData
+            })
+        );
+    }
+
+    unregister(processId) {
+        return this._processes.delete(processId);
+    }
+
+    get(processId) {
+        return this._processes.get(processId) || null;
+    }
+
+    updateStatus(processId, status) {
+        const existing =
+            this._processes.get(processId);
+
+        if (!existing) {
+            return false;
+        }
+
+        this._processes.set(
+            processId,
+            Object.freeze({
+                ...existing,
+                status
+            })
+        );
+
+        return true;
+    }
+}
+
+module.exports = ProcessRegistry;
+</file>
+
+<file path="src/main/runtime/processes/ProcessSupervisor.js">
+'use strict';
+
+class ProcessSupervisor {
+    constructor({
+        processManager,
+        processRegistry,
+        logger = null
+    }) {
+        this._processManager =
+            processManager;
+
+        this._processRegistry =
+            processRegistry;
+
+        this._logger =
+            logger;
+    }
+
+    startManagedProcess(
+        processConfig = {}
+    ) {
+        const {
+            processId,
+            binPath,
+            args = [],
+            type = 'generic',
+            metadata = {},
+            onData = null,
+            maxBufferSize = 100
+        } = processConfig;
+
+        if (!processId) {
+            throw new Error(
+                'processId is required'
+            );
+        }
+
+        if (!binPath) {
+            throw new Error(
+                'binPath is required'
+            );
+        }
+
+        this._processRegistry.register(
+            processId,
+            {
+                id: processId,
+                type,
+                metadata,
+                status: 'STARTING',
+                startedAt:
+                    Date.now()
+            }
+        );
+
+        try {
+            const result =
+                this._processManager.execute(
+                    processId,
+                    binPath,
+                    args,
+                    type,
+                    onData,
+                    maxBufferSize
+                );
+
+            this._processRegistry
+                .updateStatus(
+                    processId,
+                    'RUNNING'
+                );
+
+            return result;
+        } catch (error) {
+            this._processRegistry
+                .updateStatus(
+                    processId,
+                    'FAILED'
+                );
+
+            throw error;
+        }
+    }
+
+    stopManagedProcess(
+        processId
+    ) {
+        const process =
+            this._processRegistry.get(
+                processId
+            );
+
+        if (!process) {
+            return false;
+        }
+
+        const result =
+            this._processManager.terminate(
+                processId
+            );
+
+        this._processRegistry
+            .updateStatus(
+                processId,
+                'STOPPED'
+            );
+
+        return result;
+    }
+
+    getProcessStatus(
+        processId
+    ) {
+        const runtimeState =
+            this._processRegistry.get(
+                processId
+            );
+
+        if (!runtimeState) {
+            return null;
+        }
+
+        const managerStatus =
+            this._processManager
+                .getProcessStatus(
+                    processId
+                );
+
+        return {
+            ...runtimeState,
+            processStatus:
+                managerStatus
+        };
+    }
+}
+
+module.exports =
+    ProcessSupervisor;
+</file>
+
+<file path=".c2pconfig">
+[ignore]
+paths = [
+    "node_modules",
+    ".venv",
+    ".git",
+    "dist",
+    "build"
+]
+</file>
+
+<file path="src/main/domain/entities/AudioFile.js">
+const BaseFile = require('./BaseFile');
+
+/**
+ * AudioFile
+ * Represents an audio file format from yt-dlp
+ */
+class AudioFile extends BaseFile {
+    constructor({
+        id = null,
+        name = '',
+        extension = '',
+        sourceUrl = '',
+        storagePath = null,
+        formatId = '',
+        abr = null,
+        codec = '',
+        fileSizeApprox = null
+    } = {}) {
+        super({ id, name, extension, sourceUrl, storagePath, type: 'audio' });
+        this.formatId = formatId;
+        this.abr = abr;
+        this.codec = codec;
+        this.fileSizeApprox = fileSizeApprox;
+    }
+}
+
+module.exports = AudioFile;
+</file>
+
+<file path="src/main/domain/entities/BaseFile.js">
+const { randomUUID } = require('crypto');
+const FileStatus = require('./FileStatus');
+
+/**
+ * BaseFile
+ * Abstract base class for file representations (VideoFile, AudioFile)
+ */
+class BaseFile {
+    constructor({
+        id = null,
+        name = '',
+        extension = '',
+        sourceUrl = '',
+        storagePath = null,
+        type = null
+    } = {}) {
+        this.id = id || randomUUID();
+        this.name = name;
+        this.extension = extension;
+        this.sourceUrl = sourceUrl;
+        this.storagePath = storagePath;
+        this.type = type;
+        this.fileStatus = new FileStatus();
+    }
+
+    /**
+     * Returns a plain object representation suitable for IPC transmission or storage
+     */
+    toJSON() {
+        return {
+            id: this.id,
+            name: this.name,
+            extension: this.extension,
+            sourceUrl: this.sourceUrl,
+            storagePath: this.storagePath,
+            type: this.type,
+            fileStatus: this.fileStatus.toJSON()
+        };
+    }
+}
+
+module.exports = BaseFile;
+</file>
+
+<file path="src/main/domain/entities/BaseNode.js">
+/**
+ * Pure base entity for all nodes/devices in the system.
+ * Contains only immutable identity and structural data.
+ */
+class BaseNode {
+    constructor({ id, deviceFriendlyName, type }) {
+        this._id = id;
+        this._deviceFriendlyName = deviceFriendlyName;
+        this._type = type;
+
+        // Freeze instance to prevent accidental mutation
+        Object.freeze(this);
+    }
+
+    // --- Read-only getters ---
+
+    get id() {
+        return this._id;
+    }
+
+    get type() {
+        return this._type;
+    }
+
+    get friendlyName() {
+        return this._deviceFriendlyName;
+    }
+
+    get deviceFriendlyName() {
+        return this._deviceFriendlyName;
+    }
+
+    toJSON() {
+        return {
+            id: this._id,
+            deviceFriendlyName: this._deviceFriendlyName,
+            type: this._type
+        };
+    }
+}
+
+module.exports = BaseNode;
+</file>
+
+<file path="src/main/domain/entities/Device.js">
+const BaseNode = require('./BaseNode');
+
+/**
+ * Pure device entity.
+ * Contains only immutable definitional data.
+ */
+class Device extends BaseNode {
+    constructor({
+        id,
+        deviceFriendlyName,
+        model,
+        version,
+        arch,
+        isNew
+    }) {
+        super({
+            id,
+            deviceFriendlyName,
+            type: 'MOBILE'
+        });
+
+        this._model = model || 'Unknown';
+        this._version = version || 'Unknown';
+        this._arch = arch || 'Unknown';
+        this._isNew = isNew ?? true;
+
+        // Freeze after construction
+        Object.freeze(this);
+    }
+
+    // --- Read-only getters ---
+
+    get model() {
+        return this._model;
+    }
+
+    get version() {
+        return this._version;
+    }
+
+    get arch() {
+        return this._arch;
+    }
+
+    get isNew() {
+        return this._isNew;
+    }
+
+    toJSON() {
+        return {
+            ...super.toJSON(),
+            model: this._model,
+            version: this._version,
+            arch: this._arch,
+            isNew: this._isNew
+        };
+    }
+
+    static fromJSON(data) {
+        return new Device({
+            id: data.id,
+            deviceFriendlyName:
+                data.deviceFriendlyName || data.friendly_name,
+            model: data.model,
+            version: data.version,
+            arch: data.arch,
+            isNew: data.isNew
+        });
+    }
+}
+
+module.exports = Device;
+</file>
+
+<file path="src/main/domain/entities/HttpFile.js">
+const crypto = require('crypto');
+const FileStatus = require('./FileStatus');
+
+/**
+ * HttpFile Model
+ * نموذج بيانات الملفات المحملة عبر HTTP
+ */
+class HttpFile {
+    constructor(data = {}) {
+        // الخصائص الأساسية
+        this.id = data.id || crypto.randomUUID();
+        this.url = data.url || '';
+        this.fileName = data.fileName || '';
+        this.storagePath = data.storagePath || '';
+        this.mimeType = data.mimeType || '';
+
+        // خصائص حالة التحميل
+        this.status = data.status || 'pending'; // 'pending' | 'downloading' | 'completed' | 'failed' | 'cancelled'
+
+        // تهيئة fileStatus وتعبئة البيانات الممررة إن وجدت
+        const statusData = data.fileStatus || {};
+        this.fileStatus = new FileStatus({
+            percentage: statusData.percentage !== undefined ? statusData.percentage : (data.progress !== undefined ? data.progress : 0),
+            downloadedBytes: statusData.downloadedBytes !== undefined ? statusData.downloadedBytes : (data.downloadedBytes !== undefined ? data.downloadedBytes : 0),
+            speed: statusData.speed !== undefined ? statusData.speed : (data.speed !== undefined ? data.speed : ''),
+            eta: statusData.eta !== undefined ? statusData.eta : (data.eta !== undefined ? data.eta : ''),
+            totalBytes: statusData.totalBytes !== undefined ? statusData.totalBytes : (data.sizeBytes !== undefined ? data.sizeBytes : null),
+            isPaused: statusData.isPaused !== undefined ? statusData.isPaused : false
+        });
+    }
+
+    /**
+     * تحويل الكائن إلى JSON عادي
+     */
+    toJSON() {
+        return {
+            id: this.id,
+            url: this.url,
+            fileName: this.fileName,
+            storagePath: this.storagePath,
+            mimeType: this.mimeType,
+            status: this.status,
+            fileStatus: this.fileStatus.toJSON()
+        };
+    }
+
+    /**
+     * تحديث حالة التقدم
+     */
+    updateProgress(progressData) {
+        if (!progressData) return;
+        this.fileStatus.update({
+            percentage: progressData.progress,
+            downloadedBytes: progressData.downloadedBytes,
+            speed: progressData.speed,
+            eta: progressData.eta,
+            totalBytes: progressData.totalBytes
+        });
+    }
+
+    /**
+     * تحديث الحالة
+     */
+    setStatus(status) {
+        this.status = status;
+    }
+
+    /**
+     * التحقق من اكتمال التحميل
+     */
+    isCompleted() {
+        return this.status === 'completed';
+    }
+
+    /**
+     * التحقق من فشل التحميل
+     */
+    isFailed() {
+        return this.status === 'failed';
+    }
+
+    /**
+     * التحقق من إلغاء التحميل
+     */
+    isCancelled() {
+        return this.status === 'cancelled';
+    }
+
+    /**
+     * التحقق من أن التحميل نشط
+     */
+    isActive() {
+        return this.status === 'downloading' || this.status === 'pending';
+    }
+}
+
+module.exports = HttpFile;
+</file>
+
+<file path="src/main/domain/entities/index.js">
+/**
+ * LinkHub Models Gateway
+ * البوابة المركزية لنماذج البيانات (Classes)
+ */
+
+const BaseNode = require('./BaseNode');
+const Device = require('./Device');
+const HttpFile = require('./HttpFile');
+const MediaNode = require('./MediaNode');
+const BaseFile = require('./BaseFile');
+const VideoFile = require('./VideoFile');
+const AudioFile = require('./AudioFile');
+
+module.exports = {
+    BaseNode,
+    Device,
+    HttpFile,
+    MediaNode,
+    BaseFile,
+    VideoFile,
+    AudioFile
+};
+</file>
+
+<file path="src/main/domain/entities/MediaNode.js">
+const BaseNode = require('./BaseNode');
+
+/**
+ * كلاس يمثل عقدة الوسائط (Media Node)
+ * تركز فقط على تتبع المهام التي تنفذها أدوات مثل yt-dlp أو axios.
+ */
+class MediaNode extends BaseNode {
+    constructor({ id, deviceFriendlyName }) {
+        // استدعاء الأب وتحديد النوع
+        super({ id, deviceFriendlyName, type: 'MEDIA_NODE' });
+
+        // قائمة المهام النشطة (روابط تحميل، تحويل صيغ، إلخ)
+        this.activeTasks = []; 
+    }
+
+    /**
+     * إضافة مهمة تحميل (مثلاً كائن يحتوي على الرابط والنسبة المئوية)
+     */
+    addTask(task) {
+        this.activeTasks.push(task);
+    }
+
+   
+
+    toJSON() {
+        return {
+            ...super.toJSON()
+            // لا توجد خصائص إضافية للحفظ حالياً، نكتفي ببيانات الأب
+        };
+    }
+
+    static fromJSON(data) {
+        return new MediaNode(data);
+    }
+}
+
+module.exports = MediaNode;
+</file>
+
+<file path="src/main/domain/entities/VideoFile.js">
+const BaseFile = require('./BaseFile');
+
+/**
+ * VideoFile
+ * Represents a video file format from yt-dlp
+ */
+class VideoFile extends BaseFile {
+    constructor({
+        id = null,
+        name = '',
+        extension = '',
+        sourceUrl = '',
+        storagePath = null,
+        formatId = '',
+        resolution = '',
+        fps = null,
+        codec = '',
+        width = null,
+        height = null,
+        fileSizeApprox = null
+    } = {}) {
+        super({ id, name, extension, sourceUrl, storagePath, type: 'video' });
+        this.formatId = formatId;
+        this.resolution = resolution;
+        this.fps = fps;
+        this.codec = codec;
+        this.width = width;
+        this.height = height;
+        this.fileSizeApprox = fileSizeApprox;
+    }
+}
+
+module.exports = VideoFile;
+</file>
+
+<file path="src/main/domain/value-objects/FileStatus.js">
+class FileStatus {
+    constructor({
+        percentage = 0,
+        speed = null,
+        eta = null,
+        downloadedBytes = 0,
+        totalBytes = null,
+        isPaused = false,
+        state = 'pending'
+    } = {}) {
+        this._percentage = this._clampPercentage(percentage);
+        this._speed = speed;
+        this._eta = eta;
+        this._downloadedBytes = Math.max(0, downloadedBytes);
+        this._totalBytes = totalBytes !== null ? Math.max(0, totalBytes) : null;
+        this._isPaused = isPaused;
+        this._state = this._validateState(state);
+    }
+
+    // ---- Getters ----
+    get percentage() { return this._percentage; }
+    get speed() { return this._speed; }
+    get eta() { return this._eta; }
+    get downloadedBytes() { return this._downloadedBytes; }
+    get totalBytes() { return this._totalBytes; }
+    get isPaused() { return this._isPaused; }
+    get state() { return this._state; }
+
+    // ---- Private helpers ----
+    _clampPercentage(value) {
+        if (value < 0) return 0;
+        if (value > 100) return 100;
+        return value;
+    }
+
+    _validateState(state) {
+        const allowed = ['pending', 'downloading', 'completed', 'failed', 'paused', 'cancelled'];
+        return allowed.includes(state) ? state : 'pending';
+    }
+
+    // ---- Public methods ----
+    update(data) {
+        if (!data || typeof data !== 'object') return;
+
+        // percentage
+        if (data.percentage !== undefined) {
+            this._percentage = this._clampPercentage(data.percentage);
+        }
+
+        // speed
+        if (data.speed !== undefined) {
+            this._speed = data.speed;
+        }
+
+        // eta
+        if (data.eta !== undefined) {
+            this._eta = data.eta;
+        }
+
+        // totalBytes
+        if (data.totalBytes !== undefined && data.totalBytes !== null) {
+            this._totalBytes = Math.max(0, data.totalBytes);
+        }
+
+        // downloadedBytes
+        if (data.downloadedBytes !== undefined) {
+            let newDownloaded = Math.max(0, data.downloadedBytes);
+            if (this._totalBytes !== null && newDownloaded > this._totalBytes) {
+                // silently clamp to totalBytes – no error reporting here (domain purity)
+                newDownloaded = this._totalBytes;
+            }
+            this._downloadedBytes = newDownloaded;
+        }
+
+        // isPaused
+        if (data.isPaused !== undefined) {
+            this._isPaused = !!data.isPaused;
+        }
+
+        // state
+        if (data.state !== undefined) {
+            this._state = this._validateState(data.state);
+        }
+    }
+
+    toJSON() {
+        return {
+            percentage: this._percentage,
+            speed: this._speed,
+            eta: this._eta,
+            downloadedBytes: this._downloadedBytes,
+            totalBytes: this._totalBytes,
+            isPaused: this._isPaused,
+            state: this._state
+        };
+    }
+}
+
+module.exports = FileStatus;
+</file>
+
+<file path="src/main/domain/value-objects/index.js">
+
+</file>
+
+<file path="src/main/infrastructure/logging/ErrorCentralService.js">
+'use strict';
+
+const path = require('path');
+const log = require('electron-log/main');
+
+const LoggerContext = require('./LoggerContext');
+
+const {
+    LOG_LEVELS,
+    LOG_TYPES,
+    SEVERITY
+} = require('./logging.constants');
+
+class ErrorCentralService {
+    constructor() {
+        this._initialized = false;
+        this._globalHandlersRegistered = false;
+    }
+
+    init(options = {}) {
+        try {
+            if (this._initialized) {
+                return;
+            }
+
+            const {
+                logFilePath = path.join(
+                    process.cwd(),
+                    'logs',
+                    'application.log'
+                ),
+                maxSize = 5 * 1024 * 1024
+            } = options;
+
+            log.initialize();
+
+            log.transports.file.level = 'info';
+            log.transports.file.maxSize = maxSize;
+
+            log.transports.file.resolvePathFn = () =>
+                logFilePath;
+
+            this._registerGlobalHandlers();
+
+            this._initialized = true;
+        } catch (error) {
+            this._safeConsoleError(
+                'Failed to initialize logger',
+                error
+            );
+        }
+    }
+
+    createLogger(source) {
+        return new LoggerContext(
+            this,
+            source
+        );
+    }
+
+    info(message, options = {}) {
+        return this.report({
+            ...options,
+            message,
+            severity:
+                options.severity ||
+                SEVERITY.LOW
+        });
+    }
+
+    warn(message, options = {}) {
+        return this.report({
+            ...options,
+            message,
+            severity:
+                options.severity ||
+                SEVERITY.MEDIUM
+        });
+    }
+
+    error(message, options = {}) {
+        return this.report({
+            ...options,
+            message,
+            severity:
+                options.severity ||
+                SEVERITY.HIGH
+        });
+    }
+
+    fatal(message, options = {}) {
+        return this.report({
+            ...options,
+            message,
+            severity:
+                SEVERITY.CRITICAL
+        });
+    }
+
+    report(options = {}) {
+        try {
+            const {
+                message = '',
+                type = LOG_TYPES.GENERAL,
+                severity = SEVERITY.LOW,
+                source = 'UNKNOWN',
+                metadata = null,
+                error = null
+            } = options;
+
+            this._writeLog({
+                message,
+                type,
+                severity,
+                source,
+                metadata,
+                error
+            });
+        } catch (err) {
+            this._safeConsoleError(
+                'Log processing failed',
+                err
+            );
+        }
+    }
+
+    _writeLog(entry) {
+        try {
+            const level =
+                this._resolveLevel(
+                    entry.severity
+                );
+
+            const timestamp =
+                new Date().toISOString();
+
+            const metadata =
+                this._normalizeMetadata(
+                    entry.metadata
+                );
+
+            const errorStack =
+                this._extractErrorStack(
+                    entry.error
+                );
+
+            const logLine = [
+                `[${timestamp}]`,
+                `[${level}]`,
+                `[${entry.type}]`,
+                `[${entry.severity}]`,
+                `[${entry.source}]`,
+                entry.message,
+                metadata,
+                errorStack
+            ].join(' | ');
+
+            switch (level) {
+                case LOG_LEVELS.ERROR:
+                    log.error(logLine);
+                    break;
+
+                case LOG_LEVELS.WARN:
+                    log.warn(logLine);
+                    break;
+
+                default:
+                    log.info(logLine);
+                    break;
+            }
+        } catch (error) {
+            this._safeConsoleError(
+                'Log write failed',
+                error
+            );
+        }
+    }
+
+    _resolveLevel(severity) {
+        switch (severity) {
+            case SEVERITY.CRITICAL:
+            case SEVERITY.HIGH:
+                return LOG_LEVELS.ERROR;
+
+            case SEVERITY.MEDIUM:
+                return LOG_LEVELS.WARN;
+
+            default:
+                return LOG_LEVELS.INFO;
+        }
+    }
+
+    _normalizeMetadata(metadata) {
+        try {
+            if (
+                metadata === undefined ||
+                metadata === null
+            ) {
+                return '';
+            }
+
+            if (
+                typeof metadata !== 'object'
+            ) {
+                return String(metadata);
+            }
+
+            return this._safeStringify(
+                metadata
+            );
+        } catch {
+            return '[Metadata Parse Failed]';
+        }
+    }
+
+    _extractErrorStack(error) {
+        try {
+            if (!(error instanceof Error)) {
+                return '';
+            }
+
+            const cause =
+                error.cause instanceof Error
+                    ? `\nCAUSE:\n${error.cause.stack}`
+                    : '';
+
+            return `${error.stack}${cause}`;
+        } catch {
+            return '';
+        }
+    }
+
+    _safeStringify(value) {
+        try {
+            const visited =
+                new WeakSet();
+
+            return JSON.stringify(
+                value,
+                (key, currentValue) => {
+                    if (
+                        currentValue &&
+                        typeof currentValue ===
+                            'object'
+                    ) {
+                        if (
+                            visited.has(
+                                currentValue
+                            )
+                        ) {
+                            return '[Circular Reference]';
+                        }
+
+                        visited.add(
+                            currentValue
+                        );
+                    }
+
+                    return currentValue;
+                }
+            );
+        } catch {
+            return '[Serialization Failed]';
+        }
+    }
+
+    _registerGlobalHandlers() {
+        if (
+            this
+                ._globalHandlersRegistered
+        ) {
+            return;
+        }
+
+        process.on(
+            'uncaughtException',
+            (error) => {
+                try {
+                    this.fatal(
+                        'Uncaught Exception',
+                        {
+                            type:
+                                LOG_TYPES.SYSTEM,
+                            source:
+                                'process',
+                            error
+                        }
+                    );
+                } catch (err) {
+                    this._safeConsoleError(
+                        'uncaughtException handler failed',
+                        err
+                    );
+                }
+            }
+        );
+
+        process.on(
+            'unhandledRejection',
+            (reason) => {
+                try {
+                    const error =
+                        reason instanceof
+                        Error
+                            ? reason
+                            : new Error(
+                                  String(
+                                      reason
+                                  )
+                              );
+
+                    this.fatal(
+                        'Unhandled Promise Rejection',
+                        {
+                            type:
+                                LOG_TYPES.SYSTEM,
+                            source:
+                                'process',
+                            error
+                        }
+                    );
+                } catch (err) {
+                    this._safeConsoleError(
+                        'unhandledRejection handler failed',
+                        err
+                    );
+                }
+            }
+        );
+
+        this
+            ._globalHandlersRegistered = true;
+    }
+
+    _safeConsoleError(
+        message,
+        error
+    ) {
+        try {
+            console.error(
+                '[ErrorCentralService]',
+                message,
+                error?.stack || error
+            );
+        } catch (_) {}
+    }
+}
+
+module.exports =
+    ErrorCentralService;
+</file>
+
+<file path="src/main/infrastructure/logging/index.js">
+'use strict';
+
+const ErrorCentralService =
+    require('./ErrorCentralService');
+
+const {
+    LOG_LEVELS,
+    LOG_TYPES,
+    LOG_SOURCES,
+    SEVERITY
+} = require('./logging.constants');
+
+const errorCentralService =
+    new ErrorCentralService();
+
+module.exports = Object.freeze({
+    errorCentralService,
+
+    LOG_LEVELS,
+    LOG_TYPES,
+    LOG_SOURCES,
+    SEVERITY
+});
+</file>
+
+<file path="src/main/infrastructure/logging/LoggerContext.js">
+'use strict';
+
+class LoggerContext {
+    constructor(logger, source) {
+        this._logger = logger;
+        this._source = source;
+
+        Object.freeze(this);
+    }
+
+    info(message, options = {}) {
+        return this._logger.info(
+            message,
+            {
+                ...options,
+                source: this._source
+            }
+        );
+    }
+
+    warn(message, options = {}) {
+        return this._logger.warn(
+            message,
+            {
+                ...options,
+                source: this._source
+            }
+        );
+    }
+
+    error(message, options = {}) {
+        return this._logger.error(
+            message,
+            {
+                ...options,
+                source: this._source
+            }
+        );
+    }
+
+    fatal(message, options = {}) {
+        return this._logger.fatal(
+            message,
+            {
+                ...options,
+                source: this._source
+            }
+        );
+    }
+
+    report(options = {}) {
+        return this._logger.report({
+            ...options,
+            source: this._source
+        });
+    }
+}
+
+module.exports = LoggerContext;
+</file>
+
+<file path="src/main/infrastructure/logging/logging.constants.js">
+'use strict';
+
+const LOG_LEVELS = Object.freeze({
+    INFO: 'INFO',
+    WARN: 'WARN',
+    ERROR: 'ERROR'
+});
+
+const LOG_TYPES = Object.freeze({
+    GENERAL: 'GENERAL',
+    SYSTEM: 'SYSTEM',
+    PROCESS: 'PROCESS',
+    ADB: 'ADB',
+    YT_DLP: 'YT_DLP',
+    HTTP_DOWNLOAD: 'HTTP_DOWNLOAD'
+});
+
+const LOG_SOURCES = Object.freeze({
+    SYSTEM: 'System',
+
+    PROCESS_MANAGER: 'ProcessManager',
+    PROCESS_SUPERVISOR: 'ProcessSupervisor',
+
+    CONNECTION_SERVICE: 'ConnectionService',
+    ADB_COMMAND_EXECUTOR: 'AdbCommandExecutor',
+
+    DEVICE_REGISTRY: 'DeviceRegistry',
+    DEVICE_ORCHESTRATOR: 'DeviceOrchestrator',
+
+    DOWNLOAD_ORCHESTRATOR: 'DownloadOrchestrator',
+
+    YTDLP_ADAPTER: 'YtdlpAdapter',
+    SCRCPY_ADAPTER: 'ScrcpyAdapter',
+
+    DATABASE_MANAGER: 'DatabaseManager'
+});
+
+const SEVERITY = Object.freeze({
+    LOW: 'LOW',
+    MEDIUM: 'MEDIUM',
+    HIGH: 'HIGH',
+    CRITICAL: 'CRITICAL'
+});
+
+module.exports = Object.freeze({
+    LOG_LEVELS,
+    LOG_TYPES,
+    LOG_SOURCES,
+    SEVERITY
+});
+</file>
+
+<file path="src/main/infrastructure/process/index.js">
+'use strict';
+
+const ProcessManager =
+    require('./ProcessManager');
+
+const ProcessLogFormatter =
+    require('./ProcessLogFormatter');
+
+module.exports = Object.freeze({
+    /**
+     * Long Running Process
+     */
+    execute:
+        ProcessManager.execute.bind(
+            ProcessManager
+        ),
+
+    /**
+     * Execute + Watch
+     */
+    executeAndWatch:
+        ProcessManager.executeAndWatch.bind(
+            ProcessManager
+        ),
+
+    /**
+     * Quick Task
+     */
+    executeQuickTaskArray:
+        ProcessManager.executeQuickTaskArray.bind(
+            ProcessManager
+        ),
+
+    /**
+     * Termination
+     */
+    terminate:
+        ProcessManager.terminate.bind(
+            ProcessManager
+        ),
+
+    terminateAll:
+        ProcessManager.terminateAll.bind(
+            ProcessManager
+        ),
+
+    /**
+     * Read APIs
+     */
+    getLogs:
+        ProcessManager.getLogs.bind(
+            ProcessManager
+        ),
+
+    getProcessInfo:
+        ProcessManager.getProcessInfo.bind(
+            ProcessManager
+        ),
+
+    getProcessStatus:
+        ProcessManager.getProcessStatus.bind(
+            ProcessManager
+        ),
+
+    /**
+     * Formatting
+     */
+    formatLogs:
+        ProcessLogFormatter.format.bind(
+            ProcessLogFormatter
+        )
+});
+</file>
+
+<file path="src/main/infrastructure/process/process.constants.js">
+'use strict';
+
+const PROCESS_STATUS = Object.freeze({
+    RUNNING: 'RUNNING',
+    EXITED: 'EXITED',
+    FAILED: 'FAILED'
+});
+
+const PROCESS_SIGNALS = Object.freeze({
+    GRACEFUL: 'SIGTERM',
+    FORCE: 'SIGKILL'
+});
+
+const PROCESS_TIMEOUTS = Object.freeze({
+    GRACEFUL_TERMINATION_MS: 500,
+    FORCE_KILL_WAIT_MS: 300,
+    WATCH_DEFAULT_TIMEOUT_MS: 15000,
+    QUICK_TASK_TIMEOUT_MS: 5000,
+    MAX_WATCH_OUTPUT_SIZE: 1024 * 1024
+});
+
+module.exports = Object.freeze({
+    PROCESS_STATUS,
+    PROCESS_SIGNALS,
+    PROCESS_TIMEOUTS
+});
+</file>
+
+<file path="src/main/infrastructure/process/ProcessEntity.js">
+'use strict';
+
+const {
+    PROCESS_STATUS
+} = require('./process.constants');
+
+class ProcessEntity {
+    constructor(options = {}) {
+        this.pid = options.pid ?? null;
+        this.type = options.type ?? 'generic';
+        this.serial = options.serial ?? null;
+
+        this.status = PROCESS_STATUS.RUNNING;
+        this.exitCode = null;
+
+        this._logs = [];
+
+        this.maxBufferSize =
+            Number.isFinite(options.maxBufferSize) &&
+            options.maxBufferSize > 0
+                ? Math.floor(options.maxBufferSize)
+                : 100;
+
+        this._pendingStdout = '';
+        this._pendingStderr = '';
+    }
+
+    addLog(text, streamType) {
+        const pendingKey =
+            streamType === 'stderr'
+                ? '_pendingStderr'
+                : '_pendingStdout';
+
+        const chunk = String(text);
+
+        const combined =
+            this[pendingKey] + chunk;
+
+        const endsWithNewLine =
+            chunk.endsWith('\n');
+
+        const lines =
+            combined.split('\n');
+
+        if (!endsWithNewLine) {
+            this[pendingKey] =
+                lines.pop() ?? '';
+        } else {
+            this[pendingKey] = '';
+
+            if (
+                lines.length > 0 &&
+                lines[lines.length - 1] === ''
+            ) {
+                lines.pop();
+            }
+        }
+
+        for (const line of lines) {
+            this._pushLog(
+                line,
+                streamType
+            );
+        }
+    }
+
+    flushPendingLogs() {
+        if (this._pendingStdout) {
+            this._pushLog(
+                this._pendingStdout,
+                'stdout'
+            );
+
+            this._pendingStdout = '';
+        }
+
+        if (this._pendingStderr) {
+            this._pushLog(
+                this._pendingStderr,
+                'stderr'
+            );
+
+            this._pendingStderr = '';
+        }
+    }
+
+    markAsExited(code) {
+        this.flushPendingLogs();
+
+        this.status =
+            PROCESS_STATUS.EXITED;
+
+        this.exitCode = code;
+    }
+
+    markAsFailed(errorMessage = null) {
+        this.flushPendingLogs();
+
+        this.status =
+            PROCESS_STATUS.FAILED;
+
+        this.exitCode = -1;
+
+        if (errorMessage) {
+            this._pushLog(
+                String(errorMessage),
+                'stderr'
+            );
+        }
+    }
+
+    getLogs() {
+        return [...this._logs];
+    }
+
+    _pushLog(text, streamType) {
+        this._logs.push({
+            text,
+            type: streamType,
+            timestamp: Date.now()
+        });
+
+        while (
+            this._logs.length >
+            this.maxBufferSize
+        ) {
+            this._logs.shift();
+        }
+    }
+}
+
+module.exports = ProcessEntity;
+</file>
+
+<file path="src/main/infrastructure/process/ProcessLogFormatter.js">
+'use strict';
+
+class ProcessLogFormatter {
+    static format(logs) {
+        if (!Array.isArray(logs)) {
+            return null;
+        }
+
+        return logs
+            .map(entry =>
+                entry.type === 'stderr'
+                    ? `[ERR] ${entry.text}`
+                    : entry.text
+            )
+            .join('\n');
+    }
+}
+
+module.exports =
+    ProcessLogFormatter;
+</file>
+
+<file path="src/main/infrastructure/process/ProcessManager.js">
+'use strict';
+
+const { spawn } = require('child_process');
+
+const ProcessEntity = require('./ProcessEntity');
+
+const {
+    PROCESS_TIMEOUTS,
+    PROCESS_SIGNALS
+} = require('./process.constants');
+
+const errorService = require(
+    '../logging/ErrorCentralService'
+);
+
+class ProcessManager {
+    constructor() {
+        this.activeProcesses = new Map();
+    }
+
+    execute(
+        id,
+        binPath,
+        args = [],
+        type = 'generic',
+        onData = null,
+        maxBufferSize = 100
+    ) {
+        if (!id) {
+            throw new Error(
+                'Process id is required'
+            );
+        }
+
+        if (this.activeProcesses.has(id)) {
+            this.terminate(id);
+        }
+
+        let child;
+
+        try {
+            child = spawn(
+                binPath,
+                Array.isArray(args)
+                    ? args
+                    : []
+            );
+        } catch (error) {
+            errorService.report({
+                type: 'PROCESS',
+                severity: 'HIGH',
+                id,
+                message:
+                    `Failed to spawn process: ${error.message}`
+            });
+
+            throw error;
+        }
+
+        const entity =
+            new ProcessEntity({
+                pid: child.pid,
+                type,
+                serial: id,
+                maxBufferSize
+            });
+
+        const processRecord = {
+            instance: child,
+            data: entity,
+            type,
+            startedAt: Date.now(),
+            finishedAt: null
+        };
+
+        this.activeProcesses.set(
+            id,
+            processRecord
+        );
+
+        const feed =
+            (chunk, streamType) => {
+                const text =
+                    chunk.toString();
+
+                entity.addLog(
+                    text,
+                    streamType
+                );
+
+                if (
+                    typeof onData !==
+                    'function'
+                ) {
+                    return;
+                }
+
+                try {
+                    onData(
+                        text,
+                        streamType
+                    );
+                } catch (error) {
+                    errorService.report({
+                        type: 'PROCESS',
+                        severity: 'LOW',
+                        id,
+                        message:
+                            `Consumer callback failed: ${error.message}`
+                    });
+                }
+            };
+
+        child.stdout?.on(
+            'data',
+            data =>
+                feed(
+                    data,
+                    'stdout'
+                )
+        );
+
+        child.stderr?.on(
+            'data',
+            data =>
+                feed(
+                    data,
+                    'stderr'
+                )
+        );
+
+        child.once(
+            'error',
+            error => {
+                entity.markAsFailed(
+                    error.message
+                );
+
+                processRecord.instance =
+                    null;
+
+                processRecord.finishedAt =
+                    Date.now();
+
+                errorService.report({
+                    type: 'PROCESS',
+                    severity: 'HIGH',
+                    id,
+                    message:
+                        `Process error: ${error.message}`
+                });
+            }
+        );
+
+        child.once(
+            'exit',
+            code => {
+                entity.markAsExited(
+                    code
+                );
+
+                processRecord.instance =
+                    null;
+
+                processRecord.finishedAt =
+                    Date.now();
+
+                errorService.report({
+                    type: 'PROCESS',
+                    severity: 'INFO',
+                    id,
+                    message:
+                        `Process exited with code ${code}`
+                });
+            }
+        );
+
+        return child;
+    }
+
+    executeAndWatch(
+        id,
+        binPath,
+        args,
+        successSentinel,
+        timeoutMs =
+            PROCESS_TIMEOUTS.WATCH_DEFAULT_TIMEOUT_MS
+    ) {
+        return new Promise(
+            (
+                resolve,
+                reject
+            ) => {
+                let child;
+                let resolved = false;
+
+                let output = '';
+
+                try {
+                    child = spawn(
+                        binPath,
+                        Array.isArray(args)
+                            ? args
+                            : []
+                    );
+                } catch (error) {
+                    reject(error);
+                    return;
+                }
+
+                const safeResolve =
+                    result => {
+                        if (resolved) {
+                            return;
+                        }
+
+                        resolved = true;
+
+                        clearTimeout(
+                            timeout
+                        );
+
+                        resolve(
+                            result
+                        );
+                    };
+
+                const timeout =
+                    setTimeout(
+                        () => {
+                            try {
+                                child.kill(
+                                    PROCESS_SIGNALS.GRACEFUL
+                                );
+                            } catch { }
+
+                            safeResolve({
+                                success: false,
+                                output:
+                                    output +
+                                    '\n[Timeout]'
+                            });
+                        },
+                        timeoutMs
+                    );
+
+                const handleData =
+                    chunk => {
+                        const text =
+                            chunk.toString();
+
+                        if (
+                            output.length <
+                            PROCESS_TIMEOUTS.MAX_WATCH_OUTPUT_SIZE
+                        ) {
+                            output += text;
+
+                            if (
+                                output.length >
+                                PROCESS_TIMEOUTS.MAX_WATCH_OUTPUT_SIZE
+                            ) {
+                                output =
+                                    output.substring(
+                                        0,
+                                        PROCESS_TIMEOUTS.MAX_WATCH_OUTPUT_SIZE
+                                    );
+                            }
+                        }
+
+                        if (
+                            text.includes(
+                                successSentinel
+                            )
+                        ) {
+                            try {
+                                child.kill(
+                                    PROCESS_SIGNALS.GRACEFUL
+                                );
+                            } catch { }
+
+                            safeResolve({
+                                success: true,
+                                output
+                            });
+                        }
+                    };
+
+                child.stdout?.on(
+                    'data',
+                    handleData
+                );
+
+                child.stderr?.on(
+                    'data',
+                    handleData
+                );
+
+                child.once(
+                    'error',
+                    error => {
+                        if (
+                            resolved
+                        ) {
+                            return;
+                        }
+
+                        clearTimeout(
+                            timeout
+                        );
+
+                        reject(
+                            error
+                        );
+                    }
+                );
+
+                child.once(
+                    'exit',
+                    code => {
+                        safeResolve({
+                            success:
+                                code ===
+                                0,
+                            output
+                        });
+                    }
+                );
+            }
+        );
+    }
+
+    executeQuickTaskArray(
+        binPath,
+        args = [],
+        options = {}
+    ) {
+        return new Promise(
+            (
+                resolve,
+                reject
+            ) => {
+                let child;
+
+                try {
+                    child = spawn(
+                        binPath,
+                        Array.isArray(args)
+                            ? args
+                            : []
+                    );
+                } catch (error) {
+                    reject(error);
+                    return;
+                }
+
+                let stdout = '';
+                let stderr = '';
+
+                const timeout =
+                    setTimeout(
+                        () => {
+                            try {
+                                child.kill(
+                                    PROCESS_SIGNALS.GRACEFUL
+                                );
+                            } catch { }
+
+                            reject({
+                                error:
+                                    new Error(
+                                        'Command timeout'
+                                    ),
+                                stderr:
+                                    'Timeout'
+                            });
+                        },
+                        options.timeout ??
+                        PROCESS_TIMEOUTS.QUICK_TASK_TIMEOUT_MS
+                    );
+
+                child.stdout?.on(
+                    'data',
+                    chunk => {
+                        stdout +=
+                            chunk.toString();
+                    }
+                );
+
+                child.stderr?.on(
+                    'data',
+                    chunk => {
+                        stderr +=
+                            chunk.toString();
+                    }
+                );
+
+                child.once(
+                    'error',
+                    error => {
+                        clearTimeout(
+                            timeout
+                        );
+
+                        reject({
+                            error,
+                            stderr
+                        });
+                    }
+                );
+
+                child.once(
+                    'exit',
+                    code => {
+                        clearTimeout(
+                            timeout
+                        );
+
+                        if (
+                            code === 0
+                        ) {
+                            resolve(
+                                stdout.trim()
+                            );
+                            return;
+                        }
+
+                        if (
+                            stdout
+                        ) {
+                            resolve(
+                                stdout.trim()
+                            );
+                            return;
+                        }
+
+                        reject({
+                            error:
+                                new Error(
+                                    `Process exited with code ${code}`
+                                ),
+                            stderr
+                        });
+                    }
+                );
+            }
+        );
+    }
+
+    terminate(id) {
+        const entry =
+            this.activeProcesses.get(
+                id
+            );
+
+        if (
+            !entry ||
+            !entry.instance
+        ) {
+            return false;
+        }
+
+        const child =
+            entry.instance;
+
+        entry.data?.markAsExited(
+            -1
+        );
+
+        try {
+            child.kill(
+                PROCESS_SIGNALS.GRACEFUL
+            );
+        } catch (
+        error
+        ) {
+            errorService.report({
+                type: 'PROCESS',
+                severity: 'LOW',
+                id,
+                message:
+                    `SIGTERM failed: ${error.message}`
+            });
+
+            return false;
+        }
+
+        setTimeout(
+            () => {
+                if (
+                    child.exitCode ===
+                    null
+                ) {
+                    try {
+                        child.kill(
+                            PROCESS_SIGNALS.FORCE
+                        );
+                    } catch { }
+                }
+            },
+            PROCESS_TIMEOUTS.GRACEFUL_TERMINATION_MS
+        );
+
+        return true;
+    }
+
+    async terminateAll() {
+        const entries =
+            Array.from(
+                this.activeProcesses.entries()
+            );
+
+        for (const [
+            id,
+            entry
+        ] of entries) {
+            try {
+                entry.data?.markAsExited(
+                    -1
+                );
+
+                entry.instance?.kill(
+                    PROCESS_SIGNALS.GRACEFUL
+                );
+            } catch (
+            error
+            ) {
+                errorService.report({
+                    type: 'PROCESS',
+                    severity: 'LOW',
+                    id,
+                    message:
+                        error.message
+                });
+            }
+        }
+
+        await new Promise(
+            resolve =>
+                setTimeout(
+                    resolve,
+                    PROCESS_TIMEOUTS.GRACEFUL_TERMINATION_MS
+                )
+        );
+
+        for (const [
+            ,
+            entry
+        ] of entries) {
+            const child =
+                entry.instance;
+
+            if (
+                child &&
+                child.exitCode ===
+                null
+            ) {
+                try {
+                    child.kill(
+                        PROCESS_SIGNALS.FORCE
+                    );
+                } catch { }
+            }
+        }
+    }
+
+    getLogs(id) {
+        return (
+            this.activeProcesses
+                .get(id)
+                ?.data
+                ?.getLogs?.() ??
+            null
+        );
+    }
+
+    getProcessInfo(id) {
+        return (
+            this.activeProcesses
+                .get(id)
+                ?.data ?? null
+        );
+    }
+
+    getProcessStatus(id) {
+        const entry =
+            this.activeProcesses.get(id);
+
+        if (!entry) {
+            return null;
+        }
+
+        const entity = entry.data;
+
+        return {
+            pid: entity.pid,
+            type: entity.type,
+            serial: entity.serial,
+            status: entity.status,
+            exitCode: entity.exitCode,
+            startedAt: entry.startedAt ?? null,
+            finishedAt: entry.finishedAt ?? null
+        };
+    }
+}
+
+module.exports =
+    new ProcessManager();
+</file>
+
+<file path=".gitignore">
+node_modules/
+.env
+*.log3
+</file>
+
+<file path="package.json">
+{
+  "name": "linkhub_",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "axios": "^1.16.1",
+    "better-sqlite3": "^12.10.0",
+    "bonjour-service": "^1.4.0",
+    "dotenv": "^17.4.2",
+    "electron-log": "^5.4.4"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "3.6.0",
+    "electron": "30.0.0",
+    "electron-builder": "24.13.3"
+  }
+}
+</file>
+
+</files>
