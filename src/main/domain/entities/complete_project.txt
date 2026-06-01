@@ -1,0 +1,787 @@
+Project Path: models
+
+Source Tree:
+
+```txt
+models
+├── AppWindow.js
+├── AudioFile.js
+├── BaseFile.js
+├── BaseNode.js
+├── Device.js
+├── FileStatus.js
+├── HttpFile.js
+├── MediaNode.js
+├── ProcessEntity.js
+├── VideoFile.js
+├── complete_project.txt
+└── index.js
+
+```
+
+`AppWindow.js`:
+
+```js
+const { BrowserWindow } = require('electron');
+const path = require('path');
+
+class AppWindow {
+    constructor(name = 'unknown', options = {}, isMain = false) {
+        this._name = name; // الاسم الوظيفي للنافذة
+        this._isMain = isMain;
+
+        // تحديد مسار preload (يدعم التخصيص أو الإلغاء بـ null)
+        const defaultPreload = path.join(__dirname, '../../preload/preload.js');
+        const preloadPath = (options.preloadPath !== undefined) ? options.preloadPath : 
+                           (options.preload !== undefined ? options.preload : defaultPreload);
+
+        const defaultOptions = {
+            width: 800,
+            height: 600,
+            show: false, // تحسين: نبدأ بـ false وننتظر الجاهزية لمنع الوميض
+            webPreferences: {
+                preload: preloadPath,
+                contextIsolation: true,
+                nodeIntegration: false
+            }
+        };
+
+        // دمج الإعدادات
+        const finalOptions = { ...defaultOptions, ...options };
+        this._browserWindow = new BrowserWindow(finalOptions);
+
+        // تحميل المحتوى بناءً على النوع
+        if (options.loadFile) {
+            this._browserWindow.loadFile(options.loadFile);
+        } else if (options.url) {
+            this._browserWindow.loadURL(options.url);
+        }
+
+    }
+
+
+    display() {
+        if (!this._browserWindow.isDestroyed()) {
+            // حماية إضافية: إذا كانت النافذة ظاهرة بالفعل، لا نفعل شيئاً
+            if (this._browserWindow.isVisible()) return;
+
+            // ننتظر الجاهزية قبل الإظهار لضمان عدم وجود وميض
+            this._browserWindow.once('ready-to-show', () => {
+                this._browserWindow.show();
+            });
+        }
+    }
+
+    /**
+     * إظهار النافذة والتركيز عليها
+     */
+    show() {
+        if (!this._browserWindow.isDestroyed()) {
+            this._browserWindow.show();
+            this._browserWindow.focus();
+        }
+    }
+
+    /**
+     * إخفاء النافذة دون إغلاقها (تبقى تعمل في الخلفية)
+     */
+    hide() {
+        if (!this._browserWindow.isDestroyed()) {
+            this._browserWindow.hide();
+        }
+    }
+
+    /**
+     * التبديل بين الظهور والاختفاء (Toggle)
+     * مفيدة جداً عند ربطها باختصار لوحة مفاتيح
+     */
+    toggle() {
+        if (this._browserWindow.isVisible()) {
+            this.hide();
+        } else {
+            this.show();
+        }
+    }
+
+    // --- الدوال المساعدة (Getters & Setters) ---
+
+    get name() {
+        return this._name;
+    }
+
+    get isMain() {
+        return this._isMain;
+    }
+
+    // الوصول للنافذة الخام من Electron إذا احتجنا خصائص متقدمة
+    get instance() {
+        return this._browserWindow;
+    }
+
+    // الحصول على الـ ID التلقائي من النظام
+    get systemId() {
+        return this._browserWindow.id;
+    }
+
+    // تحديث العنوان بسهولة
+    set title(newTitle) {
+        if (!this._browserWindow.isDestroyed()) {
+            this._browserWindow.setTitle(newTitle);
+        }
+    }
+
+    // --- الدوال التشغيلية ---
+
+    /**
+     * إرسال بيانات آمن للواجهة
+     */
+    send(channel, data) {
+        if (!this._browserWindow.isDestroyed()) {
+            this._browserWindow.webContents.send(channel, data);
+        }
+    }
+
+    /**
+     * إغلاق آمن للنافذة
+     */
+    close() {
+        if (!this._browserWindow.isDestroyed()) {
+            this._browserWindow.close();
+        }
+    }
+
+    /**
+     * التركيز على النافذة (جلبها للمقدمة)
+     */
+    focus() {
+        if (!this._browserWindow.isDestroyed()) {
+            this._browserWindow.focus();
+        }
+    }
+}
+
+module.exports = AppWindow;
+```
+
+`AudioFile.js`:
+
+```js
+const BaseFile = require('./BaseFile');
+
+/**
+ * AudioFile
+ * Represents an audio file format from yt-dlp
+ */
+class AudioFile extends BaseFile {
+    constructor({
+        id = null,
+        name = '',
+        extension = '',
+        sourceUrl = '',
+        storagePath = null,
+        formatId = '',
+        abr = null,
+        codec = '',
+        fileSizeApprox = null
+    } = {}) {
+        super({ id, name, extension, sourceUrl, storagePath, type: 'audio' });
+        this.formatId = formatId;
+        this.abr = abr;
+        this.codec = codec;
+        this.fileSizeApprox = fileSizeApprox;
+    }
+}
+
+module.exports = AudioFile;
+
+```
+
+`BaseFile.js`:
+
+```js
+const { randomUUID } = require('crypto');
+const FileStatus = require('./FileStatus');
+
+/**
+ * BaseFile
+ * Abstract base class for file representations (VideoFile, AudioFile)
+ */
+class BaseFile {
+    constructor({
+        id = null,
+        name = '',
+        extension = '',
+        sourceUrl = '',
+        storagePath = null,
+        type = null
+    } = {}) {
+        this.id = id || randomUUID();
+        this.name = name;
+        this.extension = extension;
+        this.sourceUrl = sourceUrl;
+        this.storagePath = storagePath;
+        this.type = type;
+        this.fileStatus = new FileStatus();
+    }
+
+    /**
+     * Returns a plain object representation suitable for IPC transmission or storage
+     */
+    toJSON() {
+        return {
+            id: this.id,
+            name: this.name,
+            extension: this.extension,
+            sourceUrl: this.sourceUrl,
+            storagePath: this.storagePath,
+            type: this.type,
+            fileStatus: this.fileStatus.toJSON()
+        };
+    }
+}
+
+module.exports = BaseFile;
+
+```
+
+`BaseNode.js`:
+
+```js
+/**
+ * Pure base entity for all nodes/devices in the system.
+ * Contains only immutable identity and structural data.
+ */
+class BaseNode {
+    constructor({ id, deviceFriendlyName, type }) {
+        this._id = id;
+        this._deviceFriendlyName = deviceFriendlyName;
+        this._type = type;
+
+        // Freeze instance to prevent accidental mutation
+        Object.freeze(this);
+    }
+
+    // --- Read-only getters ---
+
+    get id() {
+        return this._id;
+    }
+
+    get type() {
+        return this._type;
+    }
+
+    get friendlyName() {
+        return this._deviceFriendlyName;
+    }
+
+    get deviceFriendlyName() {
+        return this._deviceFriendlyName;
+    }
+
+    toJSON() {
+        return {
+            id: this._id,
+            deviceFriendlyName: this._deviceFriendlyName,
+            type: this._type
+        };
+    }
+}
+
+module.exports = BaseNode;
+```
+
+`Device.js`:
+
+```js
+const BaseNode = require('./BaseNode');
+
+/**
+ * Pure device entity.
+ * Contains only immutable definitional data.
+ */
+class Device extends BaseNode {
+    constructor({
+        id,
+        deviceFriendlyName,
+        model,
+        version,
+        arch,
+        isNew
+    }) {
+        super({
+            id,
+            deviceFriendlyName,
+            type: 'MOBILE'
+        });
+
+        this._model = model || 'Unknown';
+        this._version = version || 'Unknown';
+        this._arch = arch || 'Unknown';
+        this._isNew = isNew ?? true;
+
+        // Freeze after construction
+        Object.freeze(this);
+    }
+
+    // --- Read-only getters ---
+
+    get model() {
+        return this._model;
+    }
+
+    get version() {
+        return this._version;
+    }
+
+    get arch() {
+        return this._arch;
+    }
+
+    get isNew() {
+        return this._isNew;
+    }
+
+    toJSON() {
+        return {
+            ...super.toJSON(),
+            model: this._model,
+            version: this._version,
+            arch: this._arch,
+            isNew: this._isNew
+        };
+    }
+
+    static fromJSON(data) {
+        return new Device({
+            id: data.id,
+            deviceFriendlyName:
+                data.deviceFriendlyName || data.friendly_name,
+            model: data.model,
+            version: data.version,
+            arch: data.arch,
+            isNew: data.isNew
+        });
+    }
+}
+
+module.exports = Device;
+```
+
+`FileStatus.js`:
+
+```js
+// src/main/domain/models/FileStatus.js
+// Pure model – no external dependencies
+
+class FileStatus {
+    constructor({
+        percentage = 0,
+        speed = null,
+        eta = null,
+        downloadedBytes = 0,
+        totalBytes = null,
+        isPaused = false,
+        state = 'pending'
+    } = {}) {
+        this._percentage = this._clampPercentage(percentage);
+        this._speed = speed;
+        this._eta = eta;
+        this._downloadedBytes = Math.max(0, downloadedBytes);
+        this._totalBytes = totalBytes !== null ? Math.max(0, totalBytes) : null;
+        this._isPaused = isPaused;
+        this._state = this._validateState(state);
+    }
+
+    // ---- Getters ----
+    get percentage() { return this._percentage; }
+    get speed() { return this._speed; }
+    get eta() { return this._eta; }
+    get downloadedBytes() { return this._downloadedBytes; }
+    get totalBytes() { return this._totalBytes; }
+    get isPaused() { return this._isPaused; }
+    get state() { return this._state; }
+
+    // ---- Private helpers ----
+    _clampPercentage(value) {
+        if (value < 0) return 0;
+        if (value > 100) return 100;
+        return value;
+    }
+
+    _validateState(state) {
+        const allowed = ['pending', 'downloading', 'completed', 'failed', 'paused', 'cancelled'];
+        return allowed.includes(state) ? state : 'pending';
+    }
+
+    // ---- Public methods ----
+    update(data) {
+        if (!data || typeof data !== 'object') return;
+
+        // percentage
+        if (data.percentage !== undefined) {
+            this._percentage = this._clampPercentage(data.percentage);
+        }
+
+        // speed
+        if (data.speed !== undefined) {
+            this._speed = data.speed;
+        }
+
+        // eta
+        if (data.eta !== undefined) {
+            this._eta = data.eta;
+        }
+
+        // totalBytes
+        if (data.totalBytes !== undefined && data.totalBytes !== null) {
+            this._totalBytes = Math.max(0, data.totalBytes);
+        }
+
+        // downloadedBytes
+        if (data.downloadedBytes !== undefined) {
+            let newDownloaded = Math.max(0, data.downloadedBytes);
+            if (this._totalBytes !== null && newDownloaded > this._totalBytes) {
+                // silently clamp to totalBytes – no error reporting here (domain purity)
+                newDownloaded = this._totalBytes;
+            }
+            this._downloadedBytes = newDownloaded;
+        }
+
+        // isPaused
+        if (data.isPaused !== undefined) {
+            this._isPaused = !!data.isPaused;
+        }
+
+        // state
+        if (data.state !== undefined) {
+            this._state = this._validateState(data.state);
+        }
+    }
+
+    toJSON() {
+        return {
+            percentage: this._percentage,
+            speed: this._speed,
+            eta: this._eta,
+            downloadedBytes: this._downloadedBytes,
+            totalBytes: this._totalBytes,
+            isPaused: this._isPaused,
+            state: this._state
+        };
+    }
+}
+
+module.exports = FileStatus;
+```
+
+`HttpFile.js`:
+
+```js
+const crypto = require('crypto');
+const FileStatus = require('./FileStatus');
+
+/**
+ * HttpFile Model
+ * نموذج بيانات الملفات المحملة عبر HTTP
+ */
+class HttpFile {
+    constructor(data = {}) {
+        // الخصائص الأساسية
+        this.id = data.id || crypto.randomUUID();
+        this.url = data.url || '';
+        this.fileName = data.fileName || '';
+        this.storagePath = data.storagePath || '';
+        this.mimeType = data.mimeType || '';
+
+        // خصائص حالة التحميل
+        this.status = data.status || 'pending'; // 'pending' | 'downloading' | 'completed' | 'failed' | 'cancelled'
+
+        // تهيئة fileStatus وتعبئة البيانات الممررة إن وجدت
+        const statusData = data.fileStatus || {};
+        this.fileStatus = new FileStatus({
+            percentage: statusData.percentage !== undefined ? statusData.percentage : (data.progress !== undefined ? data.progress : 0),
+            downloadedBytes: statusData.downloadedBytes !== undefined ? statusData.downloadedBytes : (data.downloadedBytes !== undefined ? data.downloadedBytes : 0),
+            speed: statusData.speed !== undefined ? statusData.speed : (data.speed !== undefined ? data.speed : ''),
+            eta: statusData.eta !== undefined ? statusData.eta : (data.eta !== undefined ? data.eta : ''),
+            totalBytes: statusData.totalBytes !== undefined ? statusData.totalBytes : (data.sizeBytes !== undefined ? data.sizeBytes : null),
+            isPaused: statusData.isPaused !== undefined ? statusData.isPaused : false
+        });
+    }
+
+    /**
+     * تحويل الكائن إلى JSON عادي
+     */
+    toJSON() {
+        return {
+            id: this.id,
+            url: this.url,
+            fileName: this.fileName,
+            storagePath: this.storagePath,
+            mimeType: this.mimeType,
+            status: this.status,
+            fileStatus: this.fileStatus.toJSON()
+        };
+    }
+
+    /**
+     * تحديث حالة التقدم
+     */
+    updateProgress(progressData) {
+        if (!progressData) return;
+        this.fileStatus.update({
+            percentage: progressData.progress,
+            downloadedBytes: progressData.downloadedBytes,
+            speed: progressData.speed,
+            eta: progressData.eta,
+            totalBytes: progressData.totalBytes
+        });
+    }
+
+    /**
+     * تحديث الحالة
+     */
+    setStatus(status) {
+        this.status = status;
+    }
+
+    /**
+     * التحقق من اكتمال التحميل
+     */
+    isCompleted() {
+        return this.status === 'completed';
+    }
+
+    /**
+     * التحقق من فشل التحميل
+     */
+    isFailed() {
+        return this.status === 'failed';
+    }
+
+    /**
+     * التحقق من إلغاء التحميل
+     */
+    isCancelled() {
+        return this.status === 'cancelled';
+    }
+
+    /**
+     * التحقق من أن التحميل نشط
+     */
+    isActive() {
+        return this.status === 'downloading' || this.status === 'pending';
+    }
+}
+
+module.exports = HttpFile;
+
+```
+
+`MediaNode.js`:
+
+```js
+const BaseNode = require('./BaseNode');
+
+/**
+ * كلاس يمثل عقدة الوسائط (Media Node)
+ * تركز فقط على تتبع المهام التي تنفذها أدوات مثل yt-dlp أو axios.
+ */
+class MediaNode extends BaseNode {
+    constructor({ id, deviceFriendlyName }) {
+        // استدعاء الأب وتحديد النوع
+        super({ id, deviceFriendlyName, type: 'MEDIA_NODE' });
+
+        // قائمة المهام النشطة (روابط تحميل، تحويل صيغ، إلخ)
+        this.activeTasks = []; 
+    }
+
+    /**
+     * إضافة مهمة تحميل (مثلاً كائن يحتوي على الرابط والنسبة المئوية)
+     */
+    addTask(task) {
+        this.activeTasks.push(task);
+    }
+
+   
+
+    toJSON() {
+        return {
+            ...super.toJSON()
+            // لا توجد خصائص إضافية للحفظ حالياً، نكتفي ببيانات الأب
+        };
+    }
+
+    static fromJSON(data) {
+        return new MediaNode(data);
+    }
+}
+
+module.exports = MediaNode;
+```
+
+`ProcessEntity.js`:
+
+```js
+/**
+ * تمثيل عملية طويلة الأمد مع سجل مخرجات محدود الحجم (FIFO).
+ */
+class ProcessEntity {
+    /**
+     * @param {object} opts
+     * @param {number} [opts.pid]
+     * @param {string} [opts.type]
+     * @param {string} [opts.serial]
+     * @param {number} [opts.maxBufferSize=100]
+     */
+    constructor(opts = {}) {
+        this.pid = opts.pid;
+        this.type = opts.type;
+        this.serial = opts.serial;
+        this.status = 'RUNNING';
+        this.exitCode = null;
+
+        this.logs = [];
+        this.maxBufferSize = Number.isFinite(opts.maxBufferSize) && opts.maxBufferSize > 0
+            ? Math.floor(opts.maxBufferSize)
+            : 100;
+
+        /** بقايا سطر غير مكتمل من آخر chunk (منفصل لكل قناة) */
+        this._pendingStdout = '';
+        this._pendingStderr = '';
+    }
+
+    /**
+     * @param {string} text
+     * @param {'stdout' | 'stderr'} streamType
+     */
+    addLog(text, streamType) {
+        const pendingKey = streamType === 'stderr' ? '_pendingStderr' : '_pendingStdout';
+        const chunk = String(text);
+        const combined = this[pendingKey] + chunk;
+        const chunkEndsWithNewline = chunk.endsWith('\n');
+        const parts = combined.split('\n');
+
+        if (!chunkEndsWithNewline) {
+            this[pendingKey] = parts.pop() ?? '';
+        } else {
+            this[pendingKey] = '';
+            if (parts.length > 0 && parts[parts.length - 1] === '') {
+                parts.pop();
+            }
+        }
+
+        for (const line of parts) {
+            this._pushEntry(line, streamType);
+        }
+    }
+
+    /**
+     * إغلاق أي سطر معلق عند انتهاء العملية
+     */
+    flushPendingLogs() {
+        if (this._pendingStdout) {
+            this._pushEntry(this._pendingStdout, 'stdout');
+            this._pendingStdout = '';
+        }
+        if (this._pendingStderr) {
+            this._pushEntry(this._pendingStderr, 'stderr');
+            this._pendingStderr = '';
+        }
+    }
+
+    /**
+     * @param {string} text
+     * @param {'stdout' | 'stderr'} streamType
+     */
+    _pushEntry(text, streamType) {
+        this.logs.push({
+            text,
+            type: streamType,
+            timestamp: Date.now()
+        });
+        while (this.logs.length > this.maxBufferSize) {
+            this.logs.shift();
+        }
+    }
+
+    markAsExited(code) {
+        this.flushPendingLogs();
+        this.status = 'EXITED';
+        this.exitCode = code;
+    }
+}
+
+module.exports = ProcessEntity;
+
+```
+
+`VideoFile.js`:
+
+```js
+const BaseFile = require('./BaseFile');
+
+/**
+ * VideoFile
+ * Represents a video file format from yt-dlp
+ */
+class VideoFile extends BaseFile {
+    constructor({
+        id = null,
+        name = '',
+        extension = '',
+        sourceUrl = '',
+        storagePath = null,
+        formatId = '',
+        resolution = '',
+        fps = null,
+        codec = '',
+        width = null,
+        height = null,
+        fileSizeApprox = null
+    } = {}) {
+        super({ id, name, extension, sourceUrl, storagePath, type: 'video' });
+        this.formatId = formatId;
+        this.resolution = resolution;
+        this.fps = fps;
+        this.codec = codec;
+        this.width = width;
+        this.height = height;
+        this.fileSizeApprox = fileSizeApprox;
+    }
+}
+
+module.exports = VideoFile;
+
+```
+
+`index.js`:
+
+```js
+/**
+ * LinkHub Models Gateway
+ * البوابة المركزية لنماذج البيانات (Classes)
+ */
+
+const BaseNode = require('./BaseNode');
+const Device = require('./Device');
+const HttpFile = require('./HttpFile');
+const MediaNode = require('./MediaNode');
+const ProcessEntity = require('./ProcessEntity');
+const FileStatus = require('./FileStatus');
+const BaseFile = require('./BaseFile');
+const VideoFile = require('./VideoFile');
+const AudioFile = require('./AudioFile');
+
+module.exports = {
+    BaseNode,
+    Device,
+    HttpFile,
+    MediaNode,
+    ProcessEntity,
+    FileStatus,
+    BaseFile,
+    VideoFile,
+    AudioFile
+};
+```
