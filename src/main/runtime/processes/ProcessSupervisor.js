@@ -129,6 +129,93 @@ class ProcessSupervisor {
                 processStatus
         };
     }
+
+    async executeQuickTaskArray(
+        binPath,
+        args = [],
+        options = {}
+    ) {
+        if (!binPath) {
+            throw new Error(
+                'binPath is required'
+            );
+        }
+
+        return this._processManager
+            .executeQuickTaskArray(
+                binPath,
+                args,
+                options
+            );
+    }
+
+    async executeAndWatch(
+        processConfig = {},
+        successSentinel,
+        timeoutMs
+    ) {
+        const {
+            processId,
+            binPath,
+            args = [],
+            type = 'watch',
+            metadata = {}
+        } = processConfig;
+
+        if (!processId) {
+            throw new Error(
+                'processId is required'
+            );
+        }
+
+        if (!binPath) {
+            throw new Error(
+                'binPath is required'
+            );
+        }
+
+        this._processRegistry.register(
+            processId,
+            {
+                id: processId,
+                type,
+                metadata,
+                status: 'RUNNING',
+                startedAt:
+                    Date.now()
+            }
+        );
+
+        try {
+            const result =
+                await this._processManager
+                    .executeAndWatch(
+                        processId,
+                        binPath,
+                        args,
+                        successSentinel,
+                        timeoutMs
+                    );
+
+            this._processRegistry
+                .updateStatus(
+                    processId,
+                    result.success
+                        ? 'EXITED'
+                        : 'FAILED'
+                    );
+
+            return result;
+        } catch (error) {
+            this._processRegistry
+                .updateStatus(
+                    processId,
+                    'FAILED'
+                );
+
+            throw error;
+        }
+    }
 }
 
 module.exports =
