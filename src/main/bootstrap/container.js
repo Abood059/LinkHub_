@@ -151,13 +151,13 @@ class BootstrapContainer {
         // --- إنشاء محولات Infrastructure ---
         const scrcpyAdapter = new ScrcpyAdapter({
             processSupervisor,
-            scrcpyPath: 'scrcpy',      // يمكن تعديل المسار لاحقاً حسب البيئة
+            scrcpyPath: 'scrcpy',
             logger: ErrorCentralService
         });
 
         const ytdlpAdapter = new YtdlpAdapter({
             processSupervisor,
-            ytDlpPath: 'yt-dlp',        // يمكن تعديل المسار لاحقاً
+            ytDlpPath: 'yt-dlp',
             logger: ErrorCentralService
         });
 
@@ -174,6 +174,10 @@ class BootstrapContainer {
             deviceRegistry,
             logger: ErrorCentralService
         });
+
+        // --- تسجيل طبقة IPC الرقيقة (المرحلة 6) ---
+        const { registerIpcHandlers } = require('../infrastructure/ipc');
+        registerIpcHandlers(deviceOrchestrator, downloadOrchestrator);
 
         // --- تسجيل جميع الخدمات في الخريطة ---
         this._services.set(
