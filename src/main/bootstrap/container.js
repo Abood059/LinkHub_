@@ -40,6 +40,27 @@ const DeviceRegistry =
         '../runtime/devices/DeviceRegistry'
     );
 
+// --- المكونات الجديدة للمرحلة الخامسة ---
+const ScrcpyAdapter =
+    require(
+        '../infrastructure/streaming/ScrcpyAdapter'
+    );
+
+const YtdlpAdapter =
+    require(
+        '../infrastructure/media/YtdlpAdapter'
+    );
+
+const DeviceOrchestrator =
+    require(
+        '../application/orchestrators/DeviceOrchestrator'
+    );
+
+const DownloadOrchestrator =
+    require(
+        '../application/orchestrators/DownloadOrchestrator'
+    );
+
 class BootstrapContainer {
     constructor() {
         this._services =
@@ -127,6 +148,34 @@ class BootstrapContainer {
             }
         );
 
+        // --- إنشاء محولات Infrastructure ---
+        const scrcpyAdapter = new ScrcpyAdapter({
+            processSupervisor,
+            scrcpyPath: 'scrcpy',      // يمكن تعديل المسار لاحقاً حسب البيئة
+            logger: ErrorCentralService
+        });
+
+        const ytdlpAdapter = new YtdlpAdapter({
+            processSupervisor,
+            ytDlpPath: 'yt-dlp',        // يمكن تعديل المسار لاحقاً
+            logger: ErrorCentralService
+        });
+
+        // --- إنشاء الـ Orchestrators (طبقة Application) ---
+        const deviceOrchestrator = new DeviceOrchestrator({
+            deviceRegistry,
+            connectionService,
+            scrcpyAdapter,
+            logger: ErrorCentralService
+        });
+
+        const downloadOrchestrator = new DownloadOrchestrator({
+            ytdlpAdapter,
+            deviceRegistry,
+            logger: ErrorCentralService
+        });
+
+        // --- تسجيل جميع الخدمات في الخريطة ---
         this._services.set(
             'errorCentralService',
             ErrorCentralService
@@ -165,6 +214,27 @@ class BootstrapContainer {
         this._services.set(
             'connectionService',
             connectionService
+        );
+
+        // --- تسجيل المكونات الجديدة ---
+        this._services.set(
+            'scrcpyAdapter',
+            scrcpyAdapter
+        );
+
+        this._services.set(
+            'ytdlpAdapter',
+            ytdlpAdapter
+        );
+
+        this._services.set(
+            'deviceOrchestrator',
+            deviceOrchestrator
+        );
+
+        this._services.set(
+            'downloadOrchestrator',
+            downloadOrchestrator
         );
 
         this._initialized =

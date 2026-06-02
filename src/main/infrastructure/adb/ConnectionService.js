@@ -80,7 +80,7 @@ class ConnectionService
                             devices
                         );
                     } catch (
-                        error
+                    error
                     ) {
                         this.emit(
                             'error',
@@ -148,6 +148,63 @@ class ConnectionService
 
         this._browser =
             null;
+    }
+
+    /**
+ * Pair with a device over TCP/IP using a pairing code.
+ * @param {string} host - Host:port for pairing (e.g., "192.168.1.10:37000")
+ * @param {string} pairingCode - 6-digit pairing code shown on device
+ * @returns {Promise<string[]>} Output lines from adb pair command
+ */
+    async pair(host, pairingCode) {
+        if (!host || !pairingCode) {
+            throw new Error('Host and pairing code are required');
+        }
+
+        try {
+            const result = await this._adbExecutor.pair(host, pairingCode);
+            this.emit('pairSuccess', { host, pairingCode });
+            return result;
+        } catch (error) {
+            this.emit('error', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Connect to a device over TCP/IP (already paired or using adb connect).
+     * @param {string} target - Host:port (e.g., "192.168.1.10:5555")
+     * @returns {Promise<string[]>} Output lines from adb connect command
+     */
+    async connect(target) {
+        if (!target) {
+            throw new Error('Target is required');
+        }
+
+        try {
+            const result = await this._adbExecutor.connect(target);
+            this.emit('connectSuccess', { target });
+            return result;
+        } catch (error) {
+            this.emit('error', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Disconnect from a device or all devices.
+     * @param {string|null} target - Optional host:port to disconnect, or null to disconnect all
+     * @returns {Promise<string[]>} Output lines from adb disconnect command
+     */
+    async disconnect(target = null) {
+        try {
+            const result = await this._adbExecutor.disconnect(target);
+            this.emit('disconnect', { target: target || 'all' });
+            return result;
+        } catch (error) {
+            this.emit('error', error);
+            throw error;
+        }
     }
 
     dispose() {

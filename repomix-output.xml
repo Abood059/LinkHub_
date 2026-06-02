@@ -277,709 +277,6 @@ module.exports =
     new BootstrapContainer();
 </file>
 
-<file path="src/main/infrastructure/adb/AdbCommandExecutor.js">
-'use strict';
-
-const path = require('path');
-const { randomUUID } = require('crypto');
-
-class AdbCommandExecutor {
-    constructor({
-        processSupervisor,
-        logger = null,
-        adbPath = null
-    }) {
-        this._processSupervisor =
-            processSupervisor;
-
-        this._logger =
-            logger;
-
-        this._adbPath =
-            adbPath ||
-            this._resolveAdbPath();
-    }
-
-    async getDevices() {
-        const lines =
-            await this._executeQuickAdbCommand(
-                ['devices']
-            );
-
-        return lines
-            .slice(1)
-            .map(
-                (line) => line.trim()
-            )
-            .filter(Boolean)
-            .map((line) => {
-                const parts =
-                    line.split(/\s+/);
-
-                return {
-                    serial:
-                        parts[0],
-                    state:
-                        parts[1] ||
-                        'unknown'
-                };
-            });
-    }
-
-    async getDeviceInfo(
-        serial
-    ) {
-        if (!serial) {
-            throw new Error(
-                'serial is required'
-            );
-        }
-
-        const [
-            model,
-            version,
-            arch
-        ] = await Promise.all([
-            this._executeShellCommand(
-                serial,
-                [
-                    'getprop',
-                    'ro.product.model'
-                ]
-            ),
-            this._executeShellCommand(
-                serial,
-                [
-                    'getprop',
-                    'ro.build.version.release'
-                ]
-            ),
-            this._executeShellCommand(
-                serial,
-                [
-                    'getprop',
-                    'ro.product.cpu.abi'
-                ]
-            )
-        ]);
-
-        return {
-            serial,
-            model:
-                model.trim(),
-            version:
-                version.trim(),
-            arch:
-                arch.trim()
-        };
-    }
-
-    async connect(
-        target
-    ) {
-        return this._executeQuickAdbCommand([
-            'connect',
-            target
-        ]);
-    }
-
-    async pair(
-        host,
-        pairingCode
-    ) {
-        return this._executeQuickAdbCommand([
-            'pair',
-            host,
-            pairingCode
-        ]);
-    }
-
-    async disconnect(
-        target = null
-    ) {
-        const args =
-            target
-                ? [
-                      'disconnect',
-                      target
-                  ]
-                : [
-                      'disconnect'
-                  ];
-
-        return this._executeQuickAdbCommand(
-            args
-        );
-    }
-
-    async _executeShellCommand(
-        serial,
-        shellArgs
-    ) {
-        const result =
-            await this._executeQuickAdbCommand(
-                [
-                    '-s',
-                    serial,
-                    'shell',
-                    ...shellArgs
-                ]
-            );
-
-        return result.join('\n');
-    }
-
-    async _executeQuickAdbCommand(
-        args = []
-    ) {
-        return this._processSupervisor
-            .executeQuickTaskArray(
-                this._adbPath,
-                args
-            );
-    }
-
-    _resolveAdbPath() {
-        const isWin =
-            process.platform ===
-            'win32';
-
-        return path.join(
-            process.cwd(),
-            'resources',
-            'bin',
-            isWin
-                ? 'win/adb.exe'
-                : 'linux/adb'
-        );
-    }
-}
-
-module.exports =
-    AdbCommandExecutor;
-</file>
-
-<file path="src/main/infrastructure/adb/ConnectionService.js">
-'use strict';
-
-const EventEmitter =
-    require('events');
-
-const {
-    Bonjour
-} = require(
-    'bonjour-service'
-);
-
-class ConnectionService
-    extends EventEmitter {
-
-    constructor({
-        adbExecutor,
-        logger = null
-    }) {
-        super();
-
-        this._adbExecutor =
-            adbExecutor;
-
-        this._logger =
-            logger;
-
-        this._bonjour =
-            new Bonjour();
-
-        this._adbMonitor =
-            null;
-
-        this._browser =
-            null;
-    }
-
-    async discoverDevices() {
-        try {
-            const devices =
-                await this
-                    ._adbExecutor
-                    .getDevices();
-
-            this.emit(
-                'devicesDiscovered',
-                devices
-            );
-
-            return devices;
-        } catch (error) {
-            this.emit(
-                'error',
-                error
-            );
-
-            throw error;
-        }
-    }
-
-    startAdbMonitoring(
-        intervalMs = 5000
-    ) {
-        if (
-            this._adbMonitor
-        ) {
-            return;
-        }
-
-        this._adbMonitor =
-            setInterval(
-                async () => {
-                    try {
-                        const devices =
-                            await this
-                                ._adbExecutor
-                                .getDevices();
-
-                        this.emit(
-                            'adbDevices',
-                            devices
-                        );
-                    } catch (
-                        error
-                    ) {
-                        this.emit(
-                            'error',
-                            error
-                        );
-                    }
-                },
-                intervalMs
-            );
-    }
-
-    stopAdbMonitoring() {
-        if (
-            !this._adbMonitor
-        ) {
-            return;
-        }
-
-        clearInterval(
-            this._adbMonitor
-        );
-
-        this._adbMonitor =
-            null;
-    }
-
-    startWirelessDiscovery() {
-        if (
-            this._browser
-        ) {
-            return;
-        }
-
-        this._browser =
-            this._bonjour.find(
-                {
-                    type: 'adb-tls-connect'
-                },
-                (service) => {
-                    this.emit(
-                        'wirelessServiceFound',
-                        {
-                            name:
-                                service.name,
-                            host:
-                                service.host,
-                            port:
-                                service.port,
-                            addresses:
-                                service.addresses
-                        }
-                    );
-                }
-            );
-    }
-
-    stopWirelessDiscovery() {
-        if (
-            !this._browser
-        ) {
-            return;
-        }
-
-        this._browser.stop();
-
-        this._browser =
-            null;
-    }
-
-    dispose() {
-        this.stopAdbMonitoring();
-        this.stopWirelessDiscovery();
-
-        this._bonjour.destroy();
-    }
-}
-
-module.exports =
-    ConnectionService;
-</file>
-
-<file path="src/main/infrastructure/persistence/DatabaseManager.js">
-'use strict';
-
-const fs =
-    require('fs/promises');
-
-const path =
-    require('path');
-
-/**
- * DatabaseManager
- *
- * Responsible only for persistence.
- *
- * No ADB logic.
- * No runtime logic.
- * No business logic.
- */
-class DatabaseManager {
-    constructor({
-        databasePath
-    } = {}) {
-        this._databasePath =
-            databasePath ||
-            path.join(
-                process.cwd(),
-                'data',
-                'devices.json'
-            );
-    }
-
-    async loadDevices() {
-        try {
-            const content =
-                await fs.readFile(
-                    this._databasePath,
-                    'utf8'
-                );
-
-            const parsed =
-                JSON.parse(content);
-
-            return Array.isArray(
-                parsed
-            )
-                ? parsed
-                : [];
-        } catch (error) {
-            if (
-                error.code ===
-                'ENOENT'
-            ) {
-                return [];
-            }
-
-            throw error;
-        }
-    }
-
-    async saveDevices(
-        devices = []
-    ) {
-        await this._ensureDirectory();
-
-        await fs.writeFile(
-            this._databasePath,
-            JSON.stringify(
-                devices,
-                null,
-                4
-            ),
-            'utf8'
-        );
-    }
-
-    async insertDevice(
-        device
-    ) {
-        const devices =
-            await this.loadDevices();
-
-        devices.push(device);
-
-        await this.saveDevices(
-            devices
-        );
-
-        return device;
-    }
-
-    async updateDevice(
-        deviceId,
-        updater
-    ) {
-        const devices =
-            await this.loadDevices();
-
-        const index =
-            devices.findIndex(
-                device =>
-                    device.id ===
-                    deviceId
-            );
-
-        if (index === -1) {
-            return null;
-        }
-
-        const current =
-            devices[index];
-
-        devices[index] =
-            typeof updater ===
-            'function'
-                ? updater(current)
-                : {
-                      ...current,
-                      ...updater
-                  };
-
-        await this.saveDevices(
-            devices
-        );
-
-        return devices[index];
-    }
-
-    async deleteDevice(
-        deviceId
-    ) {
-        const devices =
-            await this.loadDevices();
-
-        const filtered =
-            devices.filter(
-                device =>
-                    device.id !==
-                    deviceId
-            );
-
-        await this.saveDevices(
-            filtered
-        );
-    }
-
-    async _ensureDirectory() {
-        const directory =
-            path.dirname(
-                this._databasePath
-            );
-
-        await fs.mkdir(
-            directory,
-            {
-                recursive: true
-            }
-        );
-    }
-}
-
-module.exports =
-    DatabaseManager;
-</file>
-
-<file path="src/main/runtime/devices/DeviceRegistry.js">
-'use strict';
-
-const DeviceRuntimeState =
-    require('./DeviceRuntimeState');
-
-/**
- * Runtime registry responsible for:
- *
- * - Device registration
- * - Device lookup
- * - Runtime state management
- *
- * This class does NOT:
- * - Connect devices
- * - Pair devices
- * - Execute ADB commands
- * - Persist data
- * - Implement business logic
- */
-class DeviceRegistry {
-    constructor() {
-        /**
-         * Map<deviceId, Device>
-         */
-        this._devices =
-            new Map();
-
-        /**
-         * Map<deviceId, DeviceRuntimeState>
-         */
-        this._runtimeStates =
-            new Map();
-    }
-
-    registerDevice(device) {
-        if (!device || !device.id) {
-            throw new Error(
-                'Device must contain a valid id'
-            );
-        }
-
-        this._devices.set(
-            device.id,
-            device
-        );
-
-        if (
-            !this._runtimeStates.has(
-                device.id
-            )
-        ) {
-            this._runtimeStates.set(
-                device.id,
-                new DeviceRuntimeState()
-            );
-        }
-
-        return device;
-    }
-
-    removeDevice(deviceId) {
-        this._devices.delete(
-            deviceId
-        );
-
-        this._runtimeStates.delete(
-            deviceId
-        );
-    }
-
-    updateState(
-        deviceId,
-        state = {}
-    ) {
-        let runtimeState =
-            this._runtimeStates.get(
-                deviceId
-            );
-
-        if (!runtimeState) {
-            runtimeState =
-                new DeviceRuntimeState();
-
-            this._runtimeStates.set(
-                deviceId,
-                runtimeState
-            );
-        }
-
-        runtimeState.update({
-            ...state,
-            lastSeen:
-                state.lastSeen ||
-                new Date()
-        });
-
-        return runtimeState;
-    }
-
-    getDevice(deviceId) {
-        return (
-            this._devices.get(
-                deviceId
-            ) || null
-        );
-    }
-
-    getRuntimeState(
-        deviceId
-    ) {
-        return (
-            this._runtimeStates.get(
-                deviceId
-            ) || null
-        );
-    }
-
-    getAllDevices() {
-        return Array.from(
-            this._devices.values()
-        );
-    }
-
-    getAllRuntimeStates() {
-        return Array.from(
-            this._runtimeStates.values()
-        );
-    }
-
-    hasDevice(deviceId) {
-        return this._devices.has(
-            deviceId
-        );
-    }
-
-    clear() {
-        this._devices.clear();
-        this._runtimeStates.clear();
-    }
-}
-
-module.exports =
-    DeviceRegistry;
-</file>
-
-<file path="src/main/runtime/devices/DeviceRuntimeState.js">
-'use strict';
-
-/**
- * Represents the runtime state of a device.
- *
- * This object contains only volatile runtime information.
- * It does not contain device metadata and does not perform
- * any business logic.
- */
-class DeviceRuntimeState {
-    constructor({
-        status = 'offline',
-        ip = null,
-        port = null,
-        connectionType = null,
-        adbTarget = null,
-        lastSeen = null
-    } = {}) {
-        this.status = status;
-        this.ip = ip;
-        this.port = port;
-        this.connectionType = connectionType;
-        this.adbTarget = adbTarget;
-        this.lastSeen = lastSeen;
-    }
-
-    update(partialState = {}) {
-        Object.assign(this, partialState);
-    }
-
-    toJSON() {
-        return {
-            status: this.status,
-            ip: this.ip,
-            port: this.port,
-            connectionType: this.connectionType,
-            adbTarget: this.adbTarget,
-            lastSeen: this.lastSeen
-        };
-    }
-}
-
-module.exports = DeviceRuntimeState;
-</file>
-
 <file path="src/main/domain/entities/AudioFile.js">
 const BaseFile = require('./BaseFile');
 
@@ -1482,6 +779,766 @@ module.exports = FileStatus;
 
 </file>
 
+<file path="src/main/infrastructure/adb/AdbCommandExecutor.js">
+'use strict';
+
+const path = require('path');
+const { randomUUID } = require('crypto');
+
+class AdbCommandExecutor {
+    constructor({
+        processSupervisor,
+        logger = null,
+        adbPath = null
+    }) {
+        this._processSupervisor =
+            processSupervisor;
+
+        this._logger =
+            logger;
+
+        this._adbPath =
+            adbPath ||
+            this._resolveAdbPath();
+    }
+
+    async getDevices() {
+        const lines =
+            await this._executeQuickAdbCommand(
+                ['devices']
+            );
+
+        return lines
+            .slice(1)
+            .map(
+                (line) => line.trim()
+            )
+            .filter(Boolean)
+            .map((line) => {
+                const parts =
+                    line.split(/\s+/);
+
+                return {
+                    serial:
+                        parts[0],
+                    state:
+                        parts[1] ||
+                        'unknown'
+                };
+            });
+    }
+
+    async getDeviceInfo(
+        serial
+    ) {
+        if (!serial) {
+            throw new Error(
+                'serial is required'
+            );
+        }
+
+        const [
+            model,
+            version,
+            arch
+        ] = await Promise.all([
+            this._executeShellCommand(
+                serial,
+                [
+                    'getprop',
+                    'ro.product.model'
+                ]
+            ),
+            this._executeShellCommand(
+                serial,
+                [
+                    'getprop',
+                    'ro.build.version.release'
+                ]
+            ),
+            this._executeShellCommand(
+                serial,
+                [
+                    'getprop',
+                    'ro.product.cpu.abi'
+                ]
+            )
+        ]);
+
+        return {
+            serial,
+            model:
+                model.trim(),
+            version:
+                version.trim(),
+            arch:
+                arch.trim()
+        };
+    }
+
+    async connect(
+        target
+    ) {
+        return this._executeQuickAdbCommand([
+            'connect',
+            target
+        ]);
+    }
+
+    async pair(
+        host,
+        pairingCode
+    ) {
+        return this._executeQuickAdbCommand([
+            'pair',
+            host,
+            pairingCode
+        ]);
+    }
+
+    async disconnect(
+        target = null
+    ) {
+        const args =
+            target
+                ? [
+                      'disconnect',
+                      target
+                  ]
+                : [
+                      'disconnect'
+                  ];
+
+        return this._executeQuickAdbCommand(
+            args
+        );
+    }
+
+    async _executeShellCommand(
+        serial,
+        shellArgs
+    ) {
+        const result =
+            await this._executeQuickAdbCommand(
+                [
+                    '-s',
+                    serial,
+                    'shell',
+                    ...shellArgs
+                ]
+            );
+
+        return result.join('\n');
+    }
+
+    async _executeQuickAdbCommand(
+        args = []
+    ) {
+        return this._processSupervisor
+            .executeQuickTaskArray(
+                this._adbPath,
+                args
+            );
+    }
+
+    _resolveAdbPath() {
+        const isWin =
+            process.platform ===
+            'win32';
+
+        return path.join(
+            process.cwd(),
+            'resources',
+            'bin',
+            isWin
+                ? 'win/adb.exe'
+                : 'linux/adb'
+        );
+    }
+}
+
+module.exports =
+    AdbCommandExecutor;
+</file>
+
+<file path="src/main/infrastructure/adb/ConnectionService.js">
+'use strict';
+
+const EventEmitter =
+    require('events');
+
+const {
+    Bonjour
+} = require(
+    'bonjour-service'
+);
+
+class ConnectionService
+    extends EventEmitter {
+
+    constructor({
+        adbExecutor,
+        logger = null
+    }) {
+        super();
+
+        this._adbExecutor =
+            adbExecutor;
+
+        this._logger =
+            logger;
+
+        this._bonjour =
+            new Bonjour();
+
+        this._adbMonitor =
+            null;
+
+        this._browser =
+            null;
+    }
+
+    async discoverDevices() {
+        try {
+            const devices =
+                await this
+                    ._adbExecutor
+                    .getDevices();
+
+            this.emit(
+                'devicesDiscovered',
+                devices
+            );
+
+            return devices;
+        } catch (error) {
+            this.emit(
+                'error',
+                error
+            );
+
+            throw error;
+        }
+    }
+
+    startAdbMonitoring(
+        intervalMs = 5000
+    ) {
+        if (
+            this._adbMonitor
+        ) {
+            return;
+        }
+
+        this._adbMonitor =
+            setInterval(
+                async () => {
+                    try {
+                        const devices =
+                            await this
+                                ._adbExecutor
+                                .getDevices();
+
+                        this.emit(
+                            'adbDevices',
+                            devices
+                        );
+                    } catch (
+                    error
+                    ) {
+                        this.emit(
+                            'error',
+                            error
+                        );
+                    }
+                },
+                intervalMs
+            );
+    }
+
+    stopAdbMonitoring() {
+        if (
+            !this._adbMonitor
+        ) {
+            return;
+        }
+
+        clearInterval(
+            this._adbMonitor
+        );
+
+        this._adbMonitor =
+            null;
+    }
+
+    startWirelessDiscovery() {
+        if (
+            this._browser
+        ) {
+            return;
+        }
+
+        this._browser =
+            this._bonjour.find(
+                {
+                    type: 'adb-tls-connect'
+                },
+                (service) => {
+                    this.emit(
+                        'wirelessServiceFound',
+                        {
+                            name:
+                                service.name,
+                            host:
+                                service.host,
+                            port:
+                                service.port,
+                            addresses:
+                                service.addresses
+                        }
+                    );
+                }
+            );
+    }
+
+    stopWirelessDiscovery() {
+        if (
+            !this._browser
+        ) {
+            return;
+        }
+
+        this._browser.stop();
+
+        this._browser =
+            null;
+    }
+
+    /**
+ * Pair with a device over TCP/IP using a pairing code.
+ * @param {string} host - Host:port for pairing (e.g., "192.168.1.10:37000")
+ * @param {string} pairingCode - 6-digit pairing code shown on device
+ * @returns {Promise<string[]>} Output lines from adb pair command
+ */
+    async pair(host, pairingCode) {
+        if (!host || !pairingCode) {
+            throw new Error('Host and pairing code are required');
+        }
+
+        try {
+            const result = await this._adbExecutor.pair(host, pairingCode);
+            this.emit('pairSuccess', { host, pairingCode });
+            return result;
+        } catch (error) {
+            this.emit('error', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Connect to a device over TCP/IP (already paired or using adb connect).
+     * @param {string} target - Host:port (e.g., "192.168.1.10:5555")
+     * @returns {Promise<string[]>} Output lines from adb connect command
+     */
+    async connect(target) {
+        if (!target) {
+            throw new Error('Target is required');
+        }
+
+        try {
+            const result = await this._adbExecutor.connect(target);
+            this.emit('connectSuccess', { target });
+            return result;
+        } catch (error) {
+            this.emit('error', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Disconnect from a device or all devices.
+     * @param {string|null} target - Optional host:port to disconnect, or null to disconnect all
+     * @returns {Promise<string[]>} Output lines from adb disconnect command
+     */
+    async disconnect(target = null) {
+        try {
+            const result = await this._adbExecutor.disconnect(target);
+            this.emit('disconnect', { target: target || 'all' });
+            return result;
+        } catch (error) {
+            this.emit('error', error);
+            throw error;
+        }
+    }
+
+    dispose() {
+        this.stopAdbMonitoring();
+        this.stopWirelessDiscovery();
+
+        this._bonjour.destroy();
+    }
+}
+
+module.exports =
+    ConnectionService;
+</file>
+
+<file path="src/main/infrastructure/persistence/DatabaseManager.js">
+'use strict';
+
+const fs =
+    require('fs/promises');
+
+const path =
+    require('path');
+
+/**
+ * DatabaseManager
+ *
+ * Responsible only for persistence.
+ *
+ * No ADB logic.
+ * No runtime logic.
+ * No business logic.
+ */
+class DatabaseManager {
+    constructor({
+        databasePath
+    } = {}) {
+        this._databasePath =
+            databasePath ||
+            path.join(
+                process.cwd(),
+                'data',
+                'devices.json'
+            );
+    }
+
+    async loadDevices() {
+        try {
+            const content =
+                await fs.readFile(
+                    this._databasePath,
+                    'utf8'
+                );
+
+            const parsed =
+                JSON.parse(content);
+
+            return Array.isArray(
+                parsed
+            )
+                ? parsed
+                : [];
+        } catch (error) {
+            if (
+                error.code ===
+                'ENOENT'
+            ) {
+                return [];
+            }
+
+            throw error;
+        }
+    }
+
+    async saveDevices(
+        devices = []
+    ) {
+        await this._ensureDirectory();
+
+        await fs.writeFile(
+            this._databasePath,
+            JSON.stringify(
+                devices,
+                null,
+                4
+            ),
+            'utf8'
+        );
+    }
+
+    async insertDevice(
+        device
+    ) {
+        const devices =
+            await this.loadDevices();
+
+        devices.push(device);
+
+        await this.saveDevices(
+            devices
+        );
+
+        return device;
+    }
+
+    async updateDevice(
+        deviceId,
+        updater
+    ) {
+        const devices =
+            await this.loadDevices();
+
+        const index =
+            devices.findIndex(
+                device =>
+                    device.id ===
+                    deviceId
+            );
+
+        if (index === -1) {
+            return null;
+        }
+
+        const current =
+            devices[index];
+
+        devices[index] =
+            typeof updater ===
+            'function'
+                ? updater(current)
+                : {
+                      ...current,
+                      ...updater
+                  };
+
+        await this.saveDevices(
+            devices
+        );
+
+        return devices[index];
+    }
+
+    async deleteDevice(
+        deviceId
+    ) {
+        const devices =
+            await this.loadDevices();
+
+        const filtered =
+            devices.filter(
+                device =>
+                    device.id !==
+                    deviceId
+            );
+
+        await this.saveDevices(
+            filtered
+        );
+    }
+
+    async _ensureDirectory() {
+        const directory =
+            path.dirname(
+                this._databasePath
+            );
+
+        await fs.mkdir(
+            directory,
+            {
+                recursive: true
+            }
+        );
+    }
+}
+
+module.exports =
+    DatabaseManager;
+</file>
+
+<file path="src/main/runtime/devices/DeviceRegistry.js">
+'use strict';
+
+const DeviceRuntimeState =
+    require('./DeviceRuntimeState');
+
+/**
+ * Runtime registry responsible for:
+ *
+ * - Device registration
+ * - Device lookup
+ * - Runtime state management
+ *
+ * This class does NOT:
+ * - Connect devices
+ * - Pair devices
+ * - Execute ADB commands
+ * - Persist data
+ * - Implement business logic
+ */
+class DeviceRegistry {
+    constructor() {
+        /**
+         * Map<deviceId, Device>
+         */
+        this._devices =
+            new Map();
+
+        /**
+         * Map<deviceId, DeviceRuntimeState>
+         */
+        this._runtimeStates =
+            new Map();
+    }
+
+    registerDevice(device) {
+        if (!device || !device.id) {
+            throw new Error(
+                'Device must contain a valid id'
+            );
+        }
+
+        this._devices.set(
+            device.id,
+            device
+        );
+
+        if (
+            !this._runtimeStates.has(
+                device.id
+            )
+        ) {
+            this._runtimeStates.set(
+                device.id,
+                new DeviceRuntimeState()
+            );
+        }
+
+        return device;
+    }
+
+    removeDevice(deviceId) {
+        this._devices.delete(
+            deviceId
+        );
+
+        this._runtimeStates.delete(
+            deviceId
+        );
+    }
+
+    updateState(
+        deviceId,
+        state = {}
+    ) {
+        let runtimeState =
+            this._runtimeStates.get(
+                deviceId
+            );
+
+        if (!runtimeState) {
+            runtimeState =
+                new DeviceRuntimeState();
+
+            this._runtimeStates.set(
+                deviceId,
+                runtimeState
+            );
+        }
+
+        runtimeState.update({
+            ...state,
+            lastSeen:
+                state.lastSeen ||
+                new Date()
+        });
+
+        return runtimeState;
+    }
+
+    getDevice(deviceId) {
+        return (
+            this._devices.get(
+                deviceId
+            ) || null
+        );
+    }
+
+    getRuntimeState(
+        deviceId
+    ) {
+        return (
+            this._runtimeStates.get(
+                deviceId
+            ) || null
+        );
+    }
+
+    getAllDevices() {
+        return Array.from(
+            this._devices.values()
+        );
+    }
+
+    getAllRuntimeStates() {
+        return Array.from(
+            this._runtimeStates.values()
+        );
+    }
+
+    hasDevice(deviceId) {
+        return this._devices.has(
+            deviceId
+        );
+    }
+
+    clear() {
+        this._devices.clear();
+        this._runtimeStates.clear();
+    }
+}
+
+module.exports =
+    DeviceRegistry;
+</file>
+
+<file path="src/main/runtime/devices/DeviceRuntimeState.js">
+'use strict';
+
+/**
+ * Represents the runtime state of a device.
+ *
+ * This object contains only volatile runtime information.
+ * It does not contain device metadata and does not perform
+ * any business logic.
+ */
+class DeviceRuntimeState {
+    constructor({
+        status = 'offline',
+        ip = null,
+        port = null,
+        connectionType = null,
+        adbTarget = null,
+        lastSeen = null
+    } = {}) {
+        this.status = status;
+        this.ip = ip;
+        this.port = port;
+        this.connectionType = connectionType;
+        this.adbTarget = adbTarget;
+        this.lastSeen = lastSeen;
+    }
+
+    update(partialState = {}) {
+        Object.assign(this, partialState);
+    }
+
+    toJSON() {
+        return {
+            status: this.status,
+            ip: this.ip,
+            port: this.port,
+            connectionType: this.connectionType,
+            adbTarget: this.adbTarget,
+            lastSeen: this.lastSeen
+        };
+    }
+}
+
+module.exports = DeviceRuntimeState;
+</file>
+
 <file path="src/main/runtime/processes/ProcessRegistry.js">
 'use strict';
 
@@ -1528,231 +1585,6 @@ class ProcessRegistry {
 }
 
 module.exports = ProcessRegistry;
-</file>
-
-<file path="src/main/runtime/processes/ProcessSupervisor.js">
-'use strict';
-
-class ProcessSupervisor {
-    constructor({
-        processManager,
-        processRegistry,
-        logger = null
-    }) {
-        this._processManager =
-            processManager;
-
-        this._processRegistry =
-            processRegistry;
-
-        this._logger =
-            logger;
-    }
-
-    startManagedProcess(
-        processConfig = {}
-    ) {
-        const {
-            processId,
-            binPath,
-            args = [],
-            type = 'generic',
-            metadata = {},
-            onData = null,
-            maxBufferSize = 100
-        } = processConfig;
-
-        if (!processId) {
-            throw new Error(
-                'processId is required'
-            );
-        }
-
-        if (!binPath) {
-            throw new Error(
-                'binPath is required'
-            );
-        }
-
-        this._processRegistry.register(
-            processId,
-            {
-                id: processId,
-                type,
-                metadata,
-                status: 'STARTING',
-                startedAt:
-                    Date.now()
-            }
-        );
-
-        try {
-            const result =
-                this._processManager.execute(
-                    processId,
-                    binPath,
-                    args,
-                    type,
-                    onData,
-                    maxBufferSize
-                );
-
-            this._processRegistry
-                .updateStatus(
-                    processId,
-                    'RUNNING'
-                );
-
-            return result;
-        } catch (error) {
-            this._processRegistry
-                .updateStatus(
-                    processId,
-                    'FAILED'
-                );
-
-            throw error;
-        }
-    }
-
-    stopManagedProcess(
-        processId
-    ) {
-        const process =
-            this._processRegistry.get(
-                processId
-            );
-
-        if (!process) {
-            return false;
-        }
-
-        return this._processManager
-            .terminate(
-                processId
-            );
-    }
-
-    getProcessStatus(
-        processId
-    ) {
-        const runtimeState =
-            this._processRegistry.get(
-                processId
-            );
-
-        if (!runtimeState) {
-            return null;
-        }
-
-        const processStatus =
-            this._processManager
-                .getProcessStatus(
-                    processId
-                );
-
-        return {
-            ...runtimeState,
-
-            status:
-                processStatus?.status ??
-                runtimeState.status,
-
-            process:
-                processStatus
-        };
-    }
-
-    async executeQuickTaskArray(
-        binPath,
-        args = [],
-        options = {}
-    ) {
-        if (!binPath) {
-            throw new Error(
-                'binPath is required'
-            );
-        }
-
-        return this._processManager
-            .executeQuickTaskArray(
-                binPath,
-                args,
-                options
-            );
-    }
-
-    async executeAndWatch(
-        processConfig = {},
-        successSentinel,
-        timeoutMs
-    ) {
-        const {
-            processId,
-            binPath,
-            args = [],
-            type = 'watch',
-            metadata = {}
-        } = processConfig;
-
-        if (!processId) {
-            throw new Error(
-                'processId is required'
-            );
-        }
-
-        if (!binPath) {
-            throw new Error(
-                'binPath is required'
-            );
-        }
-
-        this._processRegistry.register(
-            processId,
-            {
-                id: processId,
-                type,
-                metadata,
-                status: 'RUNNING',
-                startedAt:
-                    Date.now()
-            }
-        );
-
-        try {
-            const result =
-                await this._processManager
-                    .executeAndWatch(
-                        processId,
-                        binPath,
-                        args,
-                        successSentinel,
-                        timeoutMs
-                    );
-
-            this._processRegistry
-                .updateStatus(
-                    processId,
-                    result.success
-                        ? 'EXITED'
-                        : 'FAILED'
-                    );
-
-            return result;
-        } catch (error) {
-            this._processRegistry
-                .updateStatus(
-                    processId,
-                    'FAILED'
-                );
-
-            throw error;
-        }
-    }
-}
-
-module.exports =
-    ProcessSupervisor;
 </file>
 
 <file path=".gitignore">
@@ -3152,6 +2984,231 @@ class ProcessManager {
 
 module.exports =
     new ProcessManager();
+</file>
+
+<file path="src/main/runtime/processes/ProcessSupervisor.js">
+'use strict';
+
+class ProcessSupervisor {
+    constructor({
+        processManager,
+        processRegistry,
+        logger = null
+    }) {
+        this._processManager =
+            processManager;
+
+        this._processRegistry =
+            processRegistry;
+
+        this._logger =
+            logger;
+    }
+
+    startManagedProcess(
+        processConfig = {}
+    ) {
+        const {
+            processId,
+            binPath,
+            args = [],
+            type = 'generic',
+            metadata = {},
+            onData = null,
+            maxBufferSize = 100
+        } = processConfig;
+
+        if (!processId) {
+            throw new Error(
+                'processId is required'
+            );
+        }
+
+        if (!binPath) {
+            throw new Error(
+                'binPath is required'
+            );
+        }
+
+        this._processRegistry.register(
+            processId,
+            {
+                id: processId,
+                type,
+                metadata,
+                status: 'STARTING',
+                startedAt:
+                    Date.now()
+            }
+        );
+
+        try {
+            const result =
+                this._processManager.execute(
+                    processId,
+                    binPath,
+                    args,
+                    type,
+                    onData,
+                    maxBufferSize
+                );
+
+            this._processRegistry
+                .updateStatus(
+                    processId,
+                    'RUNNING'
+                );
+
+            return result;
+        } catch (error) {
+            this._processRegistry
+                .updateStatus(
+                    processId,
+                    'FAILED'
+                );
+
+            throw error;
+        }
+    }
+
+    stopManagedProcess(
+        processId
+    ) {
+        const process =
+            this._processRegistry.get(
+                processId
+            );
+
+        if (!process) {
+            return false;
+        }
+
+        return this._processManager
+            .terminate(
+                processId
+            );
+    }
+
+    getProcessStatus(
+        processId
+    ) {
+        const runtimeState =
+            this._processRegistry.get(
+                processId
+            );
+
+        if (!runtimeState) {
+            return null;
+        }
+
+        const processStatus =
+            this._processManager
+                .getProcessStatus(
+                    processId
+                );
+
+        return {
+            ...runtimeState,
+
+            status:
+                processStatus?.status ??
+                runtimeState.status,
+
+            process:
+                processStatus
+        };
+    }
+
+    async executeQuickTaskArray(
+        binPath,
+        args = [],
+        options = {}
+    ) {
+        if (!binPath) {
+            throw new Error(
+                'binPath is required'
+            );
+        }
+
+        return this._processManager
+            .executeQuickTaskArray(
+                binPath,
+                args,
+                options
+            );
+    }
+
+    async executeAndWatch(
+        processConfig = {},
+        successSentinel,
+        timeoutMs
+    ) {
+        const {
+            processId,
+            binPath,
+            args = [],
+            type = 'watch',
+            metadata = {}
+        } = processConfig;
+
+        if (!processId) {
+            throw new Error(
+                'processId is required'
+            );
+        }
+
+        if (!binPath) {
+            throw new Error(
+                'binPath is required'
+            );
+        }
+
+        this._processRegistry.register(
+            processId,
+            {
+                id: processId,
+                type,
+                metadata,
+                status: 'RUNNING',
+                startedAt:
+                    Date.now()
+            }
+        );
+
+        try {
+            const result =
+                await this._processManager
+                    .executeAndWatch(
+                        processId,
+                        binPath,
+                        args,
+                        successSentinel,
+                        timeoutMs
+                    );
+
+            this._processRegistry
+                .updateStatus(
+                    processId,
+                    result.success
+                        ? 'EXITED'
+                        : 'FAILED'
+                    );
+
+            return result;
+        } catch (error) {
+            this._processRegistry
+                .updateStatus(
+                    processId,
+                    'FAILED'
+                );
+
+            throw error;
+        }
+    }
+}
+
+module.exports =
+    ProcessSupervisor;
 </file>
 
 </files>
