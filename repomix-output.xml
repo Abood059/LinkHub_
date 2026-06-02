@@ -100,187 +100,6 @@ package.json
 <files>
 This section contains the contents of the repository's files.
 
-<file path="src/main/infrastructure/ipc/DeviceHandlers.js">
-'use strict';
-
-/**
- * DeviceHandlers
- * 
- * Thin IPC layer for device-related operations.
- * Responsibilities ONLY:
- * - Register IPC channels with Electron's ipcMain
- * - Forward requests to DeviceOrchestrator
- * - Return results/errors
- * 
- * NO business logic, NO runtime state, NO process execution.
- */
-class DeviceHandlers {
-    constructor(deviceOrchestrator) {
-        if (!deviceOrchestrator) {
-            throw new Error('DeviceOrchestrator is required for DeviceHandlers');
-        }
-        this._deviceOrchestrator = deviceOrchestrator;
-    }
-
-    /**
-     * Register all device IPC channels
-     */
-    register(ipcMain) {
-        if (!ipcMain || typeof ipcMain.handle !== 'function') {
-            throw new Error('Valid ipcMain instance required');
-        }
-
-        // Get all devices with their runtime state
-        ipcMain.handle('device:list', async () => {
-            return this._deviceOrchestrator.getAllDevices();
-        });
-
-        // Get a single device by ID
-        ipcMain.handle('device:get', async (event, deviceId) => {
-            if (!deviceId) {
-                throw new Error('deviceId is required');
-            }
-            return this._deviceOrchestrator.getDevice(deviceId);
-        });
-
-        // Pair with a wireless device (requires host:port and pairing code)
-        ipcMain.handle('device:pair', async (event, host, pairingCode) => {
-            if (!host || !pairingCode) {
-                throw new Error('host and pairingCode are required');
-            }
-            return this._deviceOrchestrator.pairDevice(host, pairingCode);
-        });
-
-        // Connect to a device (USB serial or TCP/IP host:port)
-        ipcMain.handle('device:connect', async (event, target, friendlyName = null) => {
-            if (!target) {
-                throw new Error('target is required (USB serial or host:port)');
-            }
-            return this._deviceOrchestrator.connectDevice(target, friendlyName);
-        });
-
-        // Start screen mirroring for a connected device
-        ipcMain.handle('device:stream:start', async (event, deviceId, options = {}) => {
-            if (!deviceId) {
-                throw new Error('deviceId is required');
-            }
-            return this._deviceOrchestrator.startStreaming(deviceId, options);
-        });
-
-        // Stop screen mirroring
-        ipcMain.handle('device:stream:stop', async (event, deviceId) => {
-            if (!deviceId) {
-                throw new Error('deviceId is required');
-            }
-            return this._deviceOrchestrator.stopStreaming(deviceId);
-        });
-    }
-}
-
-module.exports = DeviceHandlers;
-</file>
-
-<file path="src/main/infrastructure/ipc/DownloadHandlers.js">
-'use strict';
-
-/**
- * DownloadHandlers
- * 
- * Thin IPC layer for download-related operations.
- * Responsibilities ONLY:
- * - Register IPC channels with Electron's ipcMain
- * - Forward requests to DownloadOrchestrator
- * - Return results/errors
- * 
- * NO business logic, NO runtime state, NO process execution.
- */
-class DownloadHandlers {
-    constructor(downloadOrchestrator) {
-        if (!downloadOrchestrator) {
-            throw new Error('DownloadOrchestrator is required for DownloadHandlers');
-        }
-        this._downloadOrchestrator = downloadOrchestrator;
-    }
-
-    /**
-     * Register all download IPC channels
-     */
-    register(ipcMain) {
-        if (!ipcMain || typeof ipcMain.handle !== 'function') {
-            throw new Error('Valid ipcMain instance required');
-        }
-
-        // Inspect a URL (get formats and metadata)
-        ipcMain.handle('download:inspect', async (event, url) => {
-            if (!url) {
-                throw new Error('URL is required');
-            }
-            return this._downloadOrchestrator.inspectLink(url);
-        });
-
-        // Start downloading a specific format
-        ipcMain.handle('download:start', async (event, url, formatId, deviceId = null, options = {}) => {
-            if (!url || !formatId) {
-                throw new Error('url and formatId are required');
-            }
-            return this._downloadOrchestrator.startDownload(url, formatId, deviceId, options);
-        });
-
-        // Stop an ongoing download by URL
-        ipcMain.handle('download:stop', async (event, url) => {
-            if (!url) {
-                throw new Error('URL is required');
-            }
-            return this._downloadOrchestrator.stopDownload(url);
-        });
-
-        // Get metadata only (lightweight, no formats)
-        ipcMain.handle('download:metadata', async (event, url) => {
-            if (!url) {
-                throw new Error('URL is required');
-            }
-            return this._downloadOrchestrator.getMetadata(url);
-        });
-    }
-}
-
-module.exports = DownloadHandlers;
-</file>
-
-<file path="src/main/infrastructure/ipc/index.js">
-'use strict';
-
-const { ipcMain } = require('electron');
-const DeviceHandlers = require('./DeviceHandlers');
-const DownloadHandlers = require('./DownloadHandlers');
-
-/**
- * Register all IPC handlers with Electron's ipcMain.
- * This function should be called once during application startup,
- * after creating DeviceOrchestrator and DownloadOrchestrator.
- * 
- * @param {Object} deviceOrchestrator - Instance of DeviceOrchestrator
- * @param {Object} downloadOrchestrator - Instance of DownloadOrchestrator
- */
-function registerIpcHandlers(deviceOrchestrator, downloadOrchestrator) {
-    if (!deviceOrchestrator || !downloadOrchestrator) {
-        throw new Error('Both DeviceOrchestrator and DownloadOrchestrator are required');
-    }
-
-    const deviceHandlers = new DeviceHandlers(deviceOrchestrator);
-    const downloadHandlers = new DownloadHandlers(downloadOrchestrator);
-
-    deviceHandlers.register(ipcMain);
-    downloadHandlers.register(ipcMain);
-}
-
-module.exports = {
-    registerIpcHandlers,
-    DeviceHandlers,
-    DownloadHandlers
-};
-</file>
-
 <file path="src/main/application/orchestrators/DeviceOrchestrator.js">
 'use strict';
 
@@ -1127,8 +946,185 @@ module.exports =
     AdbCommandExecutor;
 </file>
 
-<file path="src/main/infrastructure/media/YtdlpAdapter.js">
+<file path="src/main/infrastructure/ipc/DeviceHandlers.js">
+'use strict';
 
+/**
+ * DeviceHandlers
+ * 
+ * Thin IPC layer for device-related operations.
+ * Responsibilities ONLY:
+ * - Register IPC channels with Electron's ipcMain
+ * - Forward requests to DeviceOrchestrator
+ * - Return results/errors
+ * 
+ * NO business logic, NO runtime state, NO process execution.
+ */
+class DeviceHandlers {
+    constructor(deviceOrchestrator) {
+        if (!deviceOrchestrator) {
+            throw new Error('DeviceOrchestrator is required for DeviceHandlers');
+        }
+        this._deviceOrchestrator = deviceOrchestrator;
+    }
+
+    /**
+     * Register all device IPC channels
+     */
+    register(ipcMain) {
+        if (!ipcMain || typeof ipcMain.handle !== 'function') {
+            throw new Error('Valid ipcMain instance required');
+        }
+
+        // Get all devices with their runtime state
+        ipcMain.handle('device:list', async () => {
+            return this._deviceOrchestrator.getAllDevices();
+        });
+
+        // Get a single device by ID
+        ipcMain.handle('device:get', async (event, deviceId) => {
+            if (!deviceId) {
+                throw new Error('deviceId is required');
+            }
+            return this._deviceOrchestrator.getDevice(deviceId);
+        });
+
+        // Pair with a wireless device (requires host:port and pairing code)
+        ipcMain.handle('device:pair', async (event, host, pairingCode) => {
+            if (!host || !pairingCode) {
+                throw new Error('host and pairingCode are required');
+            }
+            return this._deviceOrchestrator.pairDevice(host, pairingCode);
+        });
+
+        // Connect to a device (USB serial or TCP/IP host:port)
+        ipcMain.handle('device:connect', async (event, target, friendlyName = null) => {
+            if (!target) {
+                throw new Error('target is required (USB serial or host:port)');
+            }
+            return this._deviceOrchestrator.connectDevice(target, friendlyName);
+        });
+
+        // Start screen mirroring for a connected device
+        ipcMain.handle('device:stream:start', async (event, deviceId, options = {}) => {
+            if (!deviceId) {
+                throw new Error('deviceId is required');
+            }
+            return this._deviceOrchestrator.startStreaming(deviceId, options);
+        });
+
+        // Stop screen mirroring
+        ipcMain.handle('device:stream:stop', async (event, deviceId) => {
+            if (!deviceId) {
+                throw new Error('deviceId is required');
+            }
+            return this._deviceOrchestrator.stopStreaming(deviceId);
+        });
+    }
+}
+
+module.exports = DeviceHandlers;
+</file>
+
+<file path="src/main/infrastructure/ipc/DownloadHandlers.js">
+'use strict';
+
+/**
+ * DownloadHandlers
+ * 
+ * Thin IPC layer for download-related operations.
+ * Responsibilities ONLY:
+ * - Register IPC channels with Electron's ipcMain
+ * - Forward requests to DownloadOrchestrator
+ * - Return results/errors
+ * 
+ * NO business logic, NO runtime state, NO process execution.
+ */
+class DownloadHandlers {
+    constructor(downloadOrchestrator) {
+        if (!downloadOrchestrator) {
+            throw new Error('DownloadOrchestrator is required for DownloadHandlers');
+        }
+        this._downloadOrchestrator = downloadOrchestrator;
+    }
+
+    /**
+     * Register all download IPC channels
+     */
+    register(ipcMain) {
+        if (!ipcMain || typeof ipcMain.handle !== 'function') {
+            throw new Error('Valid ipcMain instance required');
+        }
+
+        // Inspect a URL (get formats and metadata)
+        ipcMain.handle('download:inspect', async (event, url) => {
+            if (!url) {
+                throw new Error('URL is required');
+            }
+            return this._downloadOrchestrator.inspectLink(url);
+        });
+
+        // Start downloading a specific format
+        ipcMain.handle('download:start', async (event, url, formatId, deviceId = null, options = {}) => {
+            if (!url || !formatId) {
+                throw new Error('url and formatId are required');
+            }
+            return this._downloadOrchestrator.startDownload(url, formatId, deviceId, options);
+        });
+
+        // Stop an ongoing download by URL
+        ipcMain.handle('download:stop', async (event, url) => {
+            if (!url) {
+                throw new Error('URL is required');
+            }
+            return this._downloadOrchestrator.stopDownload(url);
+        });
+
+        // Get metadata only (lightweight, no formats)
+        ipcMain.handle('download:metadata', async (event, url) => {
+            if (!url) {
+                throw new Error('URL is required');
+            }
+            return this._downloadOrchestrator.getMetadata(url);
+        });
+    }
+}
+
+module.exports = DownloadHandlers;
+</file>
+
+<file path="src/main/infrastructure/ipc/index.js">
+'use strict';
+
+const { ipcMain } = require('electron');
+const DeviceHandlers = require('./DeviceHandlers');
+const DownloadHandlers = require('./DownloadHandlers');
+
+/**
+ * Register all IPC handlers with Electron's ipcMain.
+ * This function should be called once during application startup,
+ * after creating DeviceOrchestrator and DownloadOrchestrator.
+ * 
+ * @param {Object} deviceOrchestrator - Instance of DeviceOrchestrator
+ * @param {Object} downloadOrchestrator - Instance of DownloadOrchestrator
+ */
+function registerIpcHandlers(deviceOrchestrator, downloadOrchestrator) {
+    if (!deviceOrchestrator || !downloadOrchestrator) {
+        throw new Error('Both DeviceOrchestrator and DownloadOrchestrator are required');
+    }
+
+    const deviceHandlers = new DeviceHandlers(deviceOrchestrator);
+    const downloadHandlers = new DownloadHandlers(downloadOrchestrator);
+
+    deviceHandlers.register(ipcMain);
+    downloadHandlers.register(ipcMain);
+}
+
+module.exports = {
+    registerIpcHandlers,
+    DeviceHandlers,
+    DownloadHandlers
+};
 </file>
 
 <file path="src/main/infrastructure/persistence/DatabaseManager.js">
@@ -1633,269 +1629,6 @@ node_modules/
     "electron-builder": "24.13.3"
   }
 }
-</file>
-
-<file path="src/main/bootstrap/container.js">
-'use strict';
-
-const ErrorCentralService =
-    require(
-        '../infrastructure/logging'
-    );
-
-const ProcessManager =
-    require(
-        '../infrastructure/process'
-    );
-
-const DatabaseManager =
-    require(
-        '../infrastructure/persistence/DatabaseManager'
-    );
-
-const AdbCommandExecutor =
-    require(
-        '../infrastructure/adb/AdbCommandExecutor'
-    );
-
-const ConnectionService =
-    require(
-        '../infrastructure/adb/ConnectionService'
-    );
-
-const ProcessRegistry =
-    require(
-        '../runtime/processes/ProcessRegistry'
-    );
-
-const ProcessSupervisor =
-    require(
-        '../runtime/processes/ProcessSupervisor'
-    );
-
-const DeviceRegistry =
-    require(
-        '../runtime/devices/DeviceRegistry'
-    );
-
-// --- المكونات الجديدة للمرحلة الخامسة ---
-const ScrcpyAdapter =
-    require(
-        '../infrastructure/streaming/ScrcpyAdapter'
-    );
-
-const YtdlpAdapter =
-    require(
-        '../infrastructure/media/YtdlpAdapter'
-    );
-
-const DeviceOrchestrator =
-    require(
-        '../application/orchestrators/DeviceOrchestrator'
-    );
-
-const DownloadOrchestrator =
-    require(
-        '../application/orchestrators/DownloadOrchestrator'
-    );
-
-class BootstrapContainer {
-    constructor() {
-        this._services =
-            new Map();
-
-        this._initialized =
-            false;
-    }
-
-    initialize() {
-        if (
-            this._initialized
-        ) {
-            return this;
-        }
-
-        const processRegistry =
-            new ProcessRegistry();
-
-        const processSupervisor =
-            new ProcessSupervisor({
-                processManager:
-                    ProcessManager,
-                processRegistry,
-                logger:
-                    ErrorCentralService
-            });
-
-        const deviceRegistry =
-            new DeviceRegistry();
-
-        const databaseManager =
-            new DatabaseManager();
-
-        const adbCommandExecutor =
-            new AdbCommandExecutor({
-                processSupervisor,
-                logger:
-                    ErrorCentralService
-            });
-
-        const connectionService =
-            new ConnectionService({
-                adbExecutor:
-                    adbCommandExecutor,
-                logger:
-                    ErrorCentralService
-            });
-
-        connectionService.on(
-            'adbDevices',
-            devices => {
-                if (
-                    !Array.isArray(
-                        devices
-                    )
-                ) {
-                    return;
-                }
-
-                for (
-                    const device of devices
-                ) {
-                    if (
-                        !device ||
-                        !device.serial
-                    ) {
-                        continue;
-                    }
-
-                    deviceRegistry
-                        .updateState(
-                            device.serial,
-                            {
-                                status:
-                                    device.state ||
-                                    'unknown',
-                                adbTarget:
-                                    device.serial,
-                                lastSeen:
-                                    new Date()
-                            }
-                        );
-                }
-            }
-        );
-
-        // --- إنشاء محولات Infrastructure ---
-        const scrcpyAdapter = new ScrcpyAdapter({
-            processSupervisor,
-            scrcpyPath: 'scrcpy',
-            logger: ErrorCentralService
-        });
-
-        const ytdlpAdapter = new YtdlpAdapter({
-            processSupervisor,
-            ytDlpPath: 'yt-dlp',
-            logger: ErrorCentralService
-        });
-
-        // --- إنشاء الـ Orchestrators (طبقة Application) ---
-        const deviceOrchestrator = new DeviceOrchestrator({
-            deviceRegistry,
-            connectionService,
-            scrcpyAdapter,
-            logger: ErrorCentralService
-        });
-
-        const downloadOrchestrator = new DownloadOrchestrator({
-            ytdlpAdapter,
-            deviceRegistry,
-            logger: ErrorCentralService
-        });
-
-        // --- تسجيل طبقة IPC الرقيقة (المرحلة 6) ---
-        const { registerIpcHandlers } = require('../infrastructure/ipc');
-        registerIpcHandlers(deviceOrchestrator, downloadOrchestrator);
-
-        // --- تسجيل جميع الخدمات في الخريطة ---
-        this._services.set(
-            'errorCentralService',
-            ErrorCentralService
-        );
-
-        this._services.set(
-            'processManager',
-            ProcessManager
-        );
-
-        this._services.set(
-            'processRegistry',
-            processRegistry
-        );
-
-        this._services.set(
-            'processSupervisor',
-            processSupervisor
-        );
-
-        this._services.set(
-            'deviceRegistry',
-            deviceRegistry
-        );
-
-        this._services.set(
-            'databaseManager',
-            databaseManager
-        );
-
-        this._services.set(
-            'adbCommandExecutor',
-            adbCommandExecutor
-        );
-
-        this._services.set(
-            'connectionService',
-            connectionService
-        );
-
-        // --- تسجيل المكونات الجديدة ---
-        this._services.set(
-            'scrcpyAdapter',
-            scrcpyAdapter
-        );
-
-        this._services.set(
-            'ytdlpAdapter',
-            ytdlpAdapter
-        );
-
-        this._services.set(
-            'deviceOrchestrator',
-            deviceOrchestrator
-        );
-
-        this._services.set(
-            'downloadOrchestrator',
-            downloadOrchestrator
-        );
-
-        this._initialized =
-            true;
-
-        return this;
-    }
-
-    resolve(name) {
-        return (
-            this._services.get(
-                name
-            ) || null
-        );
-    }
-}
-
-module.exports =
-    new BootstrapContainer();
 </file>
 
 <file path="src/main/infrastructure/adb/ConnectionService.js">
@@ -2612,6 +2345,179 @@ module.exports = Object.freeze({
     LOG_SOURCES,
     SEVERITY
 });
+</file>
+
+<file path="src/main/infrastructure/media/YtdlpAdapter.js">
+'use strict';
+
+class YtdlpAdapter {
+    constructor({ processSupervisor, ytdlpPath = 'yt-dlp' }) {
+        this._processSupervisor = processSupervisor;
+        this._ytdlpPath = ytdlpPath;
+        this._activeDownloads = new Map(); // processId -> { resolve, reject, entity }
+    }
+
+    /**
+     * Inspect available formats for a given URL without downloading.
+     * @param {string} url - Video/audio URL
+     * @returns {Promise<Object>} Formats and metadata
+     */
+    async inspectFormats(url) {
+        if (!url) {
+            throw new Error('URL is required');
+        }
+
+        const processId = `ytdlp-inspect-${Date.now()}`;
+        const args = ['-F', '--print-json', url];
+
+        // Use quick task to get output
+        const output = await this._processSupervisor.executeQuickTaskArray(
+            this._ytdlpPath,
+            args,
+            { timeout: 30000 }
+        );
+
+        // Parse JSON output (yt-dlp --print-json returns one JSON object per line for formats)
+        const lines = output.split('\n').filter(l => l.trim());
+        if (lines.length === 0) {
+            throw new Error('No output from yt-dlp');
+        }
+
+        // First line is video info, subsequent lines are format entries
+        const videoInfo = JSON.parse(lines[0]);
+        const formats = lines.slice(1).map(line => {
+            try {
+                return JSON.parse(line);
+            } catch (e) {
+                return null;
+            }
+        }).filter(f => f);
+
+        return {
+            title: videoInfo.title,
+            duration: videoInfo.duration,
+            thumbnail: videoInfo.thumbnail,
+            formats: formats.map(f => ({
+                formatId: f.format_id,
+                ext: f.ext,
+                resolution: f.resolution || null,
+                fps: f.fps || null,
+                acodec: f.acodec,
+                vcodec: f.vcodec,
+                filesize: f.filesize,
+                formatNote: f.format_note
+            }))
+        };
+    }
+
+    /**
+     * Extract metadata for a URL without downloading.
+     * @param {string} url - Video/audio URL
+     * @returns {Promise<Object>} Basic metadata (title, duration, thumbnail, etc.)
+     */
+    async extractMetadata(url) {
+        if (!url) {
+            throw new Error('URL is required');
+        }
+
+        const args = ['-j', '--flat-playlist', url];
+        const output = await this._processSupervisor.executeQuickTaskArray(
+            this._ytdlpPath,
+            args,
+            { timeout: 15000 }
+        );
+
+        const data = JSON.parse(output);
+        return {
+            id: data.id,
+            title: data.title,
+            duration: data.duration,
+            thumbnail: data.thumbnail,
+            uploader: data.uploader,
+            webpageUrl: data.webpage_url
+        };
+    }
+
+    /**
+     * Start downloading a video/audio format.
+     * @param {string} url - Source URL
+     * @param {string} formatId - Format ID to download
+     * @param {string} outputPath - Full output file path
+     * @param {Function} onProgress - Callback for progress updates
+     * @returns {Promise<Object>} Promise resolved when download completes
+     */
+    startDownload(url, formatId, outputPath, onProgress = null) {
+        return new Promise((resolve, reject) => {
+            const processId = `ytdlp-dl-${Date.now()}`;
+            const args = [
+                '-f', formatId,
+                '-o', outputPath,
+                '--newline',
+                '--progress',
+                url
+            ];
+
+            const process = this._processSupervisor.startManagedProcess({
+                processId,
+                binPath: this._ytdlpPath,
+                args,
+                type: 'ytdlp-download',
+                metadata: { url, formatId, outputPath },
+                onData: (chunk, streamType) => {
+                    if (streamType !== 'stderr') return;
+                    const text = chunk.toString();
+                    // Parse progress: [download]  45.2% of 10.23MiB at 1.2Mi/s ETA 00:05
+                    const match = text.match(/\[download\]\s+(\d+(?:\.\d+)?)%/);
+                    if (match && onProgress) {
+                        const percent = parseFloat(match[1]);
+                        onProgress({ percent, raw: text });
+                    }
+                }
+            });
+
+            this._activeDownloads.set(processId, { resolve, reject, process });
+
+            // Wait for process exit via monitoring? Actually startManagedProcess returns child
+            // We need to listen to exit via ProcessSupervisor? Simplified: we poll or use ProcessRegistry.
+            // Better: Use ProcessSupervisor to get status, but for simplicity we'll assume onData can detect completion.
+            // Since this is infrastructure, we can attach a one-time listener to the child process.
+            if (process && process.once) {
+                process.once('exit', (code) => {
+                    this._activeDownloads.delete(processId);
+                    if (code === 0) {
+                        resolve({ success: true, outputPath, processId });
+                    } else {
+                        reject(new Error(`Download failed with exit code ${code}`));
+                    }
+                });
+                process.once('error', (err) => {
+                    this._activeDownloads.delete(processId);
+                    reject(err);
+                });
+            } else {
+                reject(new Error('Failed to start process'));
+            }
+        });
+    }
+
+    /**
+     * Stop an ongoing download.
+     * @param {string} processId - ID returned from startDownload
+     * @returns {boolean} True if stopped
+     */
+    stopDownload(processId) {
+        if (!processId) return false;
+        const exists = this._activeDownloads.has(processId);
+        if (exists) {
+            this._processSupervisor.stopManagedProcess(processId);
+            this._activeDownloads.delete(processId);
+            return true;
+        }
+        return false;
+    }
+}
+
+module.exports = YtdlpAdapter;
 </file>
 
 <file path="src/main/infrastructure/process/index.js">
@@ -3709,6 +3615,269 @@ class ProcessSupervisor {
 
 module.exports =
     ProcessSupervisor;
+</file>
+
+<file path="src/main/bootstrap/container.js">
+'use strict';
+
+const ErrorCentralService =
+    require(
+        '../infrastructure/logging'
+    );
+
+const ProcessManager =
+    require(
+        '../infrastructure/process'
+    );
+
+const DatabaseManager =
+    require(
+        '../infrastructure/persistence/DatabaseManager'
+    );
+
+const AdbCommandExecutor =
+    require(
+        '../infrastructure/adb/AdbCommandExecutor'
+    );
+
+const ConnectionService =
+    require(
+        '../infrastructure/adb/ConnectionService'
+    );
+
+const ProcessRegistry =
+    require(
+        '../runtime/processes/ProcessRegistry'
+    );
+
+const ProcessSupervisor =
+    require(
+        '../runtime/processes/ProcessSupervisor'
+    );
+
+const DeviceRegistry =
+    require(
+        '../runtime/devices/DeviceRegistry'
+    );
+
+// --- المكونات الجديدة للمرحلة الخامسة ---
+const ScrcpyAdapter =
+    require(
+        '../infrastructure/streaming/ScrcpyAdapter'
+    );
+
+const YtdlpAdapter =
+    require(
+        '../infrastructure/media/YtdlpAdapter'
+    );
+
+const DeviceOrchestrator =
+    require(
+        '../application/orchestrators/DeviceOrchestrator'
+    );
+
+const DownloadOrchestrator =
+    require(
+        '../application/orchestrators/DownloadOrchestrator'
+    );
+
+class BootstrapContainer {
+    constructor() {
+        this._services =
+            new Map();
+
+        this._initialized =
+            false;
+    }
+
+    initialize() {
+        if (
+            this._initialized
+        ) {
+            return this;
+        }
+
+        const processRegistry =
+            new ProcessRegistry();
+
+        const processSupervisor =
+            new ProcessSupervisor({
+                processManager:
+                    ProcessManager,
+                processRegistry,
+                logger:
+                    ErrorCentralService
+            });
+
+        const deviceRegistry =
+            new DeviceRegistry();
+
+        const databaseManager =
+            new DatabaseManager();
+
+        const adbCommandExecutor =
+            new AdbCommandExecutor({
+                processSupervisor,
+                logger:
+                    ErrorCentralService
+            });
+
+        const connectionService =
+            new ConnectionService({
+                adbExecutor:
+                    adbCommandExecutor,
+                logger:
+                    ErrorCentralService
+            });
+
+        connectionService.on(
+            'adbDevices',
+            devices => {
+                if (
+                    !Array.isArray(
+                        devices
+                    )
+                ) {
+                    return;
+                }
+
+                for (
+                    const device of devices
+                ) {
+                    if (
+                        !device ||
+                        !device.serial
+                    ) {
+                        continue;
+                    }
+
+                    deviceRegistry
+                        .updateState(
+                            device.serial,
+                            {
+                                status:
+                                    device.state ||
+                                    'unknown',
+                                adbTarget:
+                                    device.serial,
+                                lastSeen:
+                                    new Date()
+                            }
+                        );
+                }
+            }
+        );
+
+        // --- إنشاء محولات Infrastructure ---
+        const scrcpyAdapter = new ScrcpyAdapter({
+            processSupervisor,
+            scrcpyPath: 'scrcpy',
+            logger: ErrorCentralService
+        });
+
+        const ytdlpAdapter = new YtdlpAdapter({
+            processSupervisor,
+            ytDlpPath: 'yt-dlp',
+            logger: ErrorCentralService
+        });
+
+        // --- إنشاء الـ Orchestrators (طبقة Application) ---
+        const deviceOrchestrator = new DeviceOrchestrator({
+            deviceRegistry,
+            connectionService,
+            scrcpyAdapter,
+            logger: ErrorCentralService
+        });
+
+        const downloadOrchestrator = new DownloadOrchestrator({
+            ytdlpAdapter,
+            deviceRegistry,
+            logger: ErrorCentralService
+        });
+
+        // --- تسجيل طبقة IPC الرقيقة (المرحلة 6) ---
+        const { registerIpcHandlers } = require('../infrastructure/ipc');
+        registerIpcHandlers(deviceOrchestrator, downloadOrchestrator);
+
+        // --- تسجيل جميع الخدمات في الخريطة ---
+        this._services.set(
+            'errorCentralService',
+            ErrorCentralService
+        );
+
+        this._services.set(
+            'processManager',
+            ProcessManager
+        );
+
+        this._services.set(
+            'processRegistry',
+            processRegistry
+        );
+
+        this._services.set(
+            'processSupervisor',
+            processSupervisor
+        );
+
+        this._services.set(
+            'deviceRegistry',
+            deviceRegistry
+        );
+
+        this._services.set(
+            'databaseManager',
+            databaseManager
+        );
+
+        this._services.set(
+            'adbCommandExecutor',
+            adbCommandExecutor
+        );
+
+        this._services.set(
+            'connectionService',
+            connectionService
+        );
+
+        // --- تسجيل المكونات الجديدة ---
+        this._services.set(
+            'scrcpyAdapter',
+            scrcpyAdapter
+        );
+
+        this._services.set(
+            'ytdlpAdapter',
+            ytdlpAdapter
+        );
+
+        this._services.set(
+            'deviceOrchestrator',
+            deviceOrchestrator
+        );
+
+        this._services.set(
+            'downloadOrchestrator',
+            downloadOrchestrator
+        );
+
+        this._initialized =
+            true;
+
+        return this;
+    }
+
+    resolve(name) {
+        return (
+            this._services.get(
+                name
+            ) || null
+        );
+    }
+}
+
+module.exports =
+    new BootstrapContainer();
 </file>
 
 </files>
