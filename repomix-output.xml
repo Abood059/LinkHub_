@@ -1,10 +1,10 @@
-This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+This file is a merged representation of a subset of the codebase, containing files not matching ignore patterns, combined into a single document by Repomix.
 
 <file_summary>
 This section contains a summary of this file.
 
 <purpose>
-This file contains a packed representation of the entire repository's contents.
+This file contains a packed representation of a subset of the repository's contents that is considered the most important context.
 It is designed to be easily consumable by AI systems for analysis, code review,
 or other automated processes.
 </purpose>
@@ -32,6 +32,7 @@ The content is organized as follows:
 <notes>
 - Some files may have been excluded based on .gitignore rules and Repomix's configuration
 - Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching these patterns are excluded: resources/**
 - Files matching patterns in .gitignore are excluded
 - Files matching default ignore patterns are excluded
 - Files are sorted by Git change count (files with more changes are at the bottom)
@@ -105,1489 +106,23 @@ src/
     index.html
     script.js
     style.css
-  renderer.zip
 .gitignore
 package.json
+repomix.config.json
 </directory_structure>
 
 <files>
 This section contains the contents of the repository's files.
 
-<file path="src/main/bootstrap/ApplicationBootstrap.js">
-'use strict';
-
-const path = require('path');
-const container = require('./container');
-const WindowManager = require('../infrastructure/windows/WindowManager');
-const WindowRegistry = require('../infrastructure/windows/WindowRegistry');
-
-class ApplicationBootstrap {
-    constructor() {
-        this._windowManager = null;
-        this._windowRegistry = null;
+<file path="repomix.config.json">
+{
+    "ignore": {
+      "useGitignore": true,
+      "customPatterns": [
+        "resources/**"
+      ]
     }
-
-    async run() {
-        console.log('[Bootstrap] Starting application...');
-
-        // 1. Initialize dependency container
-        container.initialize();
-        console.log('[Bootstrap] Container initialized.');
-
-        // 2. Initialize error central service (logger)
-        const errorService = container.resolve('errorCentralService');
-        if (errorService && typeof errorService.init === 'function') {
-            errorService.init();
-            console.log('[Bootstrap] ErrorCentralService initialized.');
-        }
-
-        // 3. Initialize database (if needed)
-        const dbManager = container.resolve('databaseManager');
-        if (dbManager && typeof dbManager.initDb === 'function') {
-            await dbManager.initDb();
-            console.log('[Bootstrap] Database initialized.');
-        }
-
-        // 4. Retrieve core services for monitoring
-        const connectionService = container.resolve('connectionService');
-        const deviceRegistry = container.resolve('deviceRegistry'); // for reference, not used directly
-
-        // 5. Start ADB monitoring and wireless discovery
-        if (connectionService) {
-            if (typeof connectionService.startAdbMonitoring === 'function') {
-                connectionService.startAdbMonitoring(5000);
-                console.log('[Bootstrap] ADB monitoring started.');
-            }
-            if (typeof connectionService.startWirelessDiscovery === 'function') {
-                connectionService.startWirelessDiscovery();
-                console.log('[Bootstrap] Wireless discovery started.');
-            }
-        }
-
-        // 6. Initialize window management infrastructure
-        this._windowRegistry = new WindowRegistry();
-        this._windowManager = new WindowManager(this._windowRegistry);
-
-
-        // 7. Create main window
-        await this.createMainWindow();
-
-        console.log('[Bootstrap] Application ready.');
-    }
-
-    async createMainWindow() {
-        const indexPath = path.join(__dirname, '../../renderer/index.html');
-        const mainWindow = this._windowManager.createMainWindow({
-            loadFile: indexPath,
-            show: false
-        });
-        mainWindow.once('ready-to-show', () => {
-            mainWindow.show();
-            if (process.env.NODE_ENV === 'development') {
-                mainWindow.webContents.openDevTools();
-            }
-        });
-        return mainWindow;
-    }
-
-    getWindowManager() {
-        return this._windowManager;
-    }
-
-    getWindowRegistry() {
-        return this._windowRegistry;
-    }
-}
-
-module.exports = ApplicationBootstrap;
-</file>
-
-<file path="src/main/infrastructure/windows/AppWindow.js">
-'use strict';
-
-/**
- * AppWindow - Lightweight wrapper around Electron BrowserWindow.
- * Provides a simplified API without any business logic.
- * This is optional; WindowManager can work directly with BrowserWindow.
- */
-class AppWindow {
-    constructor(name, browserWindow) {
-        if (!name || typeof name !== 'string') {
-            throw new Error('AppWindow requires a valid name');
-        }
-        if (!browserWindow || typeof browserWindow !== 'object') {
-            throw new Error('AppWindow requires a BrowserWindow instance');
-        }
-        this._name = name;
-        this._win = browserWindow;
-    }
-    
-    get name() {
-        return this._name;
-    }
-    
-    get instance() {
-        return this._win;
-    }
-    
-    show() {
-        if (!this._win.isDestroyed()) {
-            this._win.show();
-        }
-    }
-    
-    hide() {
-        if (!this._win.isDestroyed()) {
-            this._win.hide();
-        }
-    }
-    
-    close() {
-        if (!this._win.isDestroyed()) {
-            this._win.close();
-        }
-    }
-    
-    focus() {
-        if (!this._win.isDestroyed()) {
-            this._win.focus();
-        }
-    }
-    
-    send(channel, data) {
-        if (!this._win.isDestroyed()) {
-            this._win.webContents.send(channel, data);
-        }
-    }
-    
-    isDestroyed() {
-        return this._win.isDestroyed();
-    }
-}
-
-module.exports = AppWindow;
-</file>
-
-<file path="src/main/infrastructure/windows/WindowManager.js">
-'use strict';
-
-const { BrowserWindow } = require('electron');
-
-/**
- * WindowManager
- * Responsible for creating, managing, and destroying BrowserWindows.
- * Uses a WindowRegistry for storage.
- * No business logic – only Electron window operations.
- */
-class WindowManager {
-    constructor(windowRegistry) {
-        if (!windowRegistry) {
-            throw new Error('WindowManager requires a WindowRegistry instance');
-        }
-        this._registry = windowRegistry;
-    }
-    
-    /**
-     * Create a new BrowserWindow and register it.
-     * @param {string} id - Unique identifier for the window
-     * @param {object} options - Electron BrowserWindow options
-     * @param {string} [options.loadFile] - Path to HTML file to load
-     * @param {string} [options.loadURL] - URL to load (alternative to loadFile)
-     * @returns {Electron.BrowserWindow} The created window
-     */
-    createWindow(id, options = {}) {
-        if (this._registry.has(id)) {
-            throw new Error(`WindowManager: Window with id "${id}" already exists. Close it first or use a different id.`);
-        }
-        
-        // Merge with default options
-        const defaultOptions = {
-            show: false,
-            webPreferences: {
-                contextIsolation: true,
-                nodeIntegration: false,
-                sandbox: false
-            }
-        };
-        const finalOptions = { ...defaultOptions, ...options };
-        
-        const browserWindow = new BrowserWindow(finalOptions);
-        
-        // Load content
-        if (finalOptions.loadFile) {
-            browserWindow.loadFile(finalOptions.loadFile);
-        } else if (finalOptions.loadURL) {
-            browserWindow.loadURL(finalOptions.loadURL);
-        } else {
-            throw new Error('WindowManager: No loadFile or loadURL provided');
-        }
-        
-        // Register the window
-        this._registry.register(id, browserWindow);
-        
-        // Auto-unregister when window is closed
-        browserWindow.once('closed', () => {
-            this._registry.unregister(id);
-        });
-        
-        return browserWindow;
-    }
-    
-    /**
-     * Helper to create the main application window with standard settings.
-     * @param {object} customOptions - Override default options
-     * @returns {Electron.BrowserWindow}
-     */
-    createMainWindow(customOptions = {}) {
-        const defaultMainOptions = {
-            width: 1200,
-            height: 800,
-            minWidth: 900,
-            minHeight: 600,
-            title: 'LinkHub',
-            webPreferences: {
-                preload: require('path').join(__dirname, '../../../preload/preload.js'),
-                contextIsolation: true,
-                nodeIntegration: false
-            },
-            show: false
-        };
-        const options = { ...defaultMainOptions, ...customOptions };
-        return this.createWindow('main', options);
-    }
-    
-    /**
-     * Get a window by id.
-     * @param {string} id
-     * @returns {Electron.BrowserWindow|null}
-     */
-    getWindow(id) {
-        return this._registry.get(id);
-    }
-    
-    /**
-     * Close a window by id. If force is true, destroy immediately.
-     * @param {string} id
-     * @param {boolean} [force=false] - If true, call destroy() instead of close()
-     * @returns {boolean} true if window existed and was closed/destroyed
-     */
-    closeWindow(id, force = false) {
-        const win = this._registry.get(id);
-        if (!win) return false;
-        
-        if (force) {
-            win.destroy();
-        } else {
-            win.close();
-        }
-        // The 'closed' event will unregister automatically
-        return true;
-    }
-    
-    /**
-     * Send an IPC message to a specific window.
-     * @param {string} id - Window identifier
-     * @param {string} channel - IPC channel name
-     * @param {any} data - Data to send
-     * @returns {boolean} true if window exists and message sent
-     */
-    sendTo(id, channel, data) {
-        const win = this._registry.get(id);
-        if (win && !win.isDestroyed()) {
-            win.webContents.send(channel, data);
-            return true;
-        }
-        return false;
-    }
-    
-    /**
-     * Broadcast an IPC message to all registered windows.
-     * @param {string} channel
-     * @param {any} data
-     */
-    broadcast(channel, data) {
-        for (const win of this._registry.getAll()) {
-            if (!win.isDestroyed()) {
-                win.webContents.send(channel, data);
-            }
-        }
-    }
-    
-    /**
-     * Destroy all windows and clear registry.
-     */
-    destroyAllWindows() {
-        for (const win of this._registry.getAll()) {
-            if (!win.isDestroyed()) {
-                win.destroy();
-            }
-        }
-        this._registry.clear();
-    }
-}
-
-module.exports = WindowManager;
-</file>
-
-<file path="src/main/infrastructure/windows/WindowRegistry.js">
-'use strict';
-
-/**
- * WindowRegistry
- * Responsible for storing and retrieving BrowserWindow instances.
- * No window creation or lifecycle logic – pure storage.
- */
-class WindowRegistry {
-    constructor() {
-        this._windows = new Map(); // key: string (windowId), value: BrowserWindow
-    }
-    
-    /**
-     * Register a window with a unique identifier.
-     * @param {string} id - Unique window identifier
-     * @param {Electron.BrowserWindow} window - BrowserWindow instance
-     * @throws {Error} if id or window is invalid
-     */
-    register(id, window) {
-        if (!id || typeof id !== 'string') {
-            throw new Error('WindowRegistry: Invalid window id');
-        }
-        if (!window || typeof window !== 'object') {
-            throw new Error('WindowRegistry: Invalid window object');
-        }
-        if (this._windows.has(id)) {
-            // Optionally warn but allow override? We'll unregister first.
-            console.warn(`WindowRegistry: Overwriting existing window with id ${id}`);
-        }
-        this._windows.set(id, window);
-    }
-    
-    /**
-     * Remove a window from registry.
-     * @param {string} id
-     * @returns {boolean} true if existed and removed
-     */
-    unregister(id) {
-        return this._windows.delete(id);
-    }
-    
-    /**
-     * Retrieve a window by id.
-     * @param {string} id
-     * @returns {Electron.BrowserWindow|null}
-     */
-    get(id) {
-        return this._windows.get(id) || null;
-    }
-    
-    /**
-     * Check if a window id exists.
-     * @param {string} id
-     * @returns {boolean}
-     */
-    has(id) {
-        return this._windows.has(id);
-    }
-    
-    /**
-     * Get all registered window instances.
-     * @returns {Electron.BrowserWindow[]}
-     */
-    getAll() {
-        return Array.from(this._windows.values());
-    }
-    
-    /**
-     * Clear all windows from registry (does not destroy them).
-     */
-    clear() {
-        this._windows.clear();
-    }
-}
-
-module.exports = WindowRegistry;
-</file>
-
-<file path="src/main/index.js">
-'use strict';
-
-const { app } = require('electron');
-const ApplicationBootstrap = require('./bootstrap/ApplicationBootstrap');
-const container = require('./bootstrap/container');
-
-// Handle creating/removing shortcuts on Windows when installing/uninstalling.
-if (require('electron-squirrel-startup')) {
-    app.quit();
-}
-
-let bootstrap = null;
-
-// This method will be called when Electron has finished initialization and is ready to create browser windows.
-app.whenReady().then(async () => {
-    try {
-        bootstrap = new ApplicationBootstrap();
-        await bootstrap.run();
-    } catch (error) {
-        console.error('[Main] Fatal error during application startup:', error);
-        app.quit();
-    }
-});
-
-// Quit when all windows are closed, except on macOS.
-app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') {
-        app.quit();
-    }
-});
-
-// On macOS, re-create a window when the dock icon is clicked and no windows are open.
-app.on('activate', () => {
-    if (bootstrap && bootstrap.getWindowManager()) {
-        const mainWindow = bootstrap.getWindowManager().getWindow('main');
-        if (!mainWindow) {
-            bootstrap.createMainWindow();
-        } else {
-            mainWindow.show();
-        }
-    }
-});
-
-// Graceful shutdown: terminate all managed processes before quitting.
-app.on('before-quit', async (event) => {
-    // Prevent default quit to allow async cleanup
-    event.preventDefault();
-    
-    try {
-        const processManager = container.resolve('processManager');
-        if (processManager && processManager.terminateAll) {
-            await processManager.terminateAll();
-        }
-        
-        const dbManager = container.resolve('databaseManager');
-        if (dbManager && dbManager.close) {
-            await dbManager.close();
-        }
-        
-        const errorService = container.resolve('errorCentralService');
-        if (errorService && errorService.flush) {
-            await errorService.flush();
-        }
-    } catch (err) {
-        console.error('[Main] Error during graceful shutdown:', err);
-    } finally {
-        app.exit(0);
-    }
-});
-</file>
-
-<file path="src/preload/preload.js">
-/**
- * preload.js
- * 
- * Safe bridge between renderer process and main process.
- * Exposes a limited, secure API via contextBridge.
- * 
- * NO business logic, NO direct access to Node.js APIs.
- */
-
-const { contextBridge, ipcRenderer } = require('electron');
-
-// ============================================================================
-// 1. Devices API
-// ============================================================================
-
-const devicesAPI = {
-    /**
-     * Get all registered devices with their runtime state.
-     * @returns {Promise<Array>}
-     */
-    getAll: () => ipcRenderer.invoke('device:list'),
-    
-    /**
-     * Get a single device by ID.
-     * @param {string} deviceId
-     * @returns {Promise<Object|null>}
-     */
-    get: (deviceId) => ipcRenderer.invoke('device:get', deviceId),
-    
-    /**
-     * Pair with a wireless device.
-     * @param {string} host - e.g., "192.168.1.10:37000"
-     * @param {string} pairingCode - 6-digit code
-     * @returns {Promise<string[]>}
-     */
-    pair: (host, pairingCode) => ipcRenderer.invoke('device:pair', host, pairingCode),
-    
-    /**
-     * Connect to a device (USB serial or TCP/IP host:port).
-     * @param {string} target - e.g., "emulator-5554" or "192.168.1.10:5555"
-     * @param {string|null} friendlyName - Optional display name
-     * @returns {Promise<Object>}
-     */
-    connect: (target, friendlyName = null) => ipcRenderer.invoke('device:connect', target, friendlyName),
-    
-    /**
-     * Start screen mirroring for a connected device.
-     * @param {string} deviceId
-     * @param {Object} options - e.g., { fullscreen: boolean, bitrate: number }
-     * @returns {Promise<string>} processId
-     */
-    stream: {
-        start: (deviceId, options = {}) => ipcRenderer.invoke('device:stream:start', deviceId, options),
-        stop: (deviceId) => ipcRenderer.invoke('device:stream:stop', deviceId)
-    }
-};
-
-// ============================================================================
-// 2. Downloads API
-// ============================================================================
-
-const downloadsAPI = {
-    /**
-     * Inspect a URL: get available formats and metadata.
-     * @param {string} url
-     * @returns {Promise<Object>}
-     */
-    inspect: (url) => ipcRenderer.invoke('download:inspect', url),
-    
-    /**
-     * Start downloading a specific format.
-     * @param {string} url
-     * @param {string} formatId
-     * @param {string|null} deviceId - Optional device ID for saving location
-     * @param {Object} options - Additional options
-     * @returns {Promise<Object>}
-     */
-    start: (url, formatId, deviceId = null, options = {}) => 
-        ipcRenderer.invoke('download:start', url, formatId, deviceId, options),
-    
-    /**
-     * Stop an ongoing download by URL.
-     * @param {string} url
-     * @returns {Promise<boolean>}
-     */
-    stop: (url) => ipcRenderer.invoke('download:stop', url),
-    
-    /**
-     * Get lightweight metadata (title, duration, thumbnail).
-     * @param {string} url
-     * @returns {Promise<Object>}
-     */
-    metadata: (url) => ipcRenderer.invoke('download:metadata', url)
-};
-
-// ============================================================================
-// 3. Event listening (for runtime → UI events)
-// ============================================================================
-
-/**
- * Generic event listener system.
- * Allows renderer to subscribe to any IPC message sent from main process.
- * 
- * Usage:
- *   linkhub.on('device:stateChanged', (event, data) => { ... });
- *   linkhub.off('device:stateChanged', callback);
- */
-const eventAPI = {
-    /**
-     * Register a listener for an IPC message from main process.
-     * @param {string} channel - Channel name (e.g., 'device:stateChanged')
-     * @param {Function} callback - Function that receives (event, ...args)
-     * @returns {Function} - Unsubscribe function
-     */
-    on: (channel, callback) => {
-        if (typeof callback !== 'function') {
-            throw new Error('Callback must be a function');
-        }
-        const wrappedCallback = (event, ...args) => callback(event, ...args);
-        ipcRenderer.on(channel, wrappedCallback);
-        // Return unsubscribe function
-        return () => {
-            ipcRenderer.removeListener(channel, wrappedCallback);
-        };
-    },
-    
-    /**
-     * Remove a specific listener.
-     * @param {string} channel
-     * @param {Function} callback - The original callback function
-     */
-    off: (channel, callback) => {
-        ipcRenderer.removeListener(channel, callback);
-    },
-    
-    /**
-     * Remove all listeners for a channel.
-     * @param {string} channel
-     */
-    removeAllListeners: (channel) => {
-        ipcRenderer.removeAllListeners(channel);
-    }
-};
-
-// ============================================================================
-// 4. Expose the unified API to renderer
-// ============================================================================
-
-contextBridge.exposeInMainWorld('linkhub', {
-    devices: devicesAPI,
-    downloads: downloadsAPI,
-    on: eventAPI.on,
-    off: eventAPI.off,
-    removeAllListeners: eventAPI.removeAllListeners
-});
-
-// Optional: Log that preload has loaded (only in development)
-if (process.env.NODE_ENV === 'development') {
-    console.log('[Preload] linkhub API exposed successfully');
-}
-</file>
-
-<file path="src/renderer/index.html">
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>LinkFlow | التدفق الذكي</title>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
-
-    <div class="app-container">
-        
-        <header class="navbar-wrapper">
-            <nav class="navbar">
-                <div class="logo">
-                    <span class="logo-text">LinkFlow</span>
-                </div>
-                
-                <div class="nav-links" dir="ltr">
-                    <a href="#" class="nav-item active" data-tab="home">
-                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                            <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
-                        </svg>
-                        <span>الرئيسية</span>
-                    </a>
-                    <a href="#" class="nav-item" data-tab="downloads">
-                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                            <path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m-4-4l4 4 4-4"/>
-                        </svg>
-                        <span>التحميلات</span>
-                    </a>
-                    <a href="#" class="nav-item" data-tab="settings">
-                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                            <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-                            <circle cx="12" cy="12" r="3"/>
-                        </svg>
-                        <span>الإعدادات</span>
-                    </a>
-                </div>
-
-                <div class="user-profile">
-                    <div class="user-avatar">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                            <path d="M5.121 17.804A9 9 0 0119 12M5.12 6.196A9 9 0 0119 12M12 3v1m0 16v1M3 12h1m16 0h1M5.6 5.6l.7.7m12.1 12.1l-.7-.7M5.6 18.4l.7-.7M18.4 5.6l-.7.7" stroke-linecap="round"/>
-                            <circle cx="12" cy="12" r="3"/>
-                        </svg>
-                    </div>
-                    <span class="user-name">المستخدم</span>
-                </div>
-            </nav>
-        </header>
-
-        <main class="dashboard-content">
-            <!-- قسم الرئيسية -->
-            <div id="home-section" class="tab-section active-section">
-                <section class="devices-section">
-                    <div class="devices-capsule-wrapper">
-                        <h2 class="section-subheading">الأجهزة المتصلة</h2>
-                        <div class="devices-capsule-pill" id="registered-devices">
-                            <!-- سيتم تعبئتها ديناميكياً عبر JS -->
-                            <div class="placeholder-text">جاري تحميل الأجهزة...</div>
-                        </div>
-                    </div>
-                    <div class="devices-capsule-wrapper offset-top">
-                        <h2 class="section-subheading offline-sub">الأجهزة غير المتصلة (المكتشفة)</h2>
-                        <div class="devices-capsule-pill offline-capsule" id="discovered-devices">
-                            <div class="placeholder-text">جاري البحث عن أجهزة...</div>
-                        </div>
-                    </div>
-                </section>
-
-                <section class="routing-section">
-                    <div class="routing-input-container">
-                        <input type="text" class="input-url" id="media-url" placeholder="أدخل رابط الوسائط (فيديو، أغنية) لبدء التوجيه...">
-                        <button class="btn-route" id="btn-start-route">توجيه وبدء التحميل</button>
-                    </div>
-                </section>
-            </div>
-
-            <!-- قسم التحميلات -->
-            <div id="downloads-section" class="tab-section">
-                <div class="downloads-card">
-                    <h2 class="section-subheading right-align">قائمة التحميلات النشطة</h2>
-                    <div class="table-container">
-                        <table class="downloads-table">
-                            <thead>
-                                <tr>
-                                    <th style="width: 30%;">اسم الملف</th>
-                                    <th style="width: 20%;">التقدم</th>
-                                    <th style="width: 15%;">الحجم</th>
-                                    <th style="width: 15%;">السرعة</th>
-                                    <th style="width: 20%;">الجهة الوجهة</th>
-                                </tr>
-                            </thead>
-                            <tbody id="downloads-tbody">
-                                <!-- سيتم تعبئتها ديناميكياً -->
-                                <tr class="empty-row"><td colspan="5" style="text-align:center;">لا توجد تحميلات نشطة</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- قسم الإعدادات -->
-            <div id="settings-section" class="tab-section">
-                <div class="settings-card">
-                    <h2 class="section-subheading right-align">الإعدادات العامة</h2>
-                    <div class="settings-placeholder">
-                        <p>✔️ جودة البث التلقائي: عالية (قابل للتعديل لاحقاً)</p>
-                        <p>✔️ حفظ الملفات على الجهاز: مفعل</p>
-                        <p>✔️ إشعارات التحميل: مفعلة</p>
-                        <button class="btn-outline" id="refresh-devices">تحديث الأجهزة</button>
-                    </div>
-                </div>
-            </div>
-        </main>
-    </div>
-
-    <script src="script.js"></script>
-</body>
-</html>
-</file>
-
-<file path="src/renderer/script.js">
-// LinkFlow - جاهز للتكامل مع Electron IPC
-// لا يحتوي على بيانات وهمية، فقط هيكل للربط
-
-document.addEventListener('DOMContentLoaded', () => {
-    // ------------------- تبديل الأقسام -------------------
-    const navItems = document.querySelectorAll('.nav-item');
-    const sections = {
-        home: document.getElementById('home-section'),
-        downloads: document.getElementById('downloads-section'),
-        settings: document.getElementById('settings-section')
-    };
-
-    function switchTab(tabId) {
-        Object.values(sections).forEach(section => section?.classList.remove('active-section'));
-        if (sections[tabId]) sections[tabId].classList.add('active-section');
-        navItems.forEach(item => {
-            const itemTab = item.getAttribute('data-tab');
-            if (itemTab === tabId) item.classList.add('active');
-            else item.classList.remove('active');
-        });
-    }
-
-    navItems.forEach(item => {
-        item.addEventListener('click', (e) => {
-            e.preventDefault();
-            switchTab(item.getAttribute('data-tab'));
-        });
-    });
-    switchTab('home');
-
-    // ------------------- إدارة الأجهزة (حقيقية) -------------------
-    let devices = [];        // قائمة الأجهزة المسجلة (من device:list)
-    let selectedDeviceIds = new Set();   // تخزين معرفات الأجهزة المحددة (لتوجيه التحميل)
-
-    const registeredContainer = document.getElementById('registered-devices');
-    const discoveredContainer = document.getElementById('discovered-devices');
-
-    // دالة لعرض الأجهزة (تقوم بتحديث الواجهة)
-    function renderDevices(registeredDevices, discoveredDevices) {
-        // عرض الأجهزة المسجلة (المتصلة)
-        if (registeredContainer) {
-            if (!registeredDevices || registeredDevices.length === 0) {
-                registeredContainer.innerHTML = '<div class="placeholder-text">لا توجد أجهزة متصلة</div>';
-            } else {
-                registeredContainer.innerHTML = '';
-                registeredDevices.forEach(device => {
-                    const deviceElement = createDeviceElement(device, true);
-                    registeredContainer.appendChild(deviceElement);
-                });
-            }
-        }
-
-        // عرض الأجهزة المكتشفة (غير المسجلة)
-        if (discoveredContainer) {
-            if (!discoveredDevices || discoveredDevices.length === 0) {
-                discoveredContainer.innerHTML = '<div class="placeholder-text">لا توجد أجهزة مكتشفة</div>';
-            } else {
-                discoveredContainer.innerHTML = '';
-                discoveredDevices.forEach(device => {
-                    const deviceElement = createDeviceElement(device, false);
-                    discoveredContainer.appendChild(deviceElement);
-                });
-            }
-        }
-    }
-
-    // إنشاء عنصر جهاز (UI) مع دعم التحديد المتعدد
-    function createDeviceElement(device, isRegistered) {
-        const div = document.createElement('div');
-        div.className = `device-item ${device.status === 'connected' ? 'status-connected' : 'status-offline'}`;
-        div.setAttribute('data-device-id', device.id);
-        div.setAttribute('data-device-name', device.deviceFriendlyName || device.model || device.id);
-
-        // إذا كان الجهاز مسجلاً ومحدداً، أضف class selected
-        if (isRegistered && selectedDeviceIds.has(device.id)) {
-            div.classList.add('selected');
-        }
-
-        div.innerHTML = `
-            <div class="device-circle">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
-                    <line x1="12" y1="18" x2="12.01" y2="18"></line>
-                </svg>
-            </div>
-            <h3 class="device-name">${escapeHtml(device.deviceFriendlyName || device.model || device.id)}</h3>
-            <span class="status-badge">${device.status === 'connected' ? 'متصل' : (device.status === 'available' ? 'متاح' : 'غير متصل')}</span>
-        `;
-
-        // إذا كان الجهاز مسجلاً (متصل أو متاح)، نمكن التحديد
-        if (isRegistered && (device.status === 'connected' || device.status === 'available')) {
-            div.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (selectedDeviceIds.has(device.id)) {
-                    selectedDeviceIds.delete(device.id);
-                    div.classList.remove('selected');
-                } else {
-                    selectedDeviceIds.add(device.id);
-                    div.classList.add('selected');
-                }
-                console.log('الأجهزة المحددة:', Array.from(selectedDeviceIds));
-            });
-        } else {
-            // الأجهزة غير المسجلة (مكتشفة) – نضيف اقتران عند النقر
-            div.addEventListener('click', async () => {
-                // TODO: استدعاء عملية الاقتران أو الاتصال عبر IPC
-                // سيكون لاحقاً: window.electronAPI.pairDevice(...) أو connectDevice
-                alert(`جهاز "${device.deviceFriendlyName}" غير مسجل. سيتم تنفيذ إجراء الاقتران/الاتصال لاحقاً.`);
-            });
-        }
-
-        return div;
-    }
-
-    function escapeHtml(str) {
-        if (!str) return '';
-        return str.replace(/[&<>]/g, function(m) {
-            if (m === '&') return '&amp;';
-            if (m === '<') return '&lt;';
-            if (m === '>') return '&gt;';
-            return m;
-        });
-    }
-
-    // ------------------- تحميل الأجهزة من الخلفية (IPC) -------------------
-    async function loadDevices() {
-        // TODO: بعد ربط IPC، استخدم window.electronAPI.getAllDevices()
-        // return await window.electronAPI.getAllDevices();
-        // حالياً نعيد بيانات وهمية فارغة لتجنب الأخطاء
-        console.log('سيتم استدعاء device:list لاحقاً');
-        return { registered: [], discovered: [] };
-    }
-
-    // تحديث واجهة الأجهزة
-    async function refreshDevicesUI() {
-        try {
-            const { registered, discovered } = await loadDevices();
-            devices = registered; // تخزين للأجهزة المسجلة
-            renderDevices(registered, discovered);
-        } catch (err) {
-            console.error('فشل تحميل الأجهزة:', err);
-            if (registeredContainer) registeredContainer.innerHTML = '<div class="placeholder-text">خطأ في تحميل الأجهزة</div>';
-        }
-    }
-
-    // ------------------- إدارة التحميلات -------------------
-    const downloadsTbody = document.getElementById('downloads-tbody');
-    const btnStart = document.getElementById('btn-start-route');
-    const urlInput = document.getElementById('media-url');
-
-    // إضافة صف تحميل جديد (يتم استدعاؤه عند بدء التحميل)
-    function addDownloadRow(fileName, targetDeviceId, targetDeviceName) {
-        // TODO: سيتم استدعاؤها من خلال IPC على progress و completion
-        const row = document.createElement('tr');
-        row.setAttribute('data-download-id', `dl-${Date.now()}-${targetDeviceId}`);
-        row.innerHTML = `
-            <td class="file-name">${escapeHtml(fileName)}</td>
-            <td>
-                <div class="progress-wrapper">
-                    <div class="progress-track">
-                        <div class="progress-fill" style="width: 0%;"></div>
-                    </div>
-                    <span class="progress-percentage">0%</span>
-                </div>
-            </td>
-            <td class="file-size">--</td>
-            <td class="download-speed">--</td>
-            <td><span class="device-tag">${escapeHtml(targetDeviceName)}</span></td>
-        `;
-        // إزالة رسالة "لا توجد تحميلات"
-        const emptyRow = downloadsTbody.querySelector('.empty-row');
-        if (emptyRow) emptyRow.remove();
-        downloadsTbody.prepend(row);
-        return row;
-    }
-
-    // تحديث تقدم التحميل (يتم استدعاؤها من مستمع IPC)
-    function updateDownloadProgress(rowId, percent, speed, size) {
-        const row = downloadsTbody.querySelector(`tr[data-download-id="${rowId}"]`);
-        if (!row) return;
-        const fill = row.querySelector('.progress-fill');
-        const percentSpan = row.querySelector('.progress-percentage');
-        const speedSpan = row.querySelector('.download-speed');
-        const sizeSpan = row.querySelector('.file-size');
-        if (fill) fill.style.width = `${percent}%`;
-        if (percentSpan) percentSpan.textContent = `${percent}%`;
-        if (speedSpan) speedSpan.textContent = speed;
-        if (sizeSpan && size) sizeSpan.textContent = size;
-        // تغيير لون شريط التقدم
-        if (fill) {
-            const hue = 210 - (percent / 100) * 90;
-            fill.style.backgroundColor = `hsl(${hue}, 70%, 55%)`;
-        }
-    }
-
-    // إكمال التحميل
-    function markDownloadComplete(rowId) {
-        const row = downloadsTbody.querySelector(`tr[data-download-id="${rowId}"]`);
-        if (!row) return;
-        const fill = row.querySelector('.progress-fill');
-        const percentSpan = row.querySelector('.progress-percentage');
-        const speedSpan = row.querySelector('.download-speed');
-        if (fill) fill.style.width = '100%';
-        if (percentSpan) percentSpan.textContent = '100%';
-        if (speedSpan) speedSpan.textContent = '0 MB/s';
-        if (fill) fill.style.backgroundColor = 'hsl(120, 70%, 55%)';
-    }
-
-    // بدء التحميل للأجهزة المحددة
-    async function startDownloadForSelectedDevices(url, fileName) {
-        if (selectedDeviceIds.size === 0) {
-            alert('الرجاء تحديد جهاز واحد أو أكثر أولاً من قسم الأجهزة المتصلة.');
-            return false;
-        }
-        // TODO: استدعاء download:start لكل جهاز محدد
-        for (let deviceId of selectedDeviceIds) {
-            const device = devices.find(d => d.id === deviceId);
-            if (!device) continue;
-            const deviceName = device.deviceFriendlyName || device.model || deviceId;
-            const row = addDownloadRow(fileName, deviceId, deviceName);
-            // هنا سيتم ربط IPC لبدء التحميل وتحديث التقدم
-            console.log(`بدء التحميل للجهاز ${deviceName} (${deviceId})`, row);
-            // مؤقتاً نضيف محاكاة صغيرة لعرض التقدم لاحقاً
-        }
-        return true;
-    }
-
-    // معالج زر التوجيه
-    btnStart.addEventListener('click', async () => {
-        let url = urlInput.value.trim();
-        if (!url) {
-            alert('الرجاء إدخال رابط الوسائط');
-            return;
-        }
-        let fileName = 'media_' + Date.now();
-        try {
-            const urlObj = new URL(url);
-            const lastSegment = urlObj.pathname.split('/').pop();
-            if (lastSegment && lastSegment.includes('.')) fileName = lastSegment;
-        } catch(e) {}
-        const success = await startDownloadForSelectedDevices(url, fileName);
-        if (success) urlInput.value = '';
-        urlInput.focus();
-    });
-
-    // ------------------- الإعدادات -------------------
-    const refreshBtn = document.getElementById('refresh-devices');
-    if (refreshBtn) {
-        refreshBtn.addEventListener('click', () => {
-            refreshDevicesUI();
-        });
-    }
-
-    // ------------------- استقبال التحديثات من الخلفية (IPC Events) -------------------
-    // TODO: ربط الأحداث القادمة من window.electronAPI
-    // مثال:
-    // window.electronAPI.onUpdateList(({ registered, discovered }) => {
-    //     devices = registered;
-    //     renderDevices(registered, discovered);
-    // });
-    // window.electronAPI.onProgress((data) => { updateDownloadProgress(data.id, data.progress, data.speed, data.size); });
-    // window.electronAPI.onFinished((data) => { markDownloadComplete(data.id); });
-
-    // تحميل أولي للأجهزة
-    refreshDevicesUI();
-});
-</file>
-
-<file path="src/renderer/style.css">
-/* LinkFlow - Modern Dark Theme (مرن ومتجاوب) */
-*,
-*::before,
-*::after {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-}
-
-body {
-    background-color: #1A1A1A;
-    color: #FFFFFF;
-    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
-    min-height: 100vh;
-    padding: clamp(16px, 4vw, 32px) clamp(16px, 5vw, 40px);
-    -webkit-font-smoothing: antialiased;
-}
-
-.app-container {
-    max-width: 1400px;
-    margin: 0 auto;
-    display: flex;
-    flex-direction: column;
-    gap: clamp(24px, 5vh, 48px);
-}
-
-/* ========== شريط التنقل ========== */
-.navbar {
-    background-color: #262626;
-    border-radius: 80px;
-    padding: 8px 20px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 16px;
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
-    border: 1px solid #333333;
-}
-
-.logo-text {
-    font-size: clamp(1.3rem, 4vw, 1.7rem);
-    font-weight: 800;
-    background: linear-gradient(135deg, #FFFFFF, #A6A6A6);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-}
-
-.nav-links {
-    display: flex;
-    gap: 8px;
-    background-color: #1A1A1A;
-    padding: 6px;
-    border-radius: 60px;
-    flex-wrap: wrap;
-    justify-content: center;
-}
-
-.nav-item {
-    padding: 6px 16px;
-    color: #A6A6A6;
-    text-decoration: none;
-    font-size: 0.85rem;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    border-radius: 40px;
-    transition: all 0.2s ease;
-    cursor: pointer;
-    white-space: nowrap;
-}
-
-.nav-item.active {
-    background-color: #1E6FD9;
-    color: white;
-    box-shadow: 0 2px 8px rgba(30,111,217,0.3);
-}
-
-.nav-icon {
-    width: 18px;
-    height: 18px;
-}
-
-/* ملف المستخدم */
-.user-profile {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    background-color: #1A1A1A;
-    padding: 4px 12px 4px 16px;
-    border-radius: 50px;
-    cursor: default;
-    transition: 0.2s;
-    border: 1px solid #3A3A3A;
-}
-
-.user-avatar {
-    width: 32px;
-    height: 32px;
-    background: linear-gradient(145deg, #1E6FD9, #0F4C9E);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.user-avatar svg {
-    width: 18px;
-    height: 18px;
-    stroke: white;
-}
-
-.user-name {
-    font-size: 0.85rem;
-    font-weight: 500;
-    color: #E0E0E0;
-}
-
-/* ========== الأقسام ========== */
-.tab-section {
-    display: none;
-    animation: fadeIn 0.25s ease;
-}
-
-.tab-section.active-section {
-    display: block;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(6px);}
-    to { opacity: 1; transform: translateY(0);}
-}
-
-/* ========== الأجهزة (تحديد متعدد) ========== */
-.devices-capsule-wrapper {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    width: 100%;
-    margin-bottom: 28px;
-}
-
-.devices-capsule-pill {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    align-items: center;
-    gap: 20px;
-    background-color: #262626;
-    padding: 16px 28px;
-    border-radius: 100px;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
-    width: auto;
-    max-width: 100%;
-}
-
-.offline-capsule {
-    background-color: #1F1F1F;
-    border: 1px solid #333333;
-}
-
-.device-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 8px 18px;
-    border-radius: 50px;
-    background-color: #1A1A1A;
-    cursor: pointer;
-    transition: all 0.2s;
-    border: 1px solid transparent;
-}
-
-.device-item:hover {
-    background-color: #2E2E2E;
-    transform: translateY(-2px);
-}
-
-/* الهالة العصرية للأجهزة المحددة (متعددة) */
-.device-item.selected {
-    border: 1.5px solid #1E6FD9;
-    background: linear-gradient(145deg, #1E2A3A, #0F1A2A);
-    box-shadow: 0 0 12px rgba(30,111,217,0.5), inset 0 1px 0 rgba(255,255,255,0.05);
-    transform: scale(1.02);
-}
-
-.device-circle {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background-color: #0F0F0F;
-    color: #FFFFFF;
-}
-
-.device-circle svg {
-    width: 20px;
-    height: 20px;
-    stroke: currentColor;
-}
-
-.status-connected .device-circle {
-    color: #1B8755;
-}
-
-.status-offline .device-circle {
-    color: #D32F2F;
-}
-
-.device-name {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: #FFFFFF;
-}
-
-.status-badge {
-    font-size: 0.7rem;
-    background-color: #2A2A2A;
-    padding: 4px 8px;
-    border-radius: 30px;
-    color: #B0B0B0;
-}
-
-/* ========== حقل الإدخال ========== */
-.routing-input-container {
-    display: flex;
-    background-color: #262626;
-    border-radius: 60px;
-    padding: 6px;
-    align-items: center;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
-    flex-wrap: wrap;
-    gap: 10px;
-}
-
-.input-url {
-    flex: 1;
-    background: transparent;
-    border: none;
-    outline: none;
-    padding: 12px 20px;
-    color: #FFFFFF;
-    font-size: 0.9rem;
-    min-width: 180px;
-}
-
-.input-url::placeholder {
-    color: #6A6A6A;
-}
-
-.btn-route {
-    border-radius: 50px;
-    background-color: #1E6FD9;
-    border: none;
-    color: white;
-    padding: 10px 28px;
-    font-size: 0.8rem;
-    font-weight: 700;
-    cursor: pointer;
-    transition: 0.2s;
-    white-space: nowrap;
-}
-
-.btn-route:hover {
-    background-color: #155bb0;
-    transform: scale(0.98);
-}
-
-/* ========== جدول التحميلات ========== */
-.downloads-card {
-    background-color: #262626;
-    border-radius: 32px;
-    padding: 24px 20px;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
-    border: 1px solid #3A3A3A;
-    overflow-x: auto;
-}
-
-.right-align {
-    text-align: right;
-    margin-bottom: 20px;
-}
-
-.downloads-table {
-    width: 100%;
-    border-collapse: collapse;
-    min-width: 750px;
-}
-
-.downloads-table th {
-    color: #A6A6A6;
-    font-size: 0.7rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    padding: 14px 8px;
-    border-bottom: 2px solid #3A3A3A;
-    text-align: right;
-}
-
-.downloads-table td {
-    padding: 14px 8px;
-    border-bottom: 1px solid #333333;
-    vertical-align: middle;
-    font-size: 0.85rem;
-}
-
-.file-name {
-    font-weight: 600;
-    color: #FFFFFF;
-}
-
-.progress-wrapper {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.progress-track {
-    flex: 1;
-    height: 6px;
-    background-color: #1A1A1A;
-    border-radius: 4px;
-    overflow: hidden;
-}
-
-.progress-fill {
-    height: 100%;
-    background-color: #1E6FD9;
-    border-radius: 4px;
-    transition: width 0.2s, background-color 0.2s;
-}
-
-.progress-percentage {
-    font-size: 0.7rem;
-    font-weight: 600;
-    color: #A6A6A6;
-    min-width: 40px;
-    text-align: left;
-}
-
-.file-size, .download-speed {
-    color: #C0C0C0;
-    font-family: monospace;
-    font-size: 0.75rem;
-}
-
-.device-tag {
-    background-color: #333333;
-    color: #E0E0E0;
-    padding: 4px 12px;
-    border-radius: 30px;
-    font-size: 0.7rem;
-    font-weight: 500;
-    display: inline-block;
-}
-
-/* ========== الإعدادات ========== */
-.settings-card {
-    background-color: #262626;
-    border-radius: 32px;
-    padding: 24px 28px;
-}
-
-.settings-placeholder p {
-    background-color: #1E1E1E;
-    padding: 12px 20px;
-    border-radius: 20px;
-    border-right: 4px solid #1E6FD9;
-    margin-bottom: 12px;
-}
-
-.btn-outline {
-    background: transparent;
-    border: 1px solid #1E6FD9;
-    color: #1E6FD9;
-    padding: 8px 20px;
-    border-radius: 40px;
-    cursor: pointer;
-    font-weight: 600;
-    transition: 0.2s;
-}
-
-.btn-outline:hover {
-    background-color: #1E6FD9;
-    color: white;
-}
-
-/* ========== تحسينات متجاوبة ========== */
-@media (max-width: 850px) {
-    .navbar {
-        border-radius: 40px;
-        justify-content: center;
-    }
-    .logo, .user-profile {
-        position: static;
-    }
-    .nav-links {
-        order: 2;
-        width: 100%;
-        justify-content: center;
-    }
-    .user-profile {
-        order: 3;
-    }
-    .devices-capsule-pill {
-        border-radius: 40px;
-        padding: 12px 16px;
-        gap: 12px;
-    }
-    .device-item {
-        padding: 4px 12px;
-        gap: 8px;
-    }
-    .device-name {
-        font-size: 0.75rem;
-    }
-    .btn-route {
-        padding: 8px 18px;
-    }
-}
-
-@media (max-width: 550px) {
-    .device-item {
-        flex-wrap: wrap;
-        justify-content: center;
-        text-align: center;
-        gap: 4px;
-    }
-    .device-circle {
-        width: 30px;
-        height: 30px;
-    }
-    .status-badge {
-        font-size: 0.6rem;
-    }
-    .routing-input-container {
-        border-radius: 30px;
-    }
-    .input-url {
-        padding: 10px 14px;
-        font-size: 0.8rem;
-    }
-    .btn-route {
-        width: 100%;
-    }
-}
+  }
 </file>
 
 <file path="src/main/application/orchestrators/DeviceOrchestrator.js">
@@ -1750,6 +285,95 @@ class DownloadOrchestrator {
 }
 
 module.exports = DownloadOrchestrator;
+</file>
+
+<file path="src/main/bootstrap/ApplicationBootstrap.js">
+'use strict';
+
+const path = require('path');
+const container = require('./container');
+const WindowManager = require('../infrastructure/windows/WindowManager');
+const WindowRegistry = require('../infrastructure/windows/WindowRegistry');
+
+class ApplicationBootstrap {
+    constructor() {
+        this._windowManager = null;
+        this._windowRegistry = null;
+    }
+
+    async run() {
+        console.log('[Bootstrap] Starting application...');
+
+        // 1. Initialize dependency container
+        container.initialize();
+        console.log('[Bootstrap] Container initialized.');
+
+        // 2. Initialize error central service (logger)
+        const errorService = container.resolve('errorCentralService');
+        if (errorService && typeof errorService.init === 'function') {
+            errorService.init();
+            console.log('[Bootstrap] ErrorCentralService initialized.');
+        }
+
+        // 3. Initialize database (if needed)
+        const dbManager = container.resolve('databaseManager');
+        if (dbManager && typeof dbManager.initDb === 'function') {
+            await dbManager.initDb();
+            console.log('[Bootstrap] Database initialized.');
+        }
+
+        // 4. Retrieve core services for monitoring
+        const connectionService = container.resolve('connectionService');
+        const deviceRegistry = container.resolve('deviceRegistry'); // for reference, not used directly
+
+        // 5. Start ADB monitoring and wireless discovery
+        if (connectionService) {
+            if (typeof connectionService.startAdbMonitoring === 'function') {
+                connectionService.startAdbMonitoring(5000);
+                console.log('[Bootstrap] ADB monitoring started.');
+            }
+            if (typeof connectionService.startWirelessDiscovery === 'function') {
+                connectionService.startWirelessDiscovery();
+                console.log('[Bootstrap] Wireless discovery started.');
+            }
+        }
+
+        // 6. Initialize window management infrastructure
+        this._windowRegistry = new WindowRegistry();
+        this._windowManager = new WindowManager(this._windowRegistry);
+
+
+        // 7. Create main window
+        await this.createMainWindow();
+
+        console.log('[Bootstrap] Application ready.');
+    }
+
+    async createMainWindow() {
+        const indexPath = path.join(__dirname, '../../renderer/index.html');
+        const mainWindow = this._windowManager.createMainWindow({
+            loadFile: indexPath,
+            show: false
+        });
+        mainWindow.once('ready-to-show', () => {
+            mainWindow.show();
+            if (process.env.NODE_ENV === 'development') {
+                mainWindow.webContents.openDevTools();
+            }
+        });
+        return mainWindow;
+    }
+
+    getWindowManager() {
+        return this._windowManager;
+    }
+
+    getWindowRegistry() {
+        return this._windowRegistry;
+    }
+}
+
+module.exports = ApplicationBootstrap;
 </file>
 
 <file path="src/main/domain/entities/AudioFile.js">
@@ -2848,166 +1472,310 @@ class ScrcpyAdapter {
 module.exports = ScrcpyAdapter;
 </file>
 
-<file path="src/main/runtime/devices/DeviceRegistry.js">
+<file path="src/main/infrastructure/windows/AppWindow.js">
 'use strict';
 
-const DeviceRuntimeState =
-    require('./DeviceRuntimeState');
-
 /**
- * Runtime registry responsible for:
- *
- * - Device registration
- * - Device lookup
- * - Runtime state management
- *
- * This class does NOT:
- * - Connect devices
- * - Pair devices
- * - Execute ADB commands
- * - Persist data
- * - Implement business logic
+ * AppWindow - Lightweight wrapper around Electron BrowserWindow.
+ * Provides a simplified API without any business logic.
+ * This is optional; WindowManager can work directly with BrowserWindow.
  */
-class DeviceRegistry {
-    constructor() {
-        /**
-         * Map<deviceId, Device>
-         */
-        this._devices =
-            new Map();
-
-        /**
-         * Map<deviceId, DeviceRuntimeState>
-         */
-        this._runtimeStates =
-            new Map();
-    }
-
-    registerDevice(device) {
-        if (!device || !device.id) {
-            throw new Error(
-                'Device must contain a valid id'
-            );
+class AppWindow {
+    constructor(name, browserWindow) {
+        if (!name || typeof name !== 'string') {
+            throw new Error('AppWindow requires a valid name');
         }
-
-        this._devices.set(
-            device.id,
-            device
-        );
-
-        if (
-            !this._runtimeStates.has(
-                device.id
-            )
-        ) {
-            this._runtimeStates.set(
-                device.id,
-                new DeviceRuntimeState()
-            );
+        if (!browserWindow || typeof browserWindow !== 'object') {
+            throw new Error('AppWindow requires a BrowserWindow instance');
         }
-
-        return device;
+        this._name = name;
+        this._win = browserWindow;
     }
-
-    removeDevice(deviceId) {
-        this._devices.delete(
-            deviceId
-        );
-
-        this._runtimeStates.delete(
-            deviceId
-        );
+    
+    get name() {
+        return this._name;
     }
-
-    updateState(
-        deviceId,
-        state = {}
-    ) {
-        let runtimeState =
-            this._runtimeStates.get(
-                deviceId
-            );
-
-        if (!runtimeState) {
-            runtimeState =
-                new DeviceRuntimeState();
-
-            this._runtimeStates.set(
-                deviceId,
-                runtimeState
-            );
+    
+    get instance() {
+        return this._win;
+    }
+    
+    show() {
+        if (!this._win.isDestroyed()) {
+            this._win.show();
         }
-
-        runtimeState.update({
-            ...state,
-            lastSeen:
-                state.lastSeen ||
-                new Date()
-        });
-
-        return runtimeState;
     }
-
-    getDevice(deviceId) {
-        return (
-            this._devices.get(
-                deviceId
-            ) || null
-        );
-    }
-
-    getRuntimeState(
-        deviceId
-    ) {
-        return (
-            this._runtimeStates.get(
-                deviceId
-            ) || null
-        );
-    }
-
-    getAllDevices() {
-        return Array.from(
-            this._devices.values()
-        );
-    }
-
-    getAllRuntimeStates() {
-        return Array.from(
-            this._runtimeStates.values()
-        );
-    }
-
-    hasDevice(deviceId) {
-        return this._devices.has(
-            deviceId
-        );
-    }
-
-    clear() {
-        this._devices.clear();
-        this._runtimeStates.clear();
-    }
-
-    /**
-     * Find device ID by ADB target (serial or host:port)
-     * @param {string} adbTarget - e.g., "emulator-5554" or "192.168.1.10:5555"
-     * @returns {string|null} deviceId if found, else null
-     */
-    findDeviceIdByAdbTarget(adbTarget) {
-        if (!adbTarget) return null;
-        for (const [deviceId, runtimeState] of this._runtimeStates.entries()) {
-            if (runtimeState.adbTarget === adbTarget) {
-                return deviceId;
-            }
+    
+    hide() {
+        if (!this._win.isDestroyed()) {
+            this._win.hide();
         }
-        // Also check devices without runtime state? Not needed as each device has runtime.
-        return null;
+    }
+    
+    close() {
+        if (!this._win.isDestroyed()) {
+            this._win.close();
+        }
+    }
+    
+    focus() {
+        if (!this._win.isDestroyed()) {
+            this._win.focus();
+        }
+    }
+    
+    send(channel, data) {
+        if (!this._win.isDestroyed()) {
+            this._win.webContents.send(channel, data);
+        }
+    }
+    
+    isDestroyed() {
+        return this._win.isDestroyed();
     }
 }
 
-module.exports =
-    DeviceRegistry;
+module.exports = AppWindow;
+</file>
+
+<file path="src/main/infrastructure/windows/WindowManager.js">
+'use strict';
+
+const { BrowserWindow } = require('electron');
+
+/**
+ * WindowManager
+ * Responsible for creating, managing, and destroying BrowserWindows.
+ * Uses a WindowRegistry for storage.
+ * No business logic – only Electron window operations.
+ */
+class WindowManager {
+    constructor(windowRegistry) {
+        if (!windowRegistry) {
+            throw new Error('WindowManager requires a WindowRegistry instance');
+        }
+        this._registry = windowRegistry;
+    }
+    
+    /**
+     * Create a new BrowserWindow and register it.
+     * @param {string} id - Unique identifier for the window
+     * @param {object} options - Electron BrowserWindow options
+     * @param {string} [options.loadFile] - Path to HTML file to load
+     * @param {string} [options.loadURL] - URL to load (alternative to loadFile)
+     * @returns {Electron.BrowserWindow} The created window
+     */
+    createWindow(id, options = {}) {
+        if (this._registry.has(id)) {
+            throw new Error(`WindowManager: Window with id "${id}" already exists. Close it first or use a different id.`);
+        }
+        
+        // Merge with default options
+        const defaultOptions = {
+            show: false,
+            webPreferences: {
+                contextIsolation: true,
+                nodeIntegration: false,
+                sandbox: false
+            }
+        };
+        const finalOptions = { ...defaultOptions, ...options };
+        
+        const browserWindow = new BrowserWindow(finalOptions);
+        
+        // Load content
+        if (finalOptions.loadFile) {
+            browserWindow.loadFile(finalOptions.loadFile);
+        } else if (finalOptions.loadURL) {
+            browserWindow.loadURL(finalOptions.loadURL);
+        } else {
+            throw new Error('WindowManager: No loadFile or loadURL provided');
+        }
+        
+        // Register the window
+        this._registry.register(id, browserWindow);
+        
+        // Auto-unregister when window is closed
+        browserWindow.once('closed', () => {
+            this._registry.unregister(id);
+        });
+        
+        return browserWindow;
+    }
+    
+    /**
+     * Helper to create the main application window with standard settings.
+     * @param {object} customOptions - Override default options
+     * @returns {Electron.BrowserWindow}
+     */
+    createMainWindow(customOptions = {}) {
+        const defaultMainOptions = {
+            width: 1200,
+            height: 800,
+            minWidth: 900,
+            minHeight: 600,
+            title: 'LinkHub',
+            webPreferences: {
+                preload: require('path').join(__dirname, '../../../preload/preload.js'),
+                contextIsolation: true,
+                nodeIntegration: false
+            },
+            show: false
+        };
+        const options = { ...defaultMainOptions, ...customOptions };
+        return this.createWindow('main', options);
+    }
+    
+    /**
+     * Get a window by id.
+     * @param {string} id
+     * @returns {Electron.BrowserWindow|null}
+     */
+    getWindow(id) {
+        return this._registry.get(id);
+    }
+    
+    /**
+     * Close a window by id. If force is true, destroy immediately.
+     * @param {string} id
+     * @param {boolean} [force=false] - If true, call destroy() instead of close()
+     * @returns {boolean} true if window existed and was closed/destroyed
+     */
+    closeWindow(id, force = false) {
+        const win = this._registry.get(id);
+        if (!win) return false;
+        
+        if (force) {
+            win.destroy();
+        } else {
+            win.close();
+        }
+        // The 'closed' event will unregister automatically
+        return true;
+    }
+    
+    /**
+     * Send an IPC message to a specific window.
+     * @param {string} id - Window identifier
+     * @param {string} channel - IPC channel name
+     * @param {any} data - Data to send
+     * @returns {boolean} true if window exists and message sent
+     */
+    sendTo(id, channel, data) {
+        const win = this._registry.get(id);
+        if (win && !win.isDestroyed()) {
+            win.webContents.send(channel, data);
+            return true;
+        }
+        return false;
+    }
+    
+    /**
+     * Broadcast an IPC message to all registered windows.
+     * @param {string} channel
+     * @param {any} data
+     */
+    broadcast(channel, data) {
+        for (const win of this._registry.getAll()) {
+            if (!win.isDestroyed()) {
+                win.webContents.send(channel, data);
+            }
+        }
+    }
+    
+    /**
+     * Destroy all windows and clear registry.
+     */
+    destroyAllWindows() {
+        for (const win of this._registry.getAll()) {
+            if (!win.isDestroyed()) {
+                win.destroy();
+            }
+        }
+        this._registry.clear();
+    }
+}
+
+module.exports = WindowManager;
+</file>
+
+<file path="src/main/infrastructure/windows/WindowRegistry.js">
+'use strict';
+
+/**
+ * WindowRegistry
+ * Responsible for storing and retrieving BrowserWindow instances.
+ * No window creation or lifecycle logic – pure storage.
+ */
+class WindowRegistry {
+    constructor() {
+        this._windows = new Map(); // key: string (windowId), value: BrowserWindow
+    }
+    
+    /**
+     * Register a window with a unique identifier.
+     * @param {string} id - Unique window identifier
+     * @param {Electron.BrowserWindow} window - BrowserWindow instance
+     * @throws {Error} if id or window is invalid
+     */
+    register(id, window) {
+        if (!id || typeof id !== 'string') {
+            throw new Error('WindowRegistry: Invalid window id');
+        }
+        if (!window || typeof window !== 'object') {
+            throw new Error('WindowRegistry: Invalid window object');
+        }
+        if (this._windows.has(id)) {
+            // Optionally warn but allow override? We'll unregister first.
+            console.warn(`WindowRegistry: Overwriting existing window with id ${id}`);
+        }
+        this._windows.set(id, window);
+    }
+    
+    /**
+     * Remove a window from registry.
+     * @param {string} id
+     * @returns {boolean} true if existed and removed
+     */
+    unregister(id) {
+        return this._windows.delete(id);
+    }
+    
+    /**
+     * Retrieve a window by id.
+     * @param {string} id
+     * @returns {Electron.BrowserWindow|null}
+     */
+    get(id) {
+        return this._windows.get(id) || null;
+    }
+    
+    /**
+     * Check if a window id exists.
+     * @param {string} id
+     * @returns {boolean}
+     */
+    has(id) {
+        return this._windows.has(id);
+    }
+    
+    /**
+     * Get all registered window instances.
+     * @returns {Electron.BrowserWindow[]}
+     */
+    getAll() {
+        return Array.from(this._windows.values());
+    }
+    
+    /**
+     * Clear all windows from registry (does not destroy them).
+     */
+    clear() {
+        this._windows.clear();
+    }
+}
+
+module.exports = WindowRegistry;
 </file>
 
 <file path="src/main/runtime/devices/DeviceRuntimeState.js">
@@ -3104,40 +1872,1092 @@ class ProcessRegistry {
 module.exports = ProcessRegistry;
 </file>
 
+<file path="src/main/index.js">
+'use strict';
+
+const { app } = require('electron');
+const ApplicationBootstrap = require('./bootstrap/ApplicationBootstrap');
+const container = require('./bootstrap/container');
+
+// Handle creating/removing shortcuts on Windows when installing/uninstalling.
+if (require('electron-squirrel-startup')) {
+    app.quit();
+}
+
+let bootstrap = null;
+
+// This method will be called when Electron has finished initialization and is ready to create browser windows.
+app.whenReady().then(async () => {
+    try {
+        bootstrap = new ApplicationBootstrap();
+        await bootstrap.run();
+    } catch (error) {
+        console.error('[Main] Fatal error during application startup:', error);
+        app.quit();
+    }
+});
+
+// Quit when all windows are closed, except on macOS.
+app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') {
+        app.quit();
+    }
+});
+
+// On macOS, re-create a window when the dock icon is clicked and no windows are open.
+app.on('activate', () => {
+    if (bootstrap && bootstrap.getWindowManager()) {
+        const mainWindow = bootstrap.getWindowManager().getWindow('main');
+        if (!mainWindow) {
+            bootstrap.createMainWindow();
+        } else {
+            mainWindow.show();
+        }
+    }
+});
+
+// Graceful shutdown: terminate all managed processes before quitting.
+app.on('before-quit', async (event) => {
+    // Prevent default quit to allow async cleanup
+    event.preventDefault();
+    
+    try {
+        const processManager = container.resolve('processManager');
+        if (processManager && processManager.terminateAll) {
+            await processManager.terminateAll();
+        }
+        
+        const dbManager = container.resolve('databaseManager');
+        if (dbManager && dbManager.close) {
+            await dbManager.close();
+        }
+        
+        const errorService = container.resolve('errorCentralService');
+        if (errorService && errorService.flush) {
+            await errorService.flush();
+        }
+    } catch (err) {
+        console.error('[Main] Error during graceful shutdown:', err);
+    } finally {
+        app.exit(0);
+    }
+});
+</file>
+
+<file path="src/preload/preload.js">
+/**
+ * preload.js
+ * 
+ * Safe bridge between renderer process and main process.
+ * Exposes a limited, secure API via contextBridge.
+ * 
+ * NO business logic, NO direct access to Node.js APIs.
+ */
+
+const { contextBridge, ipcRenderer } = require('electron');
+
+// ============================================================================
+// 1. Devices API
+// ============================================================================
+
+const devicesAPI = {
+    /**
+     * Get all registered devices with their runtime state.
+     * @returns {Promise<Array>}
+     */
+    getAll: () => ipcRenderer.invoke('device:list'),
+    
+    /**
+     * Get a single device by ID.
+     * @param {string} deviceId
+     * @returns {Promise<Object|null>}
+     */
+    get: (deviceId) => ipcRenderer.invoke('device:get', deviceId),
+    
+    /**
+     * Pair with a wireless device.
+     * @param {string} host - e.g., "192.168.1.10:37000"
+     * @param {string} pairingCode - 6-digit code
+     * @returns {Promise<string[]>}
+     */
+    pair: (host, pairingCode) => ipcRenderer.invoke('device:pair', host, pairingCode),
+    
+    /**
+     * Connect to a device (USB serial or TCP/IP host:port).
+     * @param {string} target - e.g., "emulator-5554" or "192.168.1.10:5555"
+     * @param {string|null} friendlyName - Optional display name
+     * @returns {Promise<Object>}
+     */
+    connect: (target, friendlyName = null) => ipcRenderer.invoke('device:connect', target, friendlyName),
+    
+    /**
+     * Start screen mirroring for a connected device.
+     * @param {string} deviceId
+     * @param {Object} options - e.g., { fullscreen: boolean, bitrate: number }
+     * @returns {Promise<string>} processId
+     */
+    stream: {
+        start: (deviceId, options = {}) => ipcRenderer.invoke('device:stream:start', deviceId, options),
+        stop: (deviceId) => ipcRenderer.invoke('device:stream:stop', deviceId)
+    }
+};
+
+// ============================================================================
+// 2. Downloads API
+// ============================================================================
+
+const downloadsAPI = {
+    /**
+     * Inspect a URL: get available formats and metadata.
+     * @param {string} url
+     * @returns {Promise<Object>}
+     */
+    inspect: (url) => ipcRenderer.invoke('download:inspect', url),
+    
+    /**
+     * Start downloading a specific format.
+     * @param {string} url
+     * @param {string} formatId
+     * @param {string|null} deviceId - Optional device ID for saving location
+     * @param {Object} options - Additional options
+     * @returns {Promise<Object>}
+     */
+    start: (url, formatId, deviceId = null, options = {}) => 
+        ipcRenderer.invoke('download:start', url, formatId, deviceId, options),
+    
+    /**
+     * Stop an ongoing download by URL.
+     * @param {string} url
+     * @returns {Promise<boolean>}
+     */
+    stop: (url) => ipcRenderer.invoke('download:stop', url),
+    
+    /**
+     * Get lightweight metadata (title, duration, thumbnail).
+     * @param {string} url
+     * @returns {Promise<Object>}
+     */
+    metadata: (url) => ipcRenderer.invoke('download:metadata', url)
+};
+
+// ============================================================================
+// 3. Event listening (for runtime → UI events)
+// ============================================================================
+
+/**
+ * Generic event listener system.
+ * Allows renderer to subscribe to any IPC message sent from main process.
+ * 
+ * Usage:
+ *   linkhub.on('device:stateChanged', (event, data) => { ... });
+ *   linkhub.off('device:stateChanged', callback);
+ */
+const eventAPI = {
+    /**
+     * Register a listener for an IPC message from main process.
+     * @param {string} channel - Channel name (e.g., 'device:stateChanged')
+     * @param {Function} callback - Function that receives (event, ...args)
+     * @returns {Function} - Unsubscribe function
+     */
+    on: (channel, callback) => {
+        if (typeof callback !== 'function') {
+            throw new Error('Callback must be a function');
+        }
+        const wrappedCallback = (event, ...args) => callback(event, ...args);
+        ipcRenderer.on(channel, wrappedCallback);
+        // Return unsubscribe function
+        return () => {
+            ipcRenderer.removeListener(channel, wrappedCallback);
+        };
+    },
+    
+    /**
+     * Remove a specific listener.
+     * @param {string} channel
+     * @param {Function} callback - The original callback function
+     */
+    off: (channel, callback) => {
+        ipcRenderer.removeListener(channel, callback);
+    },
+    
+    /**
+     * Remove all listeners for a channel.
+     * @param {string} channel
+     */
+    removeAllListeners: (channel) => {
+        ipcRenderer.removeAllListeners(channel);
+    }
+};
+
+// ============================================================================
+// 4. Expose the unified API to renderer
+// ============================================================================
+
+contextBridge.exposeInMainWorld('linkhub', {
+    devices: devicesAPI,
+    downloads: downloadsAPI,
+    on: eventAPI.on,
+    off: eventAPI.off,
+    removeAllListeners: eventAPI.removeAllListeners
+});
+
+// Optional: Log that preload has loaded (only in development)
+if (process.env.NODE_ENV === 'development') {
+    console.log('[Preload] linkhub API exposed successfully');
+}
+</file>
+
+<file path="src/renderer/index.html">
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>LinkFlow | التدفق الذكي</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="app-container">
+        
+        <header class="navbar-wrapper">
+            <nav class="navbar">
+                <div class="logo">
+                    <span class="logo-text">LinkFlow</span>
+                </div>
+                
+                <div class="nav-links" dir="ltr">
+                    <a href="#" class="nav-item active" data-tab="home">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                        </svg>
+                        <span>الرئيسية</span>
+                    </a>
+                    <a href="#" class="nav-item" data-tab="downloads">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m-4-4l4 4 4-4"/>
+                        </svg>
+                        <span>التحميلات</span>
+                    </a>
+                    <a href="#" class="nav-item" data-tab="settings">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                            <circle cx="12" cy="12" r="3"/>
+                        </svg>
+                        <span>الإعدادات</span>
+                    </a>
+                </div>
+
+                <div class="user-profile">
+                    <div class="user-avatar">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M5.121 17.804A9 9 0 0119 12M5.12 6.196A9 9 0 0119 12M12 3v1m0 16v1M3 12h1m16 0h1M5.6 5.6l.7.7m12.1 12.1l-.7-.7M5.6 18.4l.7-.7M18.4 5.6l-.7.7" stroke-linecap="round"/>
+                            <circle cx="12" cy="12" r="3"/>
+                        </svg>
+                    </div>
+                    <span class="user-name">المستخدم</span>
+                </div>
+            </nav>
+        </header>
+
+        <main class="dashboard-content">
+            <!-- قسم الرئيسية -->
+            <div id="home-section" class="tab-section active-section">
+                <section class="devices-section">
+                    <div class="devices-capsule-wrapper">
+                        <h2 class="section-subheading">الأجهزة المتصلة</h2>
+                        <div class="devices-capsule-pill" id="registered-devices">
+                            <!-- سيتم تعبئتها ديناميكياً عبر JS -->
+                            <div class="placeholder-text">جاري تحميل الأجهزة...</div>
+                        </div>
+                    </div>
+                    <div class="devices-capsule-wrapper offset-top">
+                        <h2 class="section-subheading offline-sub">الأجهزة غير المتصلة (المكتشفة)</h2>
+                        <div class="devices-capsule-pill offline-capsule" id="discovered-devices">
+                            <div class="placeholder-text">جاري البحث عن أجهزة...</div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="routing-section">
+                    <div class="routing-input-container">
+                        <input type="text" class="input-url" id="media-url" placeholder="أدخل رابط الوسائط (فيديو، أغنية) لبدء التوجيه...">
+                        <button class="btn-route" id="btn-start-route">توجيه وبدء التحميل</button>
+                    </div>
+                </section>
+            </div>
+
+            <!-- قسم التحميلات -->
+            <div id="downloads-section" class="tab-section">
+                <div class="downloads-card">
+                    <h2 class="section-subheading right-align">قائمة التحميلات النشطة</h2>
+                    <div class="table-container">
+                        <table class="downloads-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 30%;">اسم الملف</th>
+                                    <th style="width: 20%;">التقدم</th>
+                                    <th style="width: 15%;">الحجم</th>
+                                    <th style="width: 15%;">السرعة</th>
+                                    <th style="width: 20%;">الجهة الوجهة</th>
+                                </tr>
+                            </thead>
+                            <tbody id="downloads-tbody">
+                                <!-- سيتم تعبئتها ديناميكياً -->
+                                <tr class="empty-row"><td colspan="5" style="text-align:center;">لا توجد تحميلات نشطة</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- قسم الإعدادات -->
+            <div id="settings-section" class="tab-section">
+                <div class="settings-card">
+                    <h2 class="section-subheading right-align">الإعدادات العامة</h2>
+                    <div class="settings-placeholder">
+                        <p>✔️ جودة البث التلقائي: عالية (قابل للتعديل لاحقاً)</p>
+                        <p>✔️ حفظ الملفات على الجهاز: مفعل</p>
+                        <p>✔️ إشعارات التحميل: مفعلة</p>
+                        <button class="btn-outline" id="refresh-devices">تحديث الأجهزة</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
+</file>
+
+<file path="src/renderer/script.js">
+// LinkFlow - جاهز للتكامل مع Electron IPC
+// لا يحتوي على بيانات وهمية، فقط هيكل للربط
+
+document.addEventListener('DOMContentLoaded', () => {
+    // ------------------- تبديل الأقسام -------------------
+    const navItems = document.querySelectorAll('.nav-item');
+    const sections = {
+        home: document.getElementById('home-section'),
+        downloads: document.getElementById('downloads-section'),
+        settings: document.getElementById('settings-section')
+    };
+
+    function switchTab(tabId) {
+        Object.values(sections).forEach(section => section?.classList.remove('active-section'));
+        if (sections[tabId]) sections[tabId].classList.add('active-section');
+        navItems.forEach(item => {
+            const itemTab = item.getAttribute('data-tab');
+            if (itemTab === tabId) item.classList.add('active');
+            else item.classList.remove('active');
+        });
+    }
+
+    navItems.forEach(item => {
+        item.addEventListener('click', (e) => {
+            e.preventDefault();
+            switchTab(item.getAttribute('data-tab'));
+        });
+    });
+    switchTab('home');
+
+    // ------------------- إدارة الأجهزة (حقيقية) -------------------
+    let devices = [];        // قائمة الأجهزة المسجلة (من device:list)
+    let selectedDeviceIds = new Set();   // تخزين معرفات الأجهزة المحددة (لتوجيه التحميل)
+
+    const registeredContainer = document.getElementById('registered-devices');
+    const discoveredContainer = document.getElementById('discovered-devices');
+
+    // دالة لعرض الأجهزة (تقوم بتحديث الواجهة)
+    function renderDevices(registeredDevices, discoveredDevices) {
+        // عرض الأجهزة المسجلة (المتصلة)
+        if (registeredContainer) {
+            if (!registeredDevices || registeredDevices.length === 0) {
+                registeredContainer.innerHTML = '<div class="placeholder-text">لا توجد أجهزة متصلة</div>';
+            } else {
+                registeredContainer.innerHTML = '';
+                registeredDevices.forEach(device => {
+                    const deviceElement = createDeviceElement(device, true);
+                    registeredContainer.appendChild(deviceElement);
+                });
+            }
+        }
+
+        // عرض الأجهزة المكتشفة (غير المسجلة)
+        if (discoveredContainer) {
+            if (!discoveredDevices || discoveredDevices.length === 0) {
+                discoveredContainer.innerHTML = '<div class="placeholder-text">لا توجد أجهزة مكتشفة</div>';
+            } else {
+                discoveredContainer.innerHTML = '';
+                discoveredDevices.forEach(device => {
+                    const deviceElement = createDeviceElement(device, false);
+                    discoveredContainer.appendChild(deviceElement);
+                });
+            }
+        }
+    }
+
+    // إنشاء عنصر جهاز (UI) مع دعم التحديد المتعدد
+    function createDeviceElement(device, isRegistered) {
+        const div = document.createElement('div');
+        div.className = `device-item ${device.status === 'connected' ? 'status-connected' : 'status-offline'}`;
+        div.setAttribute('data-device-id', device.id);
+        div.setAttribute('data-device-name', device.deviceFriendlyName || device.model || device.id);
+
+        // إذا كان الجهاز مسجلاً ومحدداً، أضف class selected
+        if (isRegistered && selectedDeviceIds.has(device.id)) {
+            div.classList.add('selected');
+        }
+
+        div.innerHTML = `
+            <div class="device-circle">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+                    <line x1="12" y1="18" x2="12.01" y2="18"></line>
+                </svg>
+            </div>
+            <h3 class="device-name">${escapeHtml(device.deviceFriendlyName || device.model || device.id)}</h3>
+            <span class="status-badge">${device.status === 'connected' ? 'متصل' : (device.status === 'available' ? 'متاح' : 'غير متصل')}</span>
+        `;
+
+        // إذا كان الجهاز مسجلاً (متصل أو متاح)، نمكن التحديد
+        if (isRegistered && (device.status === 'connected' || device.status === 'available')) {
+            div.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (selectedDeviceIds.has(device.id)) {
+                    selectedDeviceIds.delete(device.id);
+                    div.classList.remove('selected');
+                } else {
+                    selectedDeviceIds.add(device.id);
+                    div.classList.add('selected');
+                }
+                console.log('الأجهزة المحددة:', Array.from(selectedDeviceIds));
+            });
+        } else {
+            // الأجهزة غير المسجلة (مكتشفة) – نضيف اقتران عند النقر
+            div.addEventListener('click', async () => {
+                // TODO: استدعاء عملية الاقتران أو الاتصال عبر IPC
+                // سيكون لاحقاً: window.electronAPI.pairDevice(...) أو connectDevice
+                alert(`جهاز "${device.deviceFriendlyName}" غير مسجل. سيتم تنفيذ إجراء الاقتران/الاتصال لاحقاً.`);
+            });
+        }
+
+        return div;
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
+    }
+
+    // ------------------- تحميل الأجهزة من الخلفية (IPC) -------------------
+    async function loadDevices() {
+        // TODO: بعد ربط IPC، استخدم window.electronAPI.getAllDevices()
+        // return await window.electronAPI.getAllDevices();
+        // حالياً نعيد بيانات وهمية فارغة لتجنب الأخطاء
+        console.log('سيتم استدعاء device:list لاحقاً');
+        return { registered: [], discovered: [] };
+    }
+
+    // تحديث واجهة الأجهزة
+    async function refreshDevicesUI() {
+        try {
+            const { registered, discovered } = await loadDevices();
+            devices = registered; // تخزين للأجهزة المسجلة
+            renderDevices(registered, discovered);
+        } catch (err) {
+            console.error('فشل تحميل الأجهزة:', err);
+            if (registeredContainer) registeredContainer.innerHTML = '<div class="placeholder-text">خطأ في تحميل الأجهزة</div>';
+        }
+    }
+
+    // ------------------- إدارة التحميلات -------------------
+    const downloadsTbody = document.getElementById('downloads-tbody');
+    const btnStart = document.getElementById('btn-start-route');
+    const urlInput = document.getElementById('media-url');
+
+    // إضافة صف تحميل جديد (يتم استدعاؤه عند بدء التحميل)
+    function addDownloadRow(fileName, targetDeviceId, targetDeviceName) {
+        // TODO: سيتم استدعاؤها من خلال IPC على progress و completion
+        const row = document.createElement('tr');
+        row.setAttribute('data-download-id', `dl-${Date.now()}-${targetDeviceId}`);
+        row.innerHTML = `
+            <td class="file-name">${escapeHtml(fileName)}</td>
+            <td>
+                <div class="progress-wrapper">
+                    <div class="progress-track">
+                        <div class="progress-fill" style="width: 0%;"></div>
+                    </div>
+                    <span class="progress-percentage">0%</span>
+                </div>
+            </td>
+            <td class="file-size">--</td>
+            <td class="download-speed">--</td>
+            <td><span class="device-tag">${escapeHtml(targetDeviceName)}</span></td>
+        `;
+        // إزالة رسالة "لا توجد تحميلات"
+        const emptyRow = downloadsTbody.querySelector('.empty-row');
+        if (emptyRow) emptyRow.remove();
+        downloadsTbody.prepend(row);
+        return row;
+    }
+
+    // تحديث تقدم التحميل (يتم استدعاؤها من مستمع IPC)
+    function updateDownloadProgress(rowId, percent, speed, size) {
+        const row = downloadsTbody.querySelector(`tr[data-download-id="${rowId}"]`);
+        if (!row) return;
+        const fill = row.querySelector('.progress-fill');
+        const percentSpan = row.querySelector('.progress-percentage');
+        const speedSpan = row.querySelector('.download-speed');
+        const sizeSpan = row.querySelector('.file-size');
+        if (fill) fill.style.width = `${percent}%`;
+        if (percentSpan) percentSpan.textContent = `${percent}%`;
+        if (speedSpan) speedSpan.textContent = speed;
+        if (sizeSpan && size) sizeSpan.textContent = size;
+        // تغيير لون شريط التقدم
+        if (fill) {
+            const hue = 210 - (percent / 100) * 90;
+            fill.style.backgroundColor = `hsl(${hue}, 70%, 55%)`;
+        }
+    }
+
+    // إكمال التحميل
+    function markDownloadComplete(rowId) {
+        const row = downloadsTbody.querySelector(`tr[data-download-id="${rowId}"]`);
+        if (!row) return;
+        const fill = row.querySelector('.progress-fill');
+        const percentSpan = row.querySelector('.progress-percentage');
+        const speedSpan = row.querySelector('.download-speed');
+        if (fill) fill.style.width = '100%';
+        if (percentSpan) percentSpan.textContent = '100%';
+        if (speedSpan) speedSpan.textContent = '0 MB/s';
+        if (fill) fill.style.backgroundColor = 'hsl(120, 70%, 55%)';
+    }
+
+    // بدء التحميل للأجهزة المحددة
+    async function startDownloadForSelectedDevices(url, fileName) {
+        if (selectedDeviceIds.size === 0) {
+            alert('الرجاء تحديد جهاز واحد أو أكثر أولاً من قسم الأجهزة المتصلة.');
+            return false;
+        }
+        // TODO: استدعاء download:start لكل جهاز محدد
+        for (let deviceId of selectedDeviceIds) {
+            const device = devices.find(d => d.id === deviceId);
+            if (!device) continue;
+            const deviceName = device.deviceFriendlyName || device.model || deviceId;
+            const row = addDownloadRow(fileName, deviceId, deviceName);
+            // هنا سيتم ربط IPC لبدء التحميل وتحديث التقدم
+            console.log(`بدء التحميل للجهاز ${deviceName} (${deviceId})`, row);
+            // مؤقتاً نضيف محاكاة صغيرة لعرض التقدم لاحقاً
+        }
+        return true;
+    }
+
+    // معالج زر التوجيه
+    btnStart.addEventListener('click', async () => {
+        let url = urlInput.value.trim();
+        if (!url) {
+            alert('الرجاء إدخال رابط الوسائط');
+            return;
+        }
+        let fileName = 'media_' + Date.now();
+        try {
+            const urlObj = new URL(url);
+            const lastSegment = urlObj.pathname.split('/').pop();
+            if (lastSegment && lastSegment.includes('.')) fileName = lastSegment;
+        } catch(e) {}
+        const success = await startDownloadForSelectedDevices(url, fileName);
+        if (success) urlInput.value = '';
+        urlInput.focus();
+    });
+
+    // ------------------- الإعدادات -------------------
+    const refreshBtn = document.getElementById('refresh-devices');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', () => {
+            refreshDevicesUI();
+        });
+    }
+
+    // ------------------- استقبال التحديثات من الخلفية (IPC Events) -------------------
+    // TODO: ربط الأحداث القادمة من window.electronAPI
+    // مثال:
+    // window.electronAPI.onUpdateList(({ registered, discovered }) => {
+    //     devices = registered;
+    //     renderDevices(registered, discovered);
+    // });
+    // window.electronAPI.onProgress((data) => { updateDownloadProgress(data.id, data.progress, data.speed, data.size); });
+    // window.electronAPI.onFinished((data) => { markDownloadComplete(data.id); });
+
+    // تحميل أولي للأجهزة
+    refreshDevicesUI();
+});
+</file>
+
+<file path="src/renderer/style.css">
+/* LinkFlow - Modern Dark Theme (مرن ومتجاوب) */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background-color: #1A1A1A;
+    color: #FFFFFF;
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+    min-height: 100vh;
+    padding: clamp(16px, 4vw, 32px) clamp(16px, 5vw, 40px);
+    -webkit-font-smoothing: antialiased;
+}
+
+.app-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: clamp(24px, 5vh, 48px);
+}
+
+/* ========== شريط التنقل ========== */
+.navbar {
+    background-color: #262626;
+    border-radius: 80px;
+    padding: 8px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+    border: 1px solid #333333;
+}
+
+.logo-text {
+    font-size: clamp(1.3rem, 4vw, 1.7rem);
+    font-weight: 800;
+    background: linear-gradient(135deg, #FFFFFF, #A6A6A6);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.nav-links {
+    display: flex;
+    gap: 8px;
+    background-color: #1A1A1A;
+    padding: 6px;
+    border-radius: 60px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.nav-item {
+    padding: 6px 16px;
+    color: #A6A6A6;
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: 40px;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.nav-item.active {
+    background-color: #1E6FD9;
+    color: white;
+    box-shadow: 0 2px 8px rgba(30,111,217,0.3);
+}
+
+.nav-icon {
+    width: 18px;
+    height: 18px;
+}
+
+/* ملف المستخدم */
+.user-profile {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background-color: #1A1A1A;
+    padding: 4px 12px 4px 16px;
+    border-radius: 50px;
+    cursor: default;
+    transition: 0.2s;
+    border: 1px solid #3A3A3A;
+}
+
+.user-avatar {
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(145deg, #1E6FD9, #0F4C9E);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.user-avatar svg {
+    width: 18px;
+    height: 18px;
+    stroke: white;
+}
+
+.user-name {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #E0E0E0;
+}
+
+/* ========== الأقسام ========== */
+.tab-section {
+    display: none;
+    animation: fadeIn 0.25s ease;
+}
+
+.tab-section.active-section {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px);}
+    to { opacity: 1; transform: translateY(0);}
+}
+
+/* ========== الأجهزة (تحديد متعدد) ========== */
+.devices-capsule-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    margin-bottom: 28px;
+}
+
+.devices-capsule-pill {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+    background-color: #262626;
+    padding: 16px 28px;
+    border-radius: 100px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+    width: auto;
+    max-width: 100%;
+}
+
+.offline-capsule {
+    background-color: #1F1F1F;
+    border: 1px solid #333333;
+}
+
+.device-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 18px;
+    border-radius: 50px;
+    background-color: #1A1A1A;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid transparent;
+}
+
+.device-item:hover {
+    background-color: #2E2E2E;
+    transform: translateY(-2px);
+}
+
+/* الهالة العصرية للأجهزة المحددة (متعددة) */
+.device-item.selected {
+    border: 1.5px solid #1E6FD9;
+    background: linear-gradient(145deg, #1E2A3A, #0F1A2A);
+    box-shadow: 0 0 12px rgba(30,111,217,0.5), inset 0 1px 0 rgba(255,255,255,0.05);
+    transform: scale(1.02);
+}
+
+.device-circle {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #0F0F0F;
+    color: #FFFFFF;
+}
+
+.device-circle svg {
+    width: 20px;
+    height: 20px;
+    stroke: currentColor;
+}
+
+.status-connected .device-circle {
+    color: #1B8755;
+}
+
+.status-offline .device-circle {
+    color: #D32F2F;
+}
+
+.device-name {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #FFFFFF;
+}
+
+.status-badge {
+    font-size: 0.7rem;
+    background-color: #2A2A2A;
+    padding: 4px 8px;
+    border-radius: 30px;
+    color: #B0B0B0;
+}
+
+/* ========== حقل الإدخال ========== */
+.routing-input-container {
+    display: flex;
+    background-color: #262626;
+    border-radius: 60px;
+    padding: 6px;
+    align-items: center;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.input-url {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    padding: 12px 20px;
+    color: #FFFFFF;
+    font-size: 0.9rem;
+    min-width: 180px;
+}
+
+.input-url::placeholder {
+    color: #6A6A6A;
+}
+
+.btn-route {
+    border-radius: 50px;
+    background-color: #1E6FD9;
+    border: none;
+    color: white;
+    padding: 10px 28px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: 0.2s;
+    white-space: nowrap;
+}
+
+.btn-route:hover {
+    background-color: #155bb0;
+    transform: scale(0.98);
+}
+
+/* ========== جدول التحميلات ========== */
+.downloads-card {
+    background-color: #262626;
+    border-radius: 32px;
+    padding: 24px 20px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+    border: 1px solid #3A3A3A;
+    overflow-x: auto;
+}
+
+.right-align {
+    text-align: right;
+    margin-bottom: 20px;
+}
+
+.downloads-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 750px;
+}
+
+.downloads-table th {
+    color: #A6A6A6;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 14px 8px;
+    border-bottom: 2px solid #3A3A3A;
+    text-align: right;
+}
+
+.downloads-table td {
+    padding: 14px 8px;
+    border-bottom: 1px solid #333333;
+    vertical-align: middle;
+    font-size: 0.85rem;
+}
+
+.file-name {
+    font-weight: 600;
+    color: #FFFFFF;
+}
+
+.progress-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.progress-track {
+    flex: 1;
+    height: 6px;
+    background-color: #1A1A1A;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background-color: #1E6FD9;
+    border-radius: 4px;
+    transition: width 0.2s, background-color 0.2s;
+}
+
+.progress-percentage {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #A6A6A6;
+    min-width: 40px;
+    text-align: left;
+}
+
+.file-size, .download-speed {
+    color: #C0C0C0;
+    font-family: monospace;
+    font-size: 0.75rem;
+}
+
+.device-tag {
+    background-color: #333333;
+    color: #E0E0E0;
+    padding: 4px 12px;
+    border-radius: 30px;
+    font-size: 0.7rem;
+    font-weight: 500;
+    display: inline-block;
+}
+
+/* ========== الإعدادات ========== */
+.settings-card {
+    background-color: #262626;
+    border-radius: 32px;
+    padding: 24px 28px;
+}
+
+.settings-placeholder p {
+    background-color: #1E1E1E;
+    padding: 12px 20px;
+    border-radius: 20px;
+    border-right: 4px solid #1E6FD9;
+    margin-bottom: 12px;
+}
+
+.btn-outline {
+    background: transparent;
+    border: 1px solid #1E6FD9;
+    color: #1E6FD9;
+    padding: 8px 20px;
+    border-radius: 40px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: 0.2s;
+}
+
+.btn-outline:hover {
+    background-color: #1E6FD9;
+    color: white;
+}
+
+/* ========== تحسينات متجاوبة ========== */
+@media (max-width: 850px) {
+    .navbar {
+        border-radius: 40px;
+        justify-content: center;
+    }
+    .logo, .user-profile {
+        position: static;
+    }
+    .nav-links {
+        order: 2;
+        width: 100%;
+        justify-content: center;
+    }
+    .user-profile {
+        order: 3;
+    }
+    .devices-capsule-pill {
+        border-radius: 40px;
+        padding: 12px 16px;
+        gap: 12px;
+    }
+    .device-item {
+        padding: 4px 12px;
+        gap: 8px;
+    }
+    .device-name {
+        font-size: 0.75rem;
+    }
+    .btn-route {
+        padding: 8px 18px;
+    }
+}
+
+@media (max-width: 550px) {
+    .device-item {
+        flex-wrap: wrap;
+        justify-content: center;
+        text-align: center;
+        gap: 4px;
+    }
+    .device-circle {
+        width: 30px;
+        height: 30px;
+    }
+    .status-badge {
+        font-size: 0.6rem;
+    }
+    .routing-input-container {
+        border-radius: 30px;
+    }
+    .input-url {
+        padding: 10px 14px;
+        font-size: 0.8rem;
+    }
+    .btn-route {
+        width: 100%;
+    }
+}
+</file>
+
 <file path=".gitignore">
 node_modules/
 .env
 *.log3
-</file>
-
-<file path="package.json">
-{
-  "name": "linkhub_",
-  "version": "1.0.0",
-  "main": "src/main/index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "electron . --no-sandbox",
-    "build": "electron-builder"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
-  "dependencies": {
-    "axios": "^1.16.1",
-    "better-sqlite3": "^12.10.0",
-    "bonjour-service": "^1.4.0",
-    "dotenv": "^17.4.2",
-    "electron-log": "^5.4.4",
-    "electron-squirrel-startup": "^1.0.1"
-  },
-  "devDependencies": {
-    "@electron/rebuild": "3.6.0",
-    "electron": "30.0.0",
-    "electron-builder": "24.13.3"
-  }
-}
 </file>
 
 <file path="src/main/infrastructure/adb/ConnectionService.js">
@@ -4901,6 +4721,168 @@ module.exports =
     new ProcessManager();
 </file>
 
+<file path="src/main/runtime/devices/DeviceRegistry.js">
+'use strict';
+
+const DeviceRuntimeState =
+    require('./DeviceRuntimeState');
+
+/**
+ * Runtime registry responsible for:
+ *
+ * - Device registration
+ * - Device lookup
+ * - Runtime state management
+ *
+ * This class does NOT:
+ * - Connect devices
+ * - Pair devices
+ * - Execute ADB commands
+ * - Persist data
+ * - Implement business logic
+ */
+class DeviceRegistry {
+    constructor() {
+        /**
+         * Map<deviceId, Device>
+         */
+        this._devices =
+            new Map();
+
+        /**
+         * Map<deviceId, DeviceRuntimeState>
+         */
+        this._runtimeStates =
+            new Map();
+    }
+
+    registerDevice(device) {
+        if (!device || !device.id) {
+            throw new Error(
+                'Device must contain a valid id'
+            );
+        }
+
+        this._devices.set(
+            device.id,
+            device
+        );
+
+        if (
+            !this._runtimeStates.has(
+                device.id
+            )
+        ) {
+            this._runtimeStates.set(
+                device.id,
+                new DeviceRuntimeState()
+            );
+        }
+
+        return device;
+    }
+
+    removeDevice(deviceId) {
+        this._devices.delete(
+            deviceId
+        );
+
+        this._runtimeStates.delete(
+            deviceId
+        );
+    }
+
+    updateState(
+        deviceId,
+        state = {}
+    ) {
+        let runtimeState =
+            this._runtimeStates.get(
+                deviceId
+            );
+
+        if (!runtimeState) {
+            runtimeState =
+                new DeviceRuntimeState();
+
+            this._runtimeStates.set(
+                deviceId,
+                runtimeState
+            );
+        }
+
+        runtimeState.update({
+            ...state,
+            lastSeen:
+                state.lastSeen ||
+                new Date()
+        });
+
+        return runtimeState;
+    }
+
+    getDevice(deviceId) {
+        return (
+            this._devices.get(
+                deviceId
+            ) || null
+        );
+    }
+
+    getRuntimeState(
+        deviceId
+    ) {
+        return (
+            this._runtimeStates.get(
+                deviceId
+            ) || null
+        );
+    }
+
+    getAllDevices() {
+        return Array.from(
+            this._devices.values()
+        );
+    }
+
+    getAllRuntimeStates() {
+        return Array.from(
+            this._runtimeStates.values()
+        );
+    }
+
+    hasDevice(deviceId) {
+        return this._devices.has(
+            deviceId
+        );
+    }
+
+    clear() {
+        this._devices.clear();
+        this._runtimeStates.clear();
+    }
+
+    /**
+     * Find device ID by ADB target (serial or host:port)
+     * @param {string} adbTarget - e.g., "emulator-5554" or "192.168.1.10:5555"
+     * @returns {string|null} deviceId if found, else null
+     */
+    findDeviceIdByAdbTarget(adbTarget) {
+        if (!adbTarget) return null;
+        for (const [deviceId, runtimeState] of this._runtimeStates.entries()) {
+            if (runtimeState.adbTarget === adbTarget) {
+                return deviceId;
+            }
+        }
+        // Also check devices without runtime state? Not needed as each device has runtime.
+        return null;
+    }
+}
+
+module.exports =
+    DeviceRegistry;
+</file>
+
 <file path="src/main/runtime/processes/ProcessSupervisor.js">
 'use strict';
 
@@ -5124,6 +5106,36 @@ class ProcessSupervisor {
 
 module.exports =
     ProcessSupervisor;
+</file>
+
+<file path="package.json">
+{
+  "name": "linkhub_",
+  "version": "1.0.0",
+  "main": "src/main/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "electron . --no-sandbox",
+    "build": "electron-builder"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "axios": "^1.16.1",
+    "better-sqlite3": "^12.10.0",
+    "bonjour-service": "^1.4.0",
+    "dotenv": "^17.4.2",
+    "electron-log": "^5.4.4",
+    "electron-squirrel-startup": "^1.0.1"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "3.6.0",
+    "electron": "30.0.0",
+    "electron-builder": "24.13.3"
+  }
+}
 </file>
 
 <file path="src/main/bootstrap/container.js">
