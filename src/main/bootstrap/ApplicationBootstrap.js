@@ -1,3 +1,4 @@
+// src/main/bootstrap/ApplicationBootstrap.js
 'use strict';
 
 const path = require('path');
@@ -23,6 +24,40 @@ class ApplicationBootstrap {
         if (errorService && typeof errorService.init === 'function') {
             errorService.init();
             console.log('[Bootstrap] ErrorCentralService initialized.');
+        }
+
+        // 2.5. Verify required tools (adb, scrcpy, yt-dlp) - NEW
+        const toolPathResolver = container.resolve('toolPathResolver');
+        if (toolPathResolver && typeof toolPathResolver.verifyAll === 'function') {
+            const toolsStatus = toolPathResolver.verifyAll();
+            console.log('[Bootstrap] Tool verification results:', toolsStatus);
+            
+            if (!toolsStatus.adb) {
+                console.warn('[Bootstrap] Warning: ADB not found. Device discovery and pairing will not work.');
+                if (errorService) {
+                    errorService.warn('ADB binary not found. Please ensure resources/bin/win/adb.exe or LINKHUB_ADB_PATH is set.', {
+                        source: 'ApplicationBootstrap'
+                    });
+                }
+            }
+            if (!toolsStatus.scrcpy) {
+                console.warn('[Bootstrap] Warning: scrcpy not found. Screen mirroring will not work.');
+                if (errorService) {
+                    errorService.warn('scrcpy binary not found. Please ensure resources/bin/win/scrcpy.exe or LINKHUB_SCRCPY_PATH is set.', {
+                        source: 'ApplicationBootstrap'
+                    });
+                }
+            }
+            if (!toolsStatus.ytdlp) {
+                console.warn('[Bootstrap] Warning: yt-dlp not found. Downloading will not work.');
+                if (errorService) {
+                    errorService.warn('yt-dlp binary not found. Please ensure resources/bin/win/yt-dlp.exe or LINKHUB_YTDLP_PATH is set.', {
+                        source: 'ApplicationBootstrap'
+                    });
+                }
+            }
+        } else {
+            console.warn('[Bootstrap] ToolPathResolver not available, skipping tool verification.');
         }
 
         // 3. Initialize database (if needed)
@@ -51,7 +86,6 @@ class ApplicationBootstrap {
         // 6. Initialize window management infrastructure
         this._windowRegistry = new WindowRegistry();
         this._windowManager = new WindowManager(this._windowRegistry);
-
 
         // 7. Create main window
         await this.createMainWindow();

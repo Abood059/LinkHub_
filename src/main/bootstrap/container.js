@@ -1,3 +1,4 @@
+// src/main/bootstrap/container.js
 'use strict';
 
 const ErrorCentralService =
@@ -61,6 +62,12 @@ const DownloadOrchestrator =
         '../application/orchestrators/DownloadOrchestrator'
     );
 
+// --- أداة حل المسارات الموحدة (المهمة 1) ---
+const ToolPathResolver =
+    require(
+        '../infrastructure/tools/ToolPathResolver'
+    );
+
 class BootstrapContainer {
     constructor() {
         this._services =
@@ -95,11 +102,18 @@ class BootstrapContainer {
         const databaseManager =
             new DatabaseManager();
 
+        // --- تهيئة محلل المسار الموحد (مع دعم logger اختياري) ---
+        const toolPathResolver = new ToolPathResolver({
+            logger: ErrorCentralService
+        });
+
+        // --- إنشاء AdbCommandExecutor باستخدام محلل المسار ---
         const adbCommandExecutor =
             new AdbCommandExecutor({
                 processSupervisor,
-                logger:
-                    ErrorCentralService
+                logger: ErrorCentralService,
+                toolPathResolver: toolPathResolver
+                // لم نمرر adbPath -> سيتم حله تلقائياً عبر toolPathResolver
             });
 
         const connectionService =
@@ -235,17 +249,20 @@ class BootstrapContainer {
             }
         });
 
-        // --- إنشاء محولات Infrastructure ---
+        // --- إنشاء محولات Infrastructure باستخدام محلل المسار الموحد ---
         const scrcpyAdapter = new ScrcpyAdapter({
             processSupervisor,
-            scrcpyPath: 'scrcpy',
-            logger: ErrorCentralService
+            logger: ErrorCentralService,
+            toolPathResolver: toolPathResolver
+            // لم نمرر scrcpyPath -> سيتم حله تلقائياً عبر toolPathResolver
         });
 
         const ytdlpAdapter = new YtdlpAdapter({
             processSupervisor,
-            ytDlpPath: 'yt-dlp',
-            logger: ErrorCentralService
+            logger: ErrorCentralService,
+            toolPathResolver: toolPathResolver
+            // لم نمرر ytdlpPath -> سيتم حله تلقائياً عبر toolPathResolver
+            // ملاحظة: الخاصية الصحيحة هي `ytdlpPath` (وليس `ytDlpPath`).
         });
 
         // --- إنشاء الـ Orchestrators (طبقة Application) ---
@@ -326,6 +343,11 @@ class BootstrapContainer {
         this._services.set(
             'downloadOrchestrator',
             downloadOrchestrator
+        );
+
+        this._services.set(
+            'toolPathResolver',
+            toolPathResolver
         );
 
         this._initialized =

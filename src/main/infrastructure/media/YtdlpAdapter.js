@@ -1,10 +1,44 @@
+// src/main/infrastructure/media/YtdlpAdapter.js
 'use strict';
 
 class YtdlpAdapter {
-    constructor({ processSupervisor, ytdlpPath = 'yt-dlp' }) {
+    constructor({
+        processSupervisor,
+        ytdlpPath = null,
+        toolPathResolver = null,   // <-- جديد: محلل المسار الموحد
+        logger = null
+    }) {
         this._processSupervisor = processSupervisor;
-        this._ytdlpPath = ytdlpPath;
+        this._logger = logger;
+        this._toolPathResolver = toolPathResolver;
+
+        // تحديد مسار yt-dlp (الأولوية: ytdlpPath المُمرر > toolPathResolver > القيمة الاحتياطية)
+        this._ytdlpPath = this._resolveYtdlpPath(ytdlpPath);
+
         this._activeDownloads = new Map(); // processId -> { resolve, reject, entity }
+    }
+
+    /**
+     * Resolves yt-dlp binary path with proper priority.
+     * @param {string|null} explicitPath - Direct override from constructor
+     * @returns {string}
+     * @throws {Error} if no valid path found
+     */
+    _resolveYtdlpPath(explicitPath) {
+        if (explicitPath) {
+            return explicitPath;
+        }
+
+        if (this._toolPathResolver) {
+            return this._toolPathResolver.getYtDlpPath();
+        }
+
+        // Fallback: assume 'yt-dlp' is in PATH (development convenience)
+        const fallbackPath = 'yt-dlp';
+        if (this._logger) {
+            this._logger.warn(`YtdlpAdapter: No toolPathResolver provided, using fallback: ${fallbackPath}`);
+        }
+        return fallbackPath;
     }
 
     /**

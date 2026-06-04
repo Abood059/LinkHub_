@@ -1,3 +1,4 @@
+// src/main/infrastructure/streaming/ScrcpyAdapter.js
 'use strict';
 
 /**
@@ -8,14 +9,41 @@
 class ScrcpyAdapter {
     constructor({
         processSupervisor,
-        scrcpyPath,
+        scrcpyPath = null,
+        toolPathResolver = null,   // <-- جديد: محلل المسار الموحد
         logger = null
     }) {
         this._processSupervisor = processSupervisor;
-        this._scrcpyPath = scrcpyPath;
         this._logger = logger;
+        this._toolPathResolver = toolPathResolver;
+
+        // تحديد مسار scrcpy (الأولوية: scrcpyPath المُمرر > toolPathResolver > القيمة الاحتياطية)
+        this._scrcpyPath = this._resolveScrcpyPath(scrcpyPath);
 
         this._activeProcesses = new Map();
+    }
+
+    /**
+     * Resolves scrcpy binary path with proper priority.
+     * @param {string|null} explicitPath - Direct override from constructor
+     * @returns {string}
+     * @throws {Error} if no valid path found
+     */
+    _resolveScrcpyPath(explicitPath) {
+        if (explicitPath) {
+            return explicitPath;
+        }
+
+        if (this._toolPathResolver) {
+            return this._toolPathResolver.getScrcpyPath();
+        }
+
+        // Fallback: assume 'scrcpy' is in PATH (development convenience)
+        const fallbackPath = 'scrcpy';
+        if (this._logger) {
+            this._logger.warn(`ScrcpyAdapter: No toolPathResolver provided, using fallback: ${fallbackPath}`);
+        }
+        return fallbackPath;
     }
 
     startMirroring(deviceId, options = {}) {

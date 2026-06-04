@@ -1,3 +1,4 @@
+// src/main/infrastructure/adb/AdbCommandExecutor.js
 'use strict';
 
 const path = require('path');
@@ -7,17 +8,22 @@ class AdbCommandExecutor {
     constructor({
         processSupervisor,
         logger = null,
-        adbPath = null
+        adbPath = null,
+        toolPathResolver = null   // <-- جديد: محلل المسار الموحد
     }) {
-        this._processSupervisor =
-            processSupervisor;
+        this._processSupervisor = processSupervisor;
+        this._logger = logger;
+        this._toolPathResolver = toolPathResolver;
 
-        this._logger =
-            logger;
-
-        this._adbPath =
-            adbPath ||
-            this._resolveAdbPath();
+        // تحديد مسار ADB (الأولوية: adbPath المُمرر > toolPathResolver > المسار القديم)
+        if (adbPath) {
+            this._adbPath = adbPath;
+        } else if (this._toolPathResolver) {
+            this._adbPath = this._toolPathResolver.getAdbPath();
+        } else {
+            // احتياطي: الطريقة القديمة (للتوافق مع الكود القديم)
+            this._adbPath = this._resolveAdbPathLegacy();
+        }
     }
 
     async getDevices() {
@@ -159,7 +165,8 @@ class AdbCommandExecutor {
             );
     }
 
-    _resolveAdbPath() {
+    // الطريقة القديمة محفوظة كخيار احتياطي (تم تعديل اسمها قليلاً)
+    _resolveAdbPathLegacy() {
         const isWin =
             process.platform ===
             'win32';
