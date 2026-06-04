@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>LinkFlow | التدفق الذكي</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="app-container">
+        
+        <header class="navbar-wrapper">
+            <nav class="navbar">
+                <div class="logo">
+                    <span class="logo-text">LinkFlow</span>
+                </div>
+                
+                <div class="nav-links" dir="ltr">
+                    <a href="#" class="nav-item active" data-tab="home">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                        </svg>
+                        <span>الرئيسية</span>
+                    </a>
+                    <a href="#" class="nav-item" data-tab="downloads">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m-4-4l4 4 4-4"/>
+                        </svg>
+                        <span>التحميلات</span>
+                    </a>
+                    <a href="#" class="nav-item" data-tab="settings">
+                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                            <circle cx="12" cy="12" r="3"/>
+                        </svg>
+                        <span>الإعدادات</span>
+                    </a>
+                </div>
+
+                <div class="user-profile">
+                    <div class="user-avatar">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M5.121 17.804A9 9 0 0119 12M5.12 6.196A9 9 0 0119 12M12 3v1m0 16v1M3 12h1m16 0h1M5.6 5.6l.7.7m12.1 12.1l-.7-.7M5.6 18.4l.7-.7M18.4 5.6l-.7.7" stroke-linecap="round"/>
+                            <circle cx="12" cy="12" r="3"/>
+                        </svg>
+                    </div>
+                    <span class="user-name">المستخدم</span>
+                </div>
+            </nav>
+        </header>
+
+        <main class="dashboard-content">
+            <!-- قسم الرئيسية -->
+            <div id="home-section" class="tab-section active-section">
+                <section class="devices-section">
+                    <div class="devices-capsule-wrapper">
+                        <h2 class="section-subheading">الأجهزة المتصلة</h2>
+                        <div class="devices-capsule-pill" id="registered-devices">
+                            <!-- سيتم تعبئتها ديناميكياً عبر JS -->
+                            <div class="placeholder-text">جاري تحميل الأجهزة...</div>
+                        </div>
+                    </div>
+                    <div class="devices-capsule-wrapper offset-top">
+                        <h2 class="section-subheading offline-sub">الأجهزة غير المتصلة (المكتشفة)</h2>
+                        <div class="devices-capsule-pill offline-capsule" id="discovered-devices">
+                            <div class="placeholder-text">جاري البحث عن أجهزة...</div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="routing-section">
+                    <div class="routing-input-container">
+                        <input type="text" class="input-url" id="media-url" placeholder="أدخل رابط الوسائط (فيديو، أغنية) لبدء التوجيه...">
+                        <button class="btn-route" id="btn-start-route">توجيه وبدء التحميل</button>
+                    </div>
+                </section>
+            </div>
+
+            <!-- قسم التحميلات -->
+            <div id="downloads-section" class="tab-section">
+                <div class="downloads-card">
+                    <h2 class="section-subheading right-align">قائمة التحميلات النشطة</h2>
+                    <div class="table-container">
+                        <table class="downloads-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 30%;">اسم الملف</th>
+                                    <th style="width: 20%;">التقدم</th>
+                                    <th style="width: 15%;">الحجم</th>
+                                    <th style="width: 15%;">السرعة</th>
+                                    <th style="width: 20%;">الجهة الوجهة</th>
+                                </tr>
+                            </thead>
+                            <tbody id="downloads-tbody">
+                                <!-- سيتم تعبئتها ديناميكياً -->
+                                <tr class="empty-row"><td colspan="5" style="text-align:center;">لا توجد تحميلات نشطة</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- قسم الإعدادات -->
+            <div id="settings-section" class="tab-section">
+                <div class="settings-card">
+                    <h2 class="section-subheading right-align">الإعدادات العامة</h2>
+                    <div class="settings-placeholder">
+                        <p>✔️ جودة البث التلقائي: عالية (قابل للتعديل لاحقاً)</p>
+                        <p>✔️ حفظ الملفات على الجهاز: مفعل</p>
+                        <p>✔️ إشعارات التحميل: مفعلة</p>
+                        <button class="btn-outline" id="refresh-devices">تحديث الأجهزة</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

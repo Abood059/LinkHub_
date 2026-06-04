@@ -1,0 +1,160 @@
+/**
+ * preload.js
+ * 
+ * Safe bridge between renderer process and main process.
+ * Exposes a limited, secure API via contextBridge.
+ * 
+ * NO business logic, NO direct access to Node.js APIs.
+ */
+
+const { contextBridge, ipcRenderer } = require('electron');
+
+// ============================================================================
+// 1. Devices API
+// ============================================================================
+
+const devicesAPI = {
+    /**
+     * Get all registered devices with their runtime state.
+     * @returns {Promise<Array>}
+     */
+    getAll: () => ipcRenderer.invoke('device:list'),
+    
+    /**
+     * Get a single device by ID.
+     * @param {string} deviceId
+     * @returns {Promise<Object|null>}
+     */
+    get: (deviceId) => ipcRenderer.invoke('device:get', deviceId),
+    
+    /**
+     * Pair with a wireless device.
+     * @param {string} host - e.g., "192.168.1.10:37000"
+     * @param {string} pairingCode - 6-digit code
+     * @returns {Promise<string[]>}
+     */
+    pair: (host, pairingCode) => ipcRenderer.invoke('device:pair', host, pairingCode),
+    
+    /**
+     * Connect to a device (USB serial or TCP/IP host:port).
+     * @param {string} target - e.g., "emulator-5554" or "192.168.1.10:5555"
+     * @param {string|null} friendlyName - Optional display name
+     * @returns {Promise<Object>}
+     */
+    connect: (target, friendlyName = null) => ipcRenderer.invoke('device:connect', target, friendlyName),
+    
+    /**
+     * Start screen mirroring for a connected device.
+     * @param {string} deviceId
+     * @param {Object} options - e.g., { fullscreen: boolean, bitrate: number }
+     * @returns {Promise<string>} processId
+     */
+    stream: {
+        start: (deviceId, options = {}) => ipcRenderer.invoke('device:stream:start', deviceId, options),
+        stop: (deviceId) => ipcRenderer.invoke('device:stream:stop', deviceId)
+    }
+};
+
+// ============================================================================
+// 2. Downloads API
+// ============================================================================
+
+const downloadsAPI = {
+    /**
+     * Inspect a URL: get available formats and metadata.
+     * @param {string} url
+     * @returns {Promise<Object>}
+     */
+    inspect: (url) => ipcRenderer.invoke('download:inspect', url),
+    
+    /**
+     * Start downloading a specific format.
+     * @param {string} url
+     * @param {string} formatId
+     * @param {string|null} deviceId - Optional device ID for saving location
+     * @param {Object} options - Additional options
+     * @returns {Promise<Object>}
+     */
+    start: (url, formatId, deviceId = null, options = {}) => 
+        ipcRenderer.invoke('download:start', url, formatId, deviceId, options),
+    
+    /**
+     * Stop an ongoing download by URL.
+     * @param {string} url
+     * @returns {Promise<boolean>}
+     */
+    stop: (url) => ipcRenderer.invoke('download:stop', url),
+    
+    /**
+     * Get lightweight metadata (title, duration, thumbnail).
+     * @param {string} url
+     * @returns {Promise<Object>}
+     */
+    metadata: (url) => ipcRenderer.invoke('download:metadata', url)
+};
+
+// ============================================================================
+// 3. Event listening (for runtime → UI events)
+// ============================================================================
+
+/**
+ * Generic event listener system.
+ * Allows renderer to subscribe to any IPC message sent from main process.
+ * 
+ * Usage:
+ *   linkhub.on('device:stateChanged', (event, data) => { ... });
+ *   linkhub.off('device:stateChanged', callback);
+ */
+const eventAPI = {
+    /**
+     * Register a listener for an IPC message from main process.
+     * @param {string} channel - Channel name (e.g., 'device:stateChanged')
+     * @param {Function} callback - Function that receives (event, ...args)
+     * @returns {Function} - Unsubscribe function
+     */
+    on: (channel, callback) => {
+        if (typeof callback !== 'function') {
+            throw new Error('Callback must be a function');
+        }
+        const wrappedCallback = (event, ...args) => callback(event, ...args);
+        ipcRenderer.on(channel, wrappedCallback);
+        // Return unsubscribe function
+        return () => {
+            ipcRenderer.removeListener(channel, wrappedCallback);
+        };
+    },
+    
+    /**
+     * Remove a specific listener.
+     * @param {string} channel
+     * @param {Function} callback - The original callback function
+     */
+    off: (channel, callback) => {
+        ipcRenderer.removeListener(channel, callback);
+    },
+    
+    /**
+     * Remove all listeners for a channel.
+     * @param {string} channel
+     */
+    removeAllListeners: (channel) => {
+        ipcRenderer.removeAllListeners(channel);
+    }
+};
+
+// ============================================================================
+// 4. Expose the unified API to renderer
+// ============================================================================
+
+contextBridge.exposeInMainWorld('linkhub', {
+    devices: devicesAPI,
+    downloads: downloadsAPI,
+    on: eventAPI.on,
+    off: eventAPI.off,
+    removeAllListeners: eventAPI.removeAllListeners
+});
+
+// Optional: Log that preload has loaded (only in development)
+if (process.env.NODE_ENV === 'development') {
+    console.log('[Preload] linkhub API exposed successfully');
+}

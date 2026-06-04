@@ -1,9 +1,11 @@
 {
   "name": "linkhub_",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "src/main/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "electron . --no-sandbox",
+    "build": "electron-builder"
   },
   "keywords": [],
   "author": "",
@@ -14,7 +16,8 @@
     "better-sqlite3": "^12.10.0",
     "bonjour-service": "^1.4.0",
     "dotenv": "^17.4.2",
-    "electron-log": "^5.4.4"
+    "electron-log": "^5.4.4",
+    "electron-squirrel-startup": "^1.0.1"
   },
   "devDependencies": {
     "@electron/rebuild": "3.6.0",

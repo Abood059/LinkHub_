@@ -137,6 +137,22 @@ class DeviceRegistry {
         this._devices.clear();
         this._runtimeStates.clear();
     }
+
+    /**
+     * Find device ID by ADB target (serial or host:port)
+     * @param {string} adbTarget - e.g., "emulator-5554" or "192.168.1.10:5555"
+     * @returns {string|null} deviceId if found, else null
+     */
+    findDeviceIdByAdbTarget(adbTarget) {
+        if (!adbTarget) return null;
+        for (const [deviceId, runtimeState] of this._runtimeStates.entries()) {
+            if (runtimeState.adbTarget === adbTarget) {
+                return deviceId;
+            }
+        }
+        // Also check devices without runtime state? Not needed as each device has runtime.
+        return null;
+    }
 }
 
 module.exports =
