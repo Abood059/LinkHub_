@@ -1,8 +1,10 @@
+// src/main/domain/entities/Device.js
 const BaseNode = require('./BaseNode');
 
 /**
  * Pure device entity.
- * Contains only immutable definitional data.
+ * Contains immutable definitional data but allows controlled updates
+ * for device details (model, version, arch) after connection.
  */
 class Device extends BaseNode {
     constructor({
@@ -24,12 +26,10 @@ class Device extends BaseNode {
         this._arch = arch || 'Unknown';
         this._isNew = isNew ?? true;
 
-        // Freeze after construction
-        Object.freeze(this);
+        // No freeze - allows updateDetails
     }
 
     // --- Read-only getters ---
-
     get model() {
         return this._model;
     }
@@ -46,6 +46,20 @@ class Device extends BaseNode {
         return this._isNew;
     }
 
+    /**
+     * Update device details after obtaining real information from ADB.
+     * @param {string} model - Device model
+     * @param {string} version - Android version
+     * @param {string} arch - CPU architecture
+     */
+    updateDetails(model, version, arch) {
+        if (model && typeof model === 'string') this._model = model;
+        if (version && typeof version === 'string') this._version = version;
+        if (arch && typeof arch === 'string') this._arch = arch;
+        // Mark as not new after first update
+        if (this._isNew) this._isNew = false;
+    }
+
     toJSON() {
         return {
             ...super.toJSON(),
@@ -59,8 +73,7 @@ class Device extends BaseNode {
     static fromJSON(data) {
         return new Device({
             id: data.id,
-            deviceFriendlyName:
-                data.deviceFriendlyName || data.friendly_name,
+            deviceFriendlyName: data.deviceFriendlyName || data.friendly_name,
             model: data.model,
             version: data.version,
             arch: data.arch,

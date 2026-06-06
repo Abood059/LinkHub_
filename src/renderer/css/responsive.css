@@ -1,0 +1,134 @@
+/* responsive.css - استجابة كاملة ومتناسقة */
+
+/* للأجهزة المتوسطة (تابلت، شاشات صغيرة) */
+@media (max-width: 850px) {
+    .navbar {
+        border-radius: 40px;
+        justify-content: center;
+    }
+    .logo, .user-profile {
+        position: static;
+    }
+    .nav-links {
+        order: 2;
+        width: 100%;
+        justify-content: center;
+    }
+    .user-profile {
+        order: 3;
+    }
+    
+    /* تحسين كبسولات الأجهزة */
+    .devices-capsule-pill {
+        border-radius: 40px;
+        padding: 16px 20px;   /* مسافة أقل قليلاً */
+        gap: 16px;
+    }
+    .device-item {
+        padding: 6px 14px;
+        gap: 8px;
+    }
+    .device-name {
+        font-size: 0.8rem;
+    }
+    .device-circle {
+        width: 34px;
+        height: 34px;
+    }
+    .device-circle svg {
+        width: 18px;
+        height: 18px;
+    }
+    .btn-route {
+        padding: 8px 18px;
+    }
+}
+
+/* للهواتف (شاشات صغيرة جداً) */
+@media (max-width: 600px) {
+    body {
+        padding: 12px;
+    }
+    
+    /* ترتيب الأجهزة بشكل عمودي تقريباً */
+    .devices-capsule-pill {
+        border-radius: 30px;
+        padding: 16px;
+        gap: 12px;
+        flex-direction: column;    /* جعل الأجهزة في عمود واحد */
+        align-items: stretch;
+    }
+    
+    .device-item {
+        width: 100%;
+        justify-content: space-between;
+        padding: 10px 16px;
+        gap: 12px;
+    }
+    
+    /* إعادة ترتيب المحتوى داخلياً */
+    .device-info {
+        flex: 1;
+    }
+    
+    .device-name {
+        font-size: 0.85rem;
+    }
+    
+    /* إخفاء التفاصيل الصغيرة إن ضاقت */
+    .device-detail {
+        display: none;
+    }
+    
+    .status-badge {
+        font-size: 0.6rem;
+        padding: 2px 8px;
+    }
+    
+    /* تحسين حقل الإدخال */
+    .routing-input-container {
+        border-radius: 30px;
+        flex-direction: column;
+        padding: 12px;
+        gap: 12px;
+    }
+    .input-url {
+        width: 100%;
+        text-align: center;
+        padding: 10px 14px;
+        font-size: 0.85rem;
+    }
+    .btn-route {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    /* العناوين */
+    .section-subheading {
+        font-size: 1rem;
+        margin-bottom: 8px;
+    }
+}
+
+/* للشاشات العريضة جداً (فائقة الاتساع) */
+@media (min-width: 1600px) {
+    .devices-capsule-pill {
+        gap: 28px;
+        padding: 24px 36px;
+    }
+    .device-item {
+        padding: 14px 26px;
+        gap: 16px;
+    }
+    .device-name {
+        font-size: 1rem;
+    }
+    .device-circle {
+        width: 48px;
+        height: 48px;
+    }
+    .device-circle svg {
+        width: 26px;
+        height: 26px;
+    }
+}

@@ -1,0 +1,26 @@
+// constants.js - الثوابت العامة
+export const DOM_IDS = {
+    navItems: '.nav-item',
+    homeSection: 'home-section',
+    downloadsSection: 'downloads-section',
+    settingsSection: 'settings-section',
+    registeredContainer: 'registered-devices',
+    discoveredContainer: 'discovered-devices',
+    downloadsTbody: 'downloads-tbody',
+    btnStart: 'btn-start-route',
+    mediaUrl: 'media-url',
+    refreshDevices: 'refresh-devices',
+    pairDevice: 'pair-device-btn',
+    // modal
+    deviceModal: 'device-modal',
+    modalClose: '.modal-close',
+    modalOverlay: '.modal-overlay',
+    modalDeviceName: 'modal-device-name',
+    modalDeviceModel: 'modal-device-model',
+    modalDeviceVersion: 'modal-device-version',
+    modalDeviceArch: 'modal-device-arch',
+    modalDeviceStatus: 'modal-device-status',
+    modalDeviceAdb: 'modal-device-adb',
+    modalStreamBtn: 'modal-stream-btn',
+    modalDisconnectBtn: 'modal-disconnect-btn'
+};

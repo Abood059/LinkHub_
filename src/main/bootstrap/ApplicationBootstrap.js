@@ -26,12 +26,12 @@ class ApplicationBootstrap {
             console.log('[Bootstrap] ErrorCentralService initialized.');
         }
 
-        // 2.5. Verify required tools (adb, scrcpy, yt-dlp) - NEW
+        // 2.5. Verify required tools (adb, scrcpy, yt-dlp)
         const toolPathResolver = container.resolve('toolPathResolver');
         if (toolPathResolver && typeof toolPathResolver.verifyAll === 'function') {
             const toolsStatus = toolPathResolver.verifyAll();
             console.log('[Bootstrap] Tool verification results:', toolsStatus);
-            
+
             if (!toolsStatus.adb) {
                 console.warn('[Bootstrap] Warning: ADB not found. Device discovery and pairing will not work.');
                 if (errorService) {
@@ -60,11 +60,13 @@ class ApplicationBootstrap {
             console.warn('[Bootstrap] ToolPathResolver not available, skipping tool verification.');
         }
 
-        // 3. Initialize database (if needed)
+        // 3. Initialize database (ensures directory and file exist)
         const dbManager = container.resolve('databaseManager');
         if (dbManager && typeof dbManager.initDb === 'function') {
             await dbManager.initDb();
             console.log('[Bootstrap] Database initialized.');
+        } else {
+            console.warn('[Bootstrap] DatabaseManager not available or missing initDb method.');
         }
 
         // 4. Retrieve core services for monitoring
@@ -74,7 +76,7 @@ class ApplicationBootstrap {
         // 5. Start ADB monitoring and wireless discovery
         if (connectionService) {
             if (typeof connectionService.startAdbMonitoring === 'function') {
-                connectionService.startAdbMonitoring(5000);
+                connectionService.startAdbMonitoring(500);
                 console.log('[Bootstrap] ADB monitoring started.');
             }
             if (typeof connectionService.startWirelessDiscovery === 'function') {
@@ -86,6 +88,9 @@ class ApplicationBootstrap {
         // 6. Initialize window management infrastructure
         this._windowRegistry = new WindowRegistry();
         this._windowManager = new WindowManager(this._windowRegistry);
+
+        // 6.5. Pass windowManager to container for event broadcasting
+        container.setWindowManager(this._windowManager);
 
         // 7. Create main window
         await this.createMainWindow();

@@ -27,31 +27,44 @@ class AdbCommandExecutor {
     }
 
     async getDevices() {
-        const lines =
-            await this._executeQuickAdbCommand(
-                ['devices']
-            );
-
-        return lines
-            .slice(1)
-            .map(
-                (line) => line.trim()
-            )
-            .filter(Boolean)
-            .map((line) => {
-                const parts =
-                    line.split(/\s+/);
-
-                return {
-                    serial:
-                        parts[0],
-                    state:
-                        parts[1] ||
-                        'unknown'
-                };
-            });
+        try {
+            // الاستدعاء الصحيح المتوافق مع الكود الخاص بك لتنفيذ الأوامر السريعة لـ ADB
+            const output = await this._executeQuickAdbCommand(['devices']);
+            
+            // التحقق من أن المخرجات نصية وليست فارغة
+            if (!output || typeof output !== 'string') {
+                return [];
+            }
+    
+            // تقطيع النص إلى أسطر بشكل مرن يتعامل مع (\n) و (\r\n) بالتساوي بين الأنظمة
+            const lines = output.split(/\r?\n/);
+    
+            // التحقق الإضافي للتأكد من وجود أسطر صالحة للمعالجة
+            if (!Array.isArray(lines) || lines.length <= 1) {
+                return [];
+            }
+    
+            // تصفية الأسطر وتحليلها بأمان كامل
+            return lines
+                .slice(1) // تخطي السطر الأول العناوين "List of devices attached"
+                .filter(line => line.trim() !== '') // تجاهل الأسطر الفارغة
+                .map(line => {
+                    const [id, state] = line.split(/\s+/); // التقسيم بناءً على الفراغات بين المعرف والحالة
+                    return { serial: id, state: state || 'unknown' }; // إرجاع التركيبة التي يتوقعها نظامك (serial و state)
+                })
+                .filter(device => device.serial && device.state); // التأكد من نجاح التحليل لكل جهاز
+    
+        } catch (error) {
+            // حماية دورتك الزمنية (كل 5 ثوانٍ) من الانهيار وطباعة خطأ نظيف دون إسقاط Electron
+            if (this._logger && typeof this._logger.warn === 'function') {
+                this._logger.warn(`[ADB] Failed to get devices list: ${error.message || error}`);
+            } else {
+                console.warn('[ADB] Failed to get devices list:', error.message || error);
+            }
+            return [];
+        }
     }
-
+    
     async getDeviceInfo(
         serial
     ) {

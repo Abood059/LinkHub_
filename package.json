@@ -4,7 +4,7 @@
   "main": "src/main/index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "electron . --no-sandbox",
+    "start": "electron . --disable-gpu --no-sandbox",
     "build": "electron-builder"
   },
   "keywords": [],

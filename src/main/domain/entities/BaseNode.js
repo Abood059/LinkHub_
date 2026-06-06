@@ -1,19 +1,19 @@
+// src/main/domain/entities/BaseNode.js
 /**
  * Pure base entity for all nodes/devices in the system.
  * Contains only immutable identity and structural data.
+ * 
+ * NOTE: Instances are NOT frozen to allow updates in derived classes.
  */
 class BaseNode {
     constructor({ id, deviceFriendlyName, type }) {
         this._id = id;
         this._deviceFriendlyName = deviceFriendlyName;
         this._type = type;
-
-        // Freeze instance to prevent accidental mutation
-        Object.freeze(this);
+        // No longer freezing - allows controlled updates in subclasses
     }
 
-    // --- Read-only getters ---
-
+    // --- Read-only getters (but internal setters exist for updates) ---
     get id() {
         return this._id;
     }
@@ -28,6 +28,11 @@ class BaseNode {
 
     get deviceFriendlyName() {
         return this._deviceFriendlyName;
+    }
+
+    // Protected setter for controlled updates (used by Device.updateDetails)
+    _setFriendlyName(name) {
+        this._deviceFriendlyName = name;
     }
 
     toJSON() {

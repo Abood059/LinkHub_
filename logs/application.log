@@ -1,0 +1,307 @@
+[2026-06-04 21:44:43.936] [error] [2026-06-04T18:44:43.934Z] | [ERROR] | [GENERAL] | [HIGH] | [UNKNOWN] | ToolPathResolver: Required binary "yt-dlp" not found at /home/abood/Project/LinkHub_/resources/bin/linux/yt-dlp. Set LINKHUB_YTDLP_PATH to override. |  | 
+[2026-06-04 21:50:06.380] [warn]  [2026-06-04T18:50:06.379Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | ToolPathResolver: Optional binary "yt-dlp" not found at /home/abood/Project/LinkHub_/resources/bin/linux/yt-dlp. |  | 
+[2026-06-04 21:50:06.387] [warn]  [2026-06-04T18:50:06.387Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | ToolPathResolver: Optional binary "yt-dlp" not found at /home/abood/Project/LinkHub_/resources/bin/linux/yt-dlp. |  | 
+[2026-06-04 21:50:06.391] [warn]  [2026-06-04T18:50:06.391Z] | [WARN] | [GENERAL] | [MEDIUM] | [ApplicationBootstrap] | yt-dlp binary not found. Please ensure resources/bin/win/yt-dlp.exe or LINKHUB_YTDLP_PATH is set. |  | 
+[2026-06-04 21:50:11.553] [error] [2026-06-04T18:50:11.553Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:50:16.532] [error] [2026-06-04T18:50:16.532Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:50:21.529] [error] [2026-06-04T18:50:21.529Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:50:26.533] [error] [2026-06-04T18:50:26.533Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:50:31.533] [error] [2026-06-04T18:50:31.533Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:50:36.533] [error] [2026-06-04T18:50:36.533Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:50:41.529] [error] [2026-06-04T18:50:41.529Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:50:46.531] [error] [2026-06-04T18:50:46.531Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:50:51.535] [error] [2026-06-04T18:50:51.535Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:50:56.537] [error] [2026-06-04T18:50:56.537Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:51:01.532] [error] [2026-06-04T18:51:01.532Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:51:06.534] [error] [2026-06-04T18:51:06.534Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:51:11.539] [error] [2026-06-04T18:51:11.539Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:51:16.534] [error] [2026-06-04T18:51:16.534Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:51:21.536] [error] [2026-06-04T18:51:21.536Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:51:26.538] [error] [2026-06-04T18:51:26.538Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:51:31.537] [error] [2026-06-04T18:51:31.537Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:51:36.539] [error] [2026-06-04T18:51:36.539Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:51:41.536] [error] [2026-06-04T18:51:41.536Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:51:46.536] [error] [2026-06-04T18:51:46.536Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:51:51.540] [error] [2026-06-04T18:51:51.540Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:51:56.537] [error] [2026-06-04T18:51:56.537Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:52:01.537] [error] [2026-06-04T18:52:01.537Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:52:06.538] [error] [2026-06-04T18:52:06.538Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:52:11.538] [error] [2026-06-04T18:52:11.538Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:52:16.538] [error] [2026-06-04T18:52:16.538Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:52:21.540] [error] [2026-06-04T18:52:21.540Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:52:26.550] [error] [2026-06-04T18:52:26.550Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:52:31.544] [error] [2026-06-04T18:52:31.544Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:52:36.539] [error] [2026-06-04T18:52:36.539Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:52:41.542] [error] [2026-06-04T18:52:41.542Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:52:46.545] [error] [2026-06-04T18:52:46.545Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:52:51.543] [error] [2026-06-04T18:52:51.543Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:52:56.544] [error] [2026-06-04T18:52:56.544Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:53:01.545] [error] [2026-06-04T18:53:01.545Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:53:06.545] [error] [2026-06-04T18:53:06.545Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:53:11.550] [error] [2026-06-04T18:53:11.550Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:53:16.548] [error] [2026-06-04T18:53:16.548Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:53:21.544] [error] [2026-06-04T18:53:21.544Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:53:26.549] [error] [2026-06-04T18:53:26.549Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:53:31.551] [error] [2026-06-04T18:53:31.551Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:53:36.547] [error] [2026-06-04T18:53:36.547Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:53:41.552] [error] [2026-06-04T18:53:41.552Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:53:46.545] [error] [2026-06-04T18:53:46.545Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:53:51.547] [error] [2026-06-04T18:53:51.547Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:53:56.547] [error] [2026-06-04T18:53:56.547Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:54:01.546] [error] [2026-06-04T18:54:01.546Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:54:06.548] [error] [2026-06-04T18:54:06.548Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:54:11.547] [error] [2026-06-04T18:54:11.547Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:54:16.548] [error] [2026-06-04T18:54:16.548Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:54:21.549] [error] [2026-06-04T18:54:21.549Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:54:26.555] [error] [2026-06-04T18:54:26.555Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:54:31.551] [error] [2026-06-04T18:54:31.551Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:54:36.551] [error] [2026-06-04T18:54:36.551Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:54:42.566] [error] [2026-06-04T18:54:42.566Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-04 21:54:48.418] [warn]  [2026-06-04T18:54:48.417Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | ToolPathResolver: Optional binary "yt-dlp" not found at /home/abood/Project/LinkHub_/resources/bin/linux/yt-dlp. |  | 
+[2026-06-04 21:54:48.424] [warn]  [2026-06-04T18:54:48.424Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | ToolPathResolver: Optional binary "yt-dlp" not found at /home/abood/Project/LinkHub_/resources/bin/linux/yt-dlp. |  | 
+[2026-06-04 21:54:48.430] [warn]  [2026-06-04T18:54:48.430Z] | [WARN] | [GENERAL] | [MEDIUM] | [ApplicationBootstrap] | yt-dlp binary not found. Please ensure resources/bin/win/yt-dlp.exe or LINKHUB_YTDLP_PATH is set. |  | 
+[2026-06-04 21:54:53.553] [error] [2026-06-04T18:54:53.552Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-05 14:23:55.075] [warn]  [2026-06-05T11:23:55.073Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | ToolPathResolver: Optional binary "yt-dlp" not found at /home/abood/Project/LinkHub_/resources/bin/linux/yt-dlp. |  | 
+[2026-06-05 14:23:55.080] [warn]  [2026-06-05T11:23:55.080Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | ToolPathResolver: Optional binary "yt-dlp" not found at /home/abood/Project/LinkHub_/resources/bin/linux/yt-dlp. |  | 
+[2026-06-05 14:23:55.082] [warn]  [2026-06-05T11:23:55.082Z] | [WARN] | [GENERAL] | [MEDIUM] | [ApplicationBootstrap] | yt-dlp binary not found. Please ensure resources/bin/win/yt-dlp.exe or LINKHUB_YTDLP_PATH is set. |  | 
+[2026-06-05 14:24:00.337] [error] [2026-06-05T11:24:00.337Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-05 15:02:06.044] [warn]  [2026-06-05T12:02:06.043Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | ToolPathResolver: Optional binary "yt-dlp" not found at /home/abood/Project/LinkHub_/resources/bin/linux/yt-dlp. |  | 
+[2026-06-05 15:02:06.052] [warn]  [2026-06-05T12:02:06.052Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | ToolPathResolver: Optional binary "yt-dlp" not found at /home/abood/Project/LinkHub_/resources/bin/linux/yt-dlp. |  | 
+[2026-06-05 15:02:06.056] [warn]  [2026-06-05T12:02:06.056Z] | [WARN] | [GENERAL] | [MEDIUM] | [ApplicationBootstrap] | yt-dlp binary not found. Please ensure resources/bin/win/yt-dlp.exe or LINKHUB_YTDLP_PATH is set. |  | 
+[2026-06-05 15:02:11.168] [error] [2026-06-05T12:02:11.167Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Unhandled Promise Rejection |  | TypeError: lines.slice(...).map is not a function
+    at AdbCommandExecutor.getDevices (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/AdbCommandExecutor.js:37:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async Timeout._onTimeout (/home/abood/Project/LinkHub_/src/main/infrastructure/adb/ConnectionService.js:32:33)
+[2026-06-05 17:19:16.912] [warn]  [2026-06-05T14:19:16.911Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | ToolPathResolver: Optional binary "yt-dlp" not found at /home/abood/Project/LinkHub_/resources/bin/linux/yt-dlp. |  | 
+[2026-06-05 17:19:16.919] [warn]  [2026-06-05T14:19:16.919Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | ToolPathResolver: Optional binary "yt-dlp" not found at /home/abood/Project/LinkHub_/resources/bin/linux/yt-dlp. |  | 
+[2026-06-05 17:19:16.923] [warn]  [2026-06-05T14:19:16.923Z] | [WARN] | [GENERAL] | [MEDIUM] | [ApplicationBootstrap] | yt-dlp binary not found. Please ensure resources/bin/win/yt-dlp.exe or LINKHUB_YTDLP_PATH is set. |  | 
+[2026-06-05 17:34:38.439] [warn]  [2026-06-05T14:34:38.438Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | ToolPathResolver: Optional binary "yt-dlp" not found at /home/abood/Project/LinkHub_/resources/bin/linux/yt-dlp. |  | 
+[2026-06-05 17:34:38.444] [warn]  [2026-06-05T14:34:38.444Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | ToolPathResolver: Optional binary "yt-dlp" not found at /home/abood/Project/LinkHub_/resources/bin/linux/yt-dlp. |  | 
+[2026-06-05 17:34:38.447] [warn]  [2026-06-05T14:34:38.447Z] | [WARN] | [GENERAL] | [MEDIUM] | [ApplicationBootstrap] | yt-dlp binary not found. Please ensure resources/bin/win/yt-dlp.exe or LINKHUB_YTDLP_PATH is set. |  | 
+[2026-06-05 17:37:10.786] [warn]  [2026-06-05T14:37:10.785Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | ToolPathResolver: Optional binary "yt-dlp" not found at /home/abood/Project/LinkHub_/resources/bin/linux/yt-dlp. |  | 
+[2026-06-05 17:37:10.794] [warn]  [2026-06-05T14:37:10.794Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | ToolPathResolver: Optional binary "yt-dlp" not found at /home/abood/Project/LinkHub_/resources/bin/linux/yt-dlp. |  | 
+[2026-06-05 17:37:10.796] [warn]  [2026-06-05T14:37:10.796Z] | [WARN] | [GENERAL] | [MEDIUM] | [ApplicationBootstrap] | yt-dlp binary not found. Please ensure resources/bin/win/yt-dlp.exe or LINKHUB_YTDLP_PATH is set. |  | 
+[2026-06-05 17:42:57.141] [warn]  [2026-06-05T14:42:57.141Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | ToolPathResolver: Optional binary "yt-dlp" not found at /home/abood/Project/LinkHub_/resources/bin/linux/yt-dlp. |  | 
+[2026-06-05 17:42:57.147] [warn]  [2026-06-05T14:42:57.147Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | ToolPathResolver: Optional binary "yt-dlp" not found at /home/abood/Project/LinkHub_/resources/bin/linux/yt-dlp. |  | 
+[2026-06-05 17:42:57.150] [warn]  [2026-06-05T14:42:57.150Z] | [WARN] | [GENERAL] | [MEDIUM] | [ApplicationBootstrap] | yt-dlp binary not found. Please ensure resources/bin/win/yt-dlp.exe or LINKHUB_YTDLP_PATH is set. |  | 
+[2026-06-05 17:51:43.168] [warn]  [2026-06-05T14:51:43.167Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | ToolPathResolver: Optional binary "yt-dlp" not found at /home/abood/Project/LinkHub_/resources/bin/linux/yt-dlp. |  | 
+[2026-06-05 17:51:43.173] [warn]  [2026-06-05T14:51:43.173Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | ToolPathResolver: Optional binary "yt-dlp" not found at /home/abood/Project/LinkHub_/resources/bin/linux/yt-dlp. |  | 
+[2026-06-05 17:51:43.176] [warn]  [2026-06-05T14:51:43.176Z] | [WARN] | [GENERAL] | [MEDIUM] | [ApplicationBootstrap] | yt-dlp binary not found. Please ensure resources/bin/win/yt-dlp.exe or LINKHUB_YTDLP_PATH is set. |  | 
+[2026-06-05 18:20:56.136] [warn]  [2026-06-05T15:20:56.136Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-05 18:20:56.637] [warn]  [2026-06-05T15:20:56.637Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-05 18:20:57.137] [warn]  [2026-06-05T15:20:57.137Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-05 18:20:57.638] [warn]  [2026-06-05T15:20:57.638Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-05 18:20:58.138] [warn]  [2026-06-05T15:20:58.138Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-05 18:20:58.639] [warn]  [2026-06-05T15:20:58.638Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-05 18:20:59.139] [warn]  [2026-06-05T15:20:59.139Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-05 18:20:59.640] [warn]  [2026-06-05T15:20:59.640Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-05 18:21:00.140] [warn]  [2026-06-05T15:21:00.140Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-05 18:21:00.642] [warn]  [2026-06-05T15:21:00.641Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-05 18:21:01.141] [warn]  [2026-06-05T15:21:01.141Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-05 18:21:01.641] [warn]  [2026-06-05T15:21:01.641Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-05 18:21:02.143] [warn]  [2026-06-05T15:21:02.143Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-05 18:21:02.643] [warn]  [2026-06-05T15:21:02.643Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-05 18:21:03.145] [warn]  [2026-06-05T15:21:03.145Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-05 18:21:03.644] [warn]  [2026-06-05T15:21:03.644Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-05 18:21:04.145] [warn]  [2026-06-05T15:21:04.145Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-05 18:21:04.645] [warn]  [2026-06-05T15:21:04.645Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-05 18:21:05.145] [warn]  [2026-06-05T15:21:05.145Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-05 18:21:05.647] [warn]  [2026-06-05T15:21:05.647Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-05 18:21:06.149] [warn]  [2026-06-05T15:21:06.149Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-05 18:21:06.647] [warn]  [2026-06-05T15:21:06.647Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-05 18:21:07.148] [warn]  [2026-06-05T15:21:07.148Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-05 18:21:07.648] [warn]  [2026-06-05T15:21:07.648Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-05 18:21:08.149] [warn]  [2026-06-05T15:21:08.149Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-05 18:21:08.649] [warn]  [2026-06-05T15:21:08.649Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-05 18:21:09.148] [warn]  [2026-06-05T15:21:09.148Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-05 18:21:09.648] [warn]  [2026-06-05T15:21:09.648Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-05 18:21:10.149] [warn]  [2026-06-05T15:21:10.149Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-05 18:21:10.648] [warn]  [2026-06-05T15:21:10.648Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-05 18:21:11.148] [warn]  [2026-06-05T15:21:11.148Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-05 18:21:11.650] [warn]  [2026-06-05T15:21:11.650Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-05 18:21:12.151] [warn]  [2026-06-05T15:21:12.151Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-05 18:21:12.651] [warn]  [2026-06-05T15:21:12.651Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-05 18:21:13.150] [warn]  [2026-06-05T15:21:13.150Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-05 18:21:13.651] [warn]  [2026-06-05T15:21:13.651Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-05 18:21:14.151] [warn]  [2026-06-05T15:21:14.151Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-05 18:21:14.652] [warn]  [2026-06-05T15:21:14.651Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-05 18:21:15.152] [warn]  [2026-06-05T15:21:15.152Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-05 18:49:34.562] [info]  [2026-06-05T15:49:34.562Z] | [INFO] | [PROCESS] | [INFO] | [ProcessManager] | Process scrcpy:RZ8T21QQ9RY exited with code 0 |  | 
+[2026-06-05 18:49:59.365] [info]  [2026-06-05T15:49:59.365Z] | [INFO] | [PROCESS] | [INFO] | [ProcessManager] | Process scrcpy:RZ8T21QQ9RY exited with code 0 |  | 
+[2026-06-05 20:36:44.931] [info]  [2026-06-05T17:36:44.930Z] | [INFO] | [PROCESS] | [INFO] | [ProcessManager] | Process scrcpy:RZ8RC1K2ZLE exited with code 0 |  | 
+[2026-06-05 20:37:02.643] [info]  [2026-06-05T17:37:02.643Z] | [INFO] | [PROCESS] | [INFO] | [ProcessManager] | Process scrcpy:RZ8RC1K2ZLE exited with code 0 |  | 
+[2026-06-05 20:37:46.301] [info]  [2026-06-05T17:37:46.301Z] | [INFO] | [PROCESS] | [INFO] | [ProcessManager] | Process scrcpy:RZ8RC1K2ZLE exited with code 0 |  | 
+[2026-06-06 12:37:25.704] [info]  [2026-06-06T09:37:25.703Z] | [INFO] | [PROCESS] | [INFO] | [ProcessManager] | Process scrcpy:RZ8RC1K2ZLE exited with code 0 |  | 
+[2026-06-06 12:37:40.554] [info]  [2026-06-06T09:37:40.554Z] | [INFO] | [PROCESS] | [INFO] | [ProcessManager] | Process scrcpy:RZ8RC1K2ZLE exited with code 0 |  | 
+[2026-06-06 12:37:45.138] [info]  [2026-06-06T09:37:45.138Z] | [INFO] | [PROCESS] | [INFO] | [ProcessManager] | Process scrcpy:RZ8RC1K2ZLE exited with code 0 |  | 

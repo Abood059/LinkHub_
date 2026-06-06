@@ -1,369 +1,314 @@
 // src/main/bootstrap/container.js
 'use strict';
 
-const ErrorCentralService =
-    require(
-        '../infrastructure/logging'
-    );
+// استيراد الـ instance بدلاً من الكلاس
+const { errorCentralService } = require('../infrastructure/logging');
 
-const ProcessManager =
-    require(
-        '../infrastructure/process'
-    );
-
-const DatabaseManager =
-    require(
-        '../infrastructure/persistence/DatabaseManager'
-    );
-
-const AdbCommandExecutor =
-    require(
-        '../infrastructure/adb/AdbCommandExecutor'
-    );
-
-const ConnectionService =
-    require(
-        '../infrastructure/adb/ConnectionService'
-    );
-
-const ProcessRegistry =
-    require(
-        '../runtime/processes/ProcessRegistry'
-    );
-
-const ProcessSupervisor =
-    require(
-        '../runtime/processes/ProcessSupervisor'
-    );
-
-const DeviceRegistry =
-    require(
-        '../runtime/devices/DeviceRegistry'
-    );
-
-// --- المكونات الجديدة للمرحلة الخامسة ---
-const ScrcpyAdapter =
-    require(
-        '../infrastructure/streaming/ScrcpyAdapter'
-    );
-
-const YtdlpAdapter =
-    require(
-        '../infrastructure/media/YtdlpAdapter'
-    );
-
-const DeviceOrchestrator =
-    require(
-        '../application/orchestrators/DeviceOrchestrator'
-    );
-
-const DownloadOrchestrator =
-    require(
-        '../application/orchestrators/DownloadOrchestrator'
-    );
-
-// --- أداة حل المسارات الموحدة (المهمة 1) ---
-const ToolPathResolver =
-    require(
-        '../infrastructure/tools/ToolPathResolver'
-    );
+const ProcessManager = require('../infrastructure/process');
+const DatabaseManager = require('../infrastructure/persistence/DatabaseManager');
+const AdbCommandExecutor = require('../infrastructure/adb/AdbCommandExecutor');
+const ConnectionService = require('../infrastructure/adb/ConnectionService');
+const ProcessRegistry = require('../runtime/processes/ProcessRegistry');
+const ProcessSupervisor = require('../runtime/processes/ProcessSupervisor');
+const DeviceRegistry = require('../runtime/devices/DeviceRegistry');
+const ScrcpyAdapter = require('../infrastructure/streaming/ScrcpyAdapter');
+const YtdlpAdapter = require('../infrastructure/media/YtdlpAdapter');
+const DeviceOrchestrator = require('../application/orchestrators/DeviceOrchestrator');
+const DownloadOrchestrator = require('../application/orchestrators/DownloadOrchestrator');
+const ToolPathResolver = require('../infrastructure/tools/ToolPathResolver');
+const Device = require('../domain/entities/Device');
 
 class BootstrapContainer {
     constructor() {
-        this._services =
-            new Map();
-
-        this._initialized =
-            false;
+        this._services = new Map();
+        this._initialized = false;
+        this._windowManager = null;
     }
 
     initialize() {
-        if (
-            this._initialized
-        ) {
+        if (this._initialized) {
             return this;
         }
 
-        const processRegistry =
-            new ProcessRegistry();
+        // تهيئة الـ logger أولاً (هام جداً)
+        errorCentralService.init();
 
-        const processSupervisor =
-            new ProcessSupervisor({
-                processManager:
-                    ProcessManager,
-                processRegistry,
-                logger:
-                    ErrorCentralService
-            });
-
-        const deviceRegistry =
-            new DeviceRegistry();
-
-        const databaseManager =
-            new DatabaseManager();
-
-        // --- تهيئة محلل المسار الموحد (مع دعم logger اختياري) ---
-        const toolPathResolver = new ToolPathResolver({
-            logger: ErrorCentralService
+        const processRegistry = new ProcessRegistry();
+        const processSupervisor = new ProcessSupervisor({
+            processManager: ProcessManager,
+            processRegistry,
+            logger: errorCentralService
         });
 
-        // --- إنشاء AdbCommandExecutor باستخدام محلل المسار ---
-        const adbCommandExecutor =
-            new AdbCommandExecutor({
-                processSupervisor,
-                logger: ErrorCentralService,
-                toolPathResolver: toolPathResolver
-                // لم نمرر adbPath -> سيتم حله تلقائياً عبر toolPathResolver
-            });
+        const deviceRegistry = new DeviceRegistry();
+        const databaseManager = new DatabaseManager();
 
-        const connectionService =
-            new ConnectionService({
-                adbExecutor:
-                    adbCommandExecutor,
-                logger:
-                    ErrorCentralService
-            });
+        const toolPathResolver = new ToolPathResolver({
+            logger: errorCentralService
+        });
 
-        // --- ربط أحداث ConnectionService مع DeviceRegistry (المهمة 0) ---
+        const adbCommandExecutor = new AdbCommandExecutor({
+            processSupervisor,
+            logger: errorCentralService,
+            toolPathResolver: toolPathResolver
+        });
 
-        // 1. حدث الأجهزة المكتشفة عبر ADB (USB أو TCP/IP المتصل)
-        connectionService.on(
-            'adbDevices',
-            devices => {
-                if (
-                    !Array.isArray(
-                        devices
-                    )
-                ) {
-                    return;
+        const connectionService = new ConnectionService({
+            adbExecutor: adbCommandExecutor,
+            logger: errorCentralService
+        });
+
+        // ==================== معالج ADB Devices المتقدم ====================
+        connectionService.on('adbDevices', devices => {
+            if (!Array.isArray(devices)) return;
+
+            // 1. جمع الـ serials الحالية من ADB
+            const currentSerials = new Set();
+            for (const device of devices) {
+                if (device?.serial) currentSerials.add(device.serial);
+            }
+
+            // 2. معالجة الأجهزة الموجودة حالياً
+            for (const device of devices) {
+                if (!device?.serial) continue;
+                const deviceId = device.serial;
+
+                // إنشاء كيان الجهاز إذا لم يكن موجوداً
+                if (!deviceRegistry.hasDevice(deviceId)) {
+                    const newDevice = new Device({
+                        id: deviceId,
+                        deviceFriendlyName: device.serial,
+                        model: 'Unknown',
+                        version: 'Unknown',
+                        arch: 'Unknown',
+                        isNew: true
+                    });
+                    deviceRegistry.registerDevice(newDevice);
                 }
 
-                for (
-                    const device of devices
-                ) {
-                    if (
-                        !device ||
-                        !device.serial
-                    ) {
-                        continue;
-                    }
+                // تحديث الحالة التشغيلية (متصل)
+                const newStatus = (device.state === 'device') ? 'connected' : (device.state || 'unknown');
+                deviceRegistry.updateState(deviceId, {
+                    status: newStatus,
+                    adbTarget: device.serial,
+                    connectionType: device.serial.includes(':') ? 'TCPIP' : 'USB',
+                    lastSeen: new Date()
+                });
 
-                    deviceRegistry
-                        .updateState(
-                            device.serial,
-                            {
-                                status:
-                                    device.state ||
-                                    'unknown',
-                                adbTarget:
-                                    device.serial,
-                                lastSeen:
-                                    new Date()
-                            }
-                        );
+                if (this._windowManager) {
+                    this._windowManager.broadcast('device:stateChanged', {
+                        deviceId: deviceId,
+                        state: newStatus,
+                        adbTarget: device.serial
+                    });
                 }
             }
-        );
 
-        // 2. حدث اكتشاف جهاز لاسلكي عبر mDNS (قبل الاقتران)
+            // 3. معالجة الأجهزة المفقودة (غير موجودة في القائمة الحالية)
+            const allDevices = deviceRegistry.getAllDevices();
+            for (const registeredDevice of allDevices) {
+                const deviceId = registeredDevice.id;
+                const runtimeState = deviceRegistry.getRuntimeState(deviceId);
+                
+                // إذا كان الجهاز غير موجود في الـ serials الحالية
+                if (!currentSerials.has(deviceId)) {
+                    // الجهاز غير مسجل (isNew = true) => إزالته بالكامل من السجل
+                    if (registeredDevice.isNew === true) {
+                        deviceRegistry.removeDevice(deviceId);
+                        if (this._windowManager) {
+                            this._windowManager.broadcast('device:removed', { deviceId });
+                        }
+                    } 
+                    // الجهاز مسجل (isNew = false) => تحديث حالته إلى offline
+                    else if (runtimeState && runtimeState.status !== 'offline') {
+                        deviceRegistry.updateState(deviceId, { status: 'offline', lastSeen: new Date() });
+                        if (this._windowManager) {
+                            this._windowManager.broadcast('device:stateChanged', {
+                                deviceId: deviceId,
+                                state: 'offline',
+                                adbTarget: deviceId
+                            });
+                        }
+                    }
+                }
+            }
+        });
+
+        // ==================== معالج اكتشاف الأجهزة اللاسلكية ====================
         connectionService.on('wirelessServiceFound', (service) => {
-            if (!service || !service.host || !service.port) return;
-
+            if (!service?.host || !service?.port) return;
             const adbTarget = `${service.host}:${service.port}`;
-            // نبحث عن جهاز موجود بنفس الهدف
             let deviceId = deviceRegistry.findDeviceIdByAdbTarget(adbTarget);
 
             if (!deviceId) {
-                // جهاز جديد غير مسجل بعد – لا ننشئ Device كامل هنا، فقط نحدث الحالة التشغيلية
-                // سنستخدم عنوان الهدف كمعرف مؤقت لحين الاقتران الفعلي
                 deviceId = `wireless-${adbTarget.replace(/:/g, '-')}`;
-                // تسجيل حالة تشغيلية فقط (بدون Device entity) لتظهر في الواجهة كجهاز مكتشف
-                deviceRegistry.updateState(deviceId, {
-                    status: 'discovered',
-                    adbTarget: adbTarget,
-                    ip: service.host,
-                    port: service.port,
-                    connectionType: 'WIRELESS_DISCOVERED',
-                    lastSeen: new Date()
-                });
-                // ملاحظة: لم يتم استدعاء registerDevice، لذلك هذا الجهاز لن يظهر في getAllDevices()
-                // إلا إذا أردنا ذلك. لكن يمكن للواجهة عرض runtimeStates مباشرة إذا احتاجت.
-                // لتجنب التعقيد، سنكتفي بتحديث الحالة فقط.
-            } else {
-                deviceRegistry.updateState(deviceId, {
-                    status: 'discovered',
-                    ip: service.host,
-                    port: service.port,
-                    lastSeen: new Date()
+                if (!deviceRegistry.hasDevice(deviceId)) {
+                    const newDevice = new Device({
+                        id: deviceId,
+                        deviceFriendlyName: service.name || adbTarget,
+                        model: 'Unknown',
+                        version: 'Unknown',
+                        arch: 'Unknown',
+                        isNew: true
+                    });
+                    deviceRegistry.registerDevice(newDevice);
+                }
+            }
+
+            deviceRegistry.updateState(deviceId, {
+                status: 'discovered',
+                adbTarget: adbTarget,
+                ip: service.host,
+                port: service.port,
+                connectionType: 'WIRELESS_DISCOVERED',
+                lastSeen: new Date()
+            });
+
+            if (this._windowManager) {
+                this._windowManager.broadcast('device:stateChanged', {
+                    deviceId: deviceId,
+                    state: 'discovered',
+                    adbTarget: adbTarget
                 });
             }
         });
 
-        // 3. حدث نجاح الاقتران (pair)
+        // ==================== باقي معالجات الأحداث ====================
         connectionService.on('pairSuccess', ({ host, pairingCode }) => {
             if (!host) return;
-            // host مثال "192.168.1.10:37000" – قد لا يكون هو هدف الاتصال النهائي
-            // نقوم بتحديث الحالة لأي جهاز له adbTarget يبدأ بنفس المضيف (بدون منفذ الاقتران)
-            const baseHost = host.split(':')[0];
-            // نبحث في runtimeStates عن أي جهاز adbTarget يبدأ بـ baseHost
-            // هذا تقريبي، لكن الأفضل انتظار حدث connectSuccess الذي يعطي الهدف النهائي.
-            // نكتفي بتسجيل الاقتران كملاحظة:
-            console.log(`[Container] Pair success for ${host}`);
+            errorCentralService.info(`Pair success for ${host}`, { source: 'Container' });
+            if (this._windowManager) {
+                this._windowManager.broadcast('device:paired', { host, pairingCode });
+            }
         });
 
-        // 4. حدث نجاح الاتصال (connect) – بعد الاقتران أو الاتصال المباشر
         connectionService.on('connectSuccess', ({ target }) => {
             if (!target) return;
-            // target مثال "192.168.1.10:5555"
             let deviceId = deviceRegistry.findDeviceIdByAdbTarget(target);
+            
             if (!deviceId) {
-                // جهاز غير مسجل بعد – ننشئ معرف مؤقت
                 deviceId = `device-${target.replace(/:/g, '-')}-${Date.now()}`;
-                // نقوم بتحديث الحالة فقط، بدون كيان Device. سيتم إنشاء Device حقيقي
-                // عندما يقوم DeviceOrchestrator.connectDevice باستدعاء registerDevice.
-                // هنا نحن ننبه الـ registry أن هذا الجهاز أصبح متصلاً.
+                if (!deviceRegistry.hasDevice(deviceId)) {
+                    const newDevice = new Device({
+                        id: deviceId,
+                        deviceFriendlyName: target,
+                        model: 'Unknown',
+                        version: 'Unknown',
+                        arch: 'Unknown',
+                        isNew: true
+                    });
+                    deviceRegistry.registerDevice(newDevice);
+                }
             }
+            
             deviceRegistry.updateState(deviceId, {
                 status: 'connected',
                 adbTarget: target,
                 connectionType: 'TCPIP',
                 lastSeen: new Date()
             });
+            
+            if (this._windowManager) {
+                this._windowManager.broadcast('device:stateChanged', {
+                    deviceId: deviceId,
+                    state: 'connected',
+                    adbTarget: target
+                });
+            }
         });
 
-        // 5. حدث قطع الاتصال
         connectionService.on('disconnect', ({ target }) => {
             if (!target || target === 'all') {
-                // قطع كل الأجهزة – نبحث عن كل الأجهزة المتصلة ونحدثها
                 for (const deviceId of deviceRegistry.getAllDevices().map(d => d.id)) {
                     const state = deviceRegistry.getRuntimeState(deviceId);
                     if (state && state.status === 'connected') {
-                        deviceRegistry.updateState(deviceId, { status: 'offline' });
+                        deviceRegistry.updateState(deviceId, { status: 'offline', lastSeen: new Date() });
+                        if (this._windowManager) {
+                            this._windowManager.broadcast('device:stateChanged', {
+                                deviceId: deviceId,
+                                state: 'offline'
+                            });
+                        }
                     }
                 }
                 return;
             }
             const deviceId = deviceRegistry.findDeviceIdByAdbTarget(target);
             if (deviceId) {
-                deviceRegistry.updateState(deviceId, { status: 'offline' });
+                deviceRegistry.updateState(deviceId, { status: 'offline', lastSeen: new Date() });
+                if (this._windowManager) {
+                    this._windowManager.broadcast('device:stateChanged', {
+                        deviceId: deviceId,
+                        state: 'offline',
+                        adbTarget: target
+                    });
+                }
             }
         });
 
-        // --- إنشاء محولات Infrastructure باستخدام محلل المسار الموحد ---
+        // ==================== تهيئة المحولات والمنسقين ====================
         const scrcpyAdapter = new ScrcpyAdapter({
             processSupervisor,
-            logger: ErrorCentralService,
+            logger: errorCentralService,
             toolPathResolver: toolPathResolver
-            // لم نمرر scrcpyPath -> سيتم حله تلقائياً عبر toolPathResolver
         });
 
         const ytdlpAdapter = new YtdlpAdapter({
             processSupervisor,
-            logger: ErrorCentralService,
+            logger: errorCentralService,
             toolPathResolver: toolPathResolver
-            // لم نمرر ytdlpPath -> سيتم حله تلقائياً عبر toolPathResolver
-            // ملاحظة: الخاصية الصحيحة هي `ytdlpPath` (وليس `ytDlpPath`).
         });
 
-        // --- إنشاء الـ Orchestrators (طبقة Application) ---
         const deviceOrchestrator = new DeviceOrchestrator({
             deviceRegistry,
             connectionService,
             scrcpyAdapter,
-            logger: ErrorCentralService
+            logger: errorCentralService
         });
 
         const downloadOrchestrator = new DownloadOrchestrator({
             ytdlpAdapter,
             deviceRegistry,
-            logger: ErrorCentralService
+            logger: errorCentralService
         });
 
-        // --- تسجيل طبقة IPC الرقيقة (المرحلة 6) ---
         const { registerIpcHandlers } = require('../infrastructure/ipc');
         registerIpcHandlers(deviceOrchestrator, downloadOrchestrator);
 
-        // --- تسجيل جميع الخدمات في الخريطة ---
-        this._services.set(
-            'errorCentralService',
-            ErrorCentralService
-        );
+        // ==================== تسجيل الخدمات ====================
+        this._services.set('errorCentralService', errorCentralService);
+        this._services.set('processManager', ProcessManager);
+        this._services.set('processRegistry', processRegistry);
+        this._services.set('processSupervisor', processSupervisor);
+        this._services.set('deviceRegistry', deviceRegistry);
+        this._services.set('databaseManager', databaseManager);
+        this._services.set('adbCommandExecutor', adbCommandExecutor);
+        this._services.set('connectionService', connectionService);
+        this._services.set('scrcpyAdapter', scrcpyAdapter);
+        this._services.set('ytdlpAdapter', ytdlpAdapter);
+        this._services.set('deviceOrchestrator', deviceOrchestrator);
+        this._services.set('downloadOrchestrator', downloadOrchestrator);
+        this._services.set('toolPathResolver', toolPathResolver);
 
-        this._services.set(
-            'processManager',
-            ProcessManager
-        );
-
-        this._services.set(
-            'processRegistry',
-            processRegistry
-        );
-
-        this._services.set(
-            'processSupervisor',
-            processSupervisor
-        );
-
-        this._services.set(
-            'deviceRegistry',
-            deviceRegistry
-        );
-
-        this._services.set(
-            'databaseManager',
-            databaseManager
-        );
-
-        this._services.set(
-            'adbCommandExecutor',
-            adbCommandExecutor
-        );
-
-        this._services.set(
-            'connectionService',
-            connectionService
-        );
-
-        // --- تسجيل المكونات الجديدة ---
-        this._services.set(
-            'scrcpyAdapter',
-            scrcpyAdapter
-        );
-
-        this._services.set(
-            'ytdlpAdapter',
-            ytdlpAdapter
-        );
-
-        this._services.set(
-            'deviceOrchestrator',
-            deviceOrchestrator
-        );
-
-        this._services.set(
-            'downloadOrchestrator',
-            downloadOrchestrator
-        );
-
-        this._services.set(
-            'toolPathResolver',
-            toolPathResolver
-        );
-
-        this._initialized =
-            true;
-
+        this._initialized = true;
         return this;
     }
 
     resolve(name) {
-        return (
-            this._services.get(
-                name
-            ) || null
-        );
+        return this._services.get(name) || null;
+    }
+
+    setWindowManager(windowManager) {
+        this._windowManager = windowManager;
+        const ytdlpAdapter = this._services.get('ytdlpAdapter');
+        if (ytdlpAdapter && typeof ytdlpAdapter.setWindowManager === 'function') {
+            ytdlpAdapter.setWindowManager(windowManager);
+        }
+    }
+
+    getWindowManager() {
+        return this._windowManager;
     }
 }
 
-module.exports =
-    new BootstrapContainer();
+module.exports = new BootstrapContainer();

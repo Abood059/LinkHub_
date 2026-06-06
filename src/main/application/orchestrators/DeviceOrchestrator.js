@@ -1,3 +1,4 @@
+// src/main/application/orchestrators/DeviceOrchestrator.js
 'use strict';
 
 const Device = require('../../domain/entities/Device');
@@ -49,7 +50,7 @@ class DeviceOrchestrator {
             await this._connectionService.connect(target);
         }
 
-        // إنشاء كيان الجهاز
+        // إنشاء كيان الجهاز (بيانات أولية غير معروفة)
         const deviceId = `device-${target.replace(/:/g, '-')}-${Date.now()}`;
         const device = new Device({
             id: deviceId,
@@ -57,7 +58,7 @@ class DeviceOrchestrator {
             model: 'Unknown',
             version: 'Unknown',
             arch: 'Unknown',
-            isNew: !this._deviceRegistry.hasDevice(deviceId)
+            isNew: true
         });
 
         // تسجيل الجهاز في الـ Registry
@@ -70,6 +71,25 @@ class DeviceOrchestrator {
             connectionType,
             lastSeen: new Date()
         });
+
+        // === جلب معلومات الجهاز الحقيقية من ADB (بعد الاتصال) ===
+        try {
+            const deviceInfo = await this._connectionService.getDeviceInfo(target);
+            if (deviceInfo) {
+                device.updateDetails(deviceInfo.model, deviceInfo.version, deviceInfo.arch);
+                this._logger?.info(`Device info updated for ${target}: ${deviceInfo.model} (${deviceInfo.version})`);
+                
+                // تحديث الـ runtime state بمعلومات إضافية اختيارية
+                this._deviceRegistry.updateState(device.id, {
+                    model: deviceInfo.model,
+                    version: deviceInfo.version,
+                    arch: deviceInfo.arch
+                });
+            }
+        } catch (err) {
+            this._logger?.warn(`Could not fetch detailed device info for ${target}: ${err.message}`);
+            // لا نمنع الاتصال بسبب فشل جلب التفاصيل، نستمر مع البيانات الافتراضية
+        }
 
         return device;
     }
@@ -96,7 +116,13 @@ class DeviceOrchestrator {
      * @param {string} deviceId - معرف الجهاز
      */
     stopStreaming(deviceId) {
-        return this._scrcpyAdapter.stopMirroring(deviceId);
+        const device = this._deviceRegistry.getDevice(deviceId);
+        if (!device) {
+            throw new Error(`Device ${deviceId} not found`);
+        }
+        const runtimeState = this._deviceRegistry.getRuntimeState(deviceId);
+        const adbTarget = runtimeState?.adbTarget || device.id;
+        return this._scrcpyAdapter.stopMirroring(adbTarget);
     }
 
     /**

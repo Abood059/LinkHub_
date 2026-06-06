@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>LinkFlow | التدفق الذكي</title>
-    <link rel="stylesheet" href="style.css">
+    <title>LinkHub</title>
+    <!-- تحديث المسار لملف CSS الرئيسي -->
+    <link rel="stylesheet" href="css/main.css">
 </head>
 <body>
 
@@ -13,7 +14,7 @@
         <header class="navbar-wrapper">
             <nav class="navbar">
                 <div class="logo">
-                    <span class="logo-text">LinkFlow</span>
+                    <span class="logo-text">LinkHub</span>
                 </div>
                 
                 <div class="nav-links" dir="ltr">
@@ -57,7 +58,6 @@
                     <div class="devices-capsule-wrapper">
                         <h2 class="section-subheading">الأجهزة المتصلة</h2>
                         <div class="devices-capsule-pill" id="registered-devices">
-                            <!-- سيتم تعبئتها ديناميكياً عبر JS -->
                             <div class="placeholder-text">جاري تحميل الأجهزة...</div>
                         </div>
                     </div>
@@ -85,16 +85,16 @@
                         <table class="downloads-table">
                             <thead>
                                 <tr>
-                                    <th style="width: 30%;">اسم الملف</th>
-                                    <th style="width: 20%;">التقدم</th>
-                                    <th style="width: 15%;">الحجم</th>
+                                    <th style="width: 20%;">اسم الملف</th>
+                                    <th style="width: 15%;">التقدم</th>
+                                    <th style="width: 10%;">الحجم</th>
                                     <th style="width: 15%;">السرعة</th>
                                     <th style="width: 20%;">الجهة الوجهة</th>
+                                    <th style="width: 20%;">الإجراءات</th>
                                 </tr>
                             </thead>
                             <tbody id="downloads-tbody">
-                                <!-- سيتم تعبئتها ديناميكياً -->
-                                <tr class="empty-row"><td colspan="5" style="text-align:center;">لا توجد تحميلات نشطة</td></tr>
+                                <tr class="empty-row"><td colspan="6" style="text-align:center;">لا توجد تحميلات نشطة</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -110,12 +110,57 @@
                         <p>✔️ حفظ الملفات على الجهاز: مفعل</p>
                         <p>✔️ إشعارات التحميل: مفعلة</p>
                         <button class="btn-outline" id="refresh-devices">تحديث الأجهزة</button>
+                        <button class="btn-outline" id="pair-device-btn" style="margin-right: 12px;">إقران جهاز لاسلكي</button>
                     </div>
                 </div>
             </div>
         </main>
     </div>
 
-    <script src="script.js"></script>
+    <!-- نافذة معلومات الجهاز (Modal) -->
+    <div id="device-modal" class="device-modal" style="display: none;">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <button class="modal-close">&times;</button>
+            <div class="modal-header">
+                <div class="device-icon-large">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+                        <line x1="12" y1="18" x2="12.01" y2="18"></line>
+                    </svg>
+                </div>
+                <h3 id="modal-device-name" class="modal-device-name"></h3>
+            </div>
+            <div class="modal-body">
+                <div class="device-detail-row">
+                    <span class="detail-label">الموديل:</span>
+                    <span id="modal-device-model" class="detail-value"></span>
+                </div>
+                <div class="device-detail-row">
+                    <span class="detail-label">الإصدار:</span>
+                    <span id="modal-device-version" class="detail-value"></span>
+                </div>
+                <div class="device-detail-row">
+                    <span class="detail-label">المعمارية:</span>
+                    <span id="modal-device-arch" class="detail-value"></span>
+                </div>
+                <div class="device-detail-row">
+                    <span class="detail-label">الحالة:</span>
+                    <span id="modal-device-status" class="detail-value status-badge-modal"></span>
+                </div>
+                <div class="device-detail-row">
+                    <span class="detail-label">معرف ADB:</span>
+                    <span id="modal-device-adb" class="detail-value code"></span>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="modal-stream-btn" class="modal-btn primary">📺 بث الشاشة</button>
+                <button id="modal-disconnect-btn" class="modal-btn danger">🔌 قطع الاتصال</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- تحديث المسار لملف الجافاسكريبت الرئيسي مع type="module" -->
+    <script type="module" src="js/main.js"></script>
 </body>
 </html>

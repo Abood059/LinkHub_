@@ -10,6 +10,8 @@ if (require('electron-squirrel-startup')) {
 }
 
 let bootstrap = null;
+// علم (Flag) لمنع التكرار والدخول في حلقة لانهائية
+let isCleanedUp = false; 
 
 // This method will be called when Electron has finished initialization and is ready to create browser windows.
 app.whenReady().then(async () => {
@@ -43,27 +45,39 @@ app.on('activate', () => {
 
 // Graceful shutdown: terminate all managed processes before quitting.
 app.on('before-quit', async (event) => {
-    // Prevent default quit to allow async cleanup
+    // إذا تمت عملية التنظيف مسبقاً، اسمح للتطبيق بالخروج فوراً دون اعتراض
+    if (isCleanedUp) {
+        return;
+    }
+
+    // منع الإغلاق التلقائي المؤقت لإتاحة الوقت للعمليات غير المتزامنة (Async)
     event.preventDefault();
     
     try {
+        console.log('[Main] Starting graceful shutdown...');
+
         const processManager = container.resolve('processManager');
-        if (processManager && processManager.terminateAll) {
+        if (processManager && typeof processManager.terminateAll === 'function') {
             await processManager.terminateAll();
         }
-        
+
         const dbManager = container.resolve('databaseManager');
-        if (dbManager && dbManager.close) {
+        if (dbManager && typeof dbManager.close === 'function') {
             await dbManager.close();
         }
-        
+
         const errorService = container.resolve('errorCentralService');
-        if (errorService && errorService.flush) {
+        if (errorService && typeof errorService.flush === 'function') {
             await errorService.flush();
         }
+
+        console.log('[Main] Cleanup completed successfully.');
     } catch (err) {
         console.error('[Main] Error during graceful shutdown:', err);
     } finally {
-        app.exit(0);
+        // نرفع العلم بأن التنظيف انتهى تماماً
+        isCleanedUp = true;
+        // الآن نستدعي app.quit() بأمان، وعندما يعود الحدث before-quit للعمل سيجد isCleanedUp = true ويخرج فوراً
+        app.quit();
     }
 });

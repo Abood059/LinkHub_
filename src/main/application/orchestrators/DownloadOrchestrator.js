@@ -20,12 +20,18 @@ class DownloadOrchestrator {
         return this._ytdlpAdapter.inspectFormats(url);
     }
 
-    startDownload(file, secondaryFile = null) {
-        if (!file) {
-            throw new Error('file is required');
+    async getMetadata(url) {
+        return this._ytdlpAdapter.extractMetadata(url);
+    }
+
+    async startDownload(url, formatId, deviceId = null, options = {}) {
+        if (!url || !formatId) {
+            throw new Error('url and formatId are required');
         }
 
-        return this._ytdlpAdapter.startDownload(file, secondaryFile);
+        // Merge deviceId into options for adapter
+        const adapterOptions = { ...options, deviceId };
+        return this._ytdlpAdapter.startDownload(url, formatId, adapterOptions);
     }
 
     stopDownload(fileId) {

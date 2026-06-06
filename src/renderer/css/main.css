@@ -1,0 +1,8 @@
+/* main.css */
+@import url('base.css');
+@import url('layout.css');
+@import url('devices.css');     /* التعديلات الجديدة */
+@import url('modal.css');
+@import url('downloads.css');
+@import url('settings.css');
+@import url('responsive.css');  /* تأكد وجوده في النهاية */

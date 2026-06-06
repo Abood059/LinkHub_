@@ -1,44 +1,29 @@
-// src/main/infrastructure/streaming/ScrcpyAdapter.js
 'use strict';
 
 /**
  * ScrcpyAdapter
  * مسؤول فقط عن تشغيل وإيقاف انعكاس الشاشة عبر scrcpy
  * بدون أي منطق أعمال أو إدارة أجهزة
+ * 
+ * @param {string} adbTarget - معرّف ADB للجهاز (serial أو host:port)
  */
 class ScrcpyAdapter {
     constructor({
         processSupervisor,
         scrcpyPath = null,
-        toolPathResolver = null,   // <-- جديد: محلل المسار الموحد
+        toolPathResolver = null,
         logger = null
     }) {
         this._processSupervisor = processSupervisor;
         this._logger = logger;
         this._toolPathResolver = toolPathResolver;
-
-        // تحديد مسار scrcpy (الأولوية: scrcpyPath المُمرر > toolPathResolver > القيمة الاحتياطية)
         this._scrcpyPath = this._resolveScrcpyPath(scrcpyPath);
-
-        this._activeProcesses = new Map();
+        this._activeProcesses = new Map(); // key: adbTarget, value: processId
     }
 
-    /**
-     * Resolves scrcpy binary path with proper priority.
-     * @param {string|null} explicitPath - Direct override from constructor
-     * @returns {string}
-     * @throws {Error} if no valid path found
-     */
     _resolveScrcpyPath(explicitPath) {
-        if (explicitPath) {
-            return explicitPath;
-        }
-
-        if (this._toolPathResolver) {
-            return this._toolPathResolver.getScrcpyPath();
-        }
-
-        // Fallback: assume 'scrcpy' is in PATH (development convenience)
+        if (explicitPath) return explicitPath;
+        if (this._toolPathResolver) return this._toolPathResolver.getScrcpyPath();
         const fallbackPath = 'scrcpy';
         if (this._logger) {
             this._logger.warn(`ScrcpyAdapter: No toolPathResolver provided, using fallback: ${fallbackPath}`);
@@ -46,45 +31,69 @@ class ScrcpyAdapter {
         return fallbackPath;
     }
 
-    startMirroring(deviceId, options = {}) {
-        if (!deviceId) {
-            throw new Error('deviceId is required');
+    /**
+     * بدء انعكاس الشاشة لجهاز معرّف بواسطة adbTarget
+     * @param {string} adbTarget - معرّف ADB (serial مثل "emulator-5554" أو "192.168.1.10:5555")
+     * @param {Object} options - { fullscreen, bitrate }
+     * @returns {string} processId
+     */
+    startMirroring(adbTarget, options = {}) {
+        if (!adbTarget) {
+            throw new Error('adbTarget is required');
         }
-
-        const processId = `scrcpy:${deviceId}`;
-
+    
+        // التحقق من وجود عملية بث نشطة لهذا الجهاز
+        const existingProcessId = this._activeProcesses.get(adbTarget);
+        if (existingProcessId) {
+            const processStatus = this._processSupervisor.getProcessStatus(existingProcessId);
+            if (processStatus && processStatus.status === 'RUNNING') {
+                throw new Error('Screen mirroring is already active for this device');
+            } else {
+                // العملية القديمة انتهت (أو فشلت) – نقوم بتنظيف المفتاح
+                this._activeProcesses.delete(adbTarget);
+            }
+        }
+    
+        const processId = `scrcpy:${adbTarget}`;
         const args = [
-            '-s',
-            deviceId,
+            '-s', adbTarget,
             ...(options.fullscreen ? ['--fullscreen'] : []),
             ...(options.bitrate ? ['--bit-rate', String(options.bitrate)] : [])
         ];
-
-        this._processSupervisor.startManagedProcess({
+    
+        const childProcess = this._processSupervisor.startManagedProcess({
             processId,
             binPath: this._scrcpyPath,
             args,
             type: 'scrcpy',
-            metadata: {
-                deviceId
-            }
+            metadata: { adbTarget }
         });
-
-        this._activeProcesses.set(deviceId, processId);
-
+    
+        // تنظيف الخريطة عند انتهاء العملية (لأي سبب)
+        if (childProcess && typeof childProcess.once === 'function') {
+            childProcess.once('exit', () => {
+                this._activeProcesses.delete(adbTarget);
+            });
+            childProcess.once('error', () => {
+                this._activeProcesses.delete(adbTarget);
+            });
+        }
+    
+        this._activeProcesses.set(adbTarget, processId);
         return processId;
     }
 
-    stopMirroring(deviceId) {
-        const processId = this._activeProcesses.get(deviceId);
-
-        if (!processId) {
-            return false;
-        }
+    /**
+     * إيقاف انعكاس الشاشة لجهاز معرّف بواسطة adbTarget
+     * @param {string} adbTarget - نفس المعرّف المستخدم في startMirroring
+     * @returns {boolean} نجاح العملية
+     */
+    stopMirroring(adbTarget) {
+        const processId = this._activeProcesses.get(adbTarget);
+        if (!processId) return false;
 
         this._processSupervisor.stopManagedProcess(processId);
-        this._activeProcesses.delete(deviceId);
-
+        this._activeProcesses.delete(adbTarget);
         return true;
     }
 }

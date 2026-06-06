@@ -41,6 +41,8 @@ The content is organized as follows:
 </file_summary>
 
 <directory_structure>
+data/
+  devices.json
 src/
   main/
     application/
@@ -105,9 +107,34 @@ src/
   preload/
     preload.js
   renderer/
+    css/
+      base.css
+      devices.css
+      downloads.css
+      layout.css
+      main.css
+      modal.css
+      responsive.css
+      settings.css
+    js/
+      core/
+        constants.js
+        utils.js
+      handlers/
+        pairHandler.js
+        startRouteHandler.js
+      services/
+        deviceService.js
+        downloadService.js
+        eventService.js
+      ui/
+        deviceManager.js
+        downloadManager.js
+        modalManager.js
+        selectionManager.js
+        tabManager.js
+      main.js
     index.html
-    script.js
-    style.css
 .gitignore
 package.json
 repomix.config.json
@@ -116,183 +143,1380 @@ repomix.config.json
 <files>
 This section contains the contents of the repository's files.
 
-<file path="src/main/infrastructure/tools/ToolPathResolver.js">
-// src/main/infrastructure/tools/ToolPathResolver.js
-'use strict';
+<file path="data/devices.json">
+[]
+</file>
 
-const path = require('path');
-const fs = require('fs');
+<file path="src/renderer/css/base.css">
+/* base.css - الإعدادات الأساسية والمتغيرات */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
 
-/**
- * ToolPathResolver
- * Unified path resolver for external binaries (adb, scrcpy, yt-dlp).
- * 
- * Supports:
- * - Environment variable overrides (LINKHUB_ADB_PATH, LINKHUB_SCRCPY_PATH, LINKHUB_YTDLP_PATH)
- * - Platform-specific subdirectories (win, linux, darwin)
- * - Fallback to resources/bin relative to Electron app root
- * 
- * This class does NOT:
- * - Spawn processes
- * - Implement business logic
- * - Depend on other services except Node.js core and electron (optional)
- */
-class ToolPathResolver {
-    /**
-     * @param {Object} options
-     * @param {string} [options.appRoot] - Override app root path (default: resolve using Electron app or cwd)
-     * @param {Function} [options.logger] - Optional logger (e.g., ErrorCentralService)
-     */
-    constructor(options = {}) {
-        this._logger = options.logger || null;
-        this._appRoot = this._resolveAppRoot(options.appRoot);
-        this._platform = process.platform;
-        this._binSubDir = this._getBinSubDir();
+body {
+    background-color: #1A1A1A;
+    color: #FFFFFF;
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+    min-height: 100vh;
+    padding: clamp(16px, 4vw, 32px) clamp(16px, 5vw, 40px);
+    -webkit-font-smoothing: antialiased;
+}
+
+.app-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: clamp(24px, 5vh, 48px);
+}
+
+/* أنيميشن fadeIn */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px);}
+    to { opacity: 1; transform: translateY(0);}
+}
+
+.tab-section {
+    display: none;
+    animation: fadeIn 0.25s ease;
+}
+.tab-section.active-section {
+    display: block;
+}
+</file>
+
+<file path="src/renderer/css/devices.css">
+/* devices.css - أقسام الأجهزة وعناصرها (بمسافات متناسقة) */
+
+/* الحاوية الخارجية لكل قائمة */
+.devices-capsule-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    margin-bottom: 32px;  /* زيادة المسافة بين القائمتين */
+}
+
+/* الحاوية الداخلية (الكبسولة) */
+.devices-capsule-pill {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;            /* مسافة متساوية بين الأجهزة */
+    background-color: #262626;
+    padding: 20px 28px;    /* زيادة padding الداخلي */
+    border-radius: 100px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+    width: auto;
+    max-width: 100%;
+    transition: all 0.2s ease;
+}
+
+/* الكبسولة الخاصة بالأجهزة غير المسجلة (لون مختلف قليلاً) */
+.offline-capsule {
+    background-color: #1F1F1F;
+    border: 1px solid #333333;
+}
+
+/* عنصر الجهاز الواحد */
+.device-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 20px;    /* زيادة padding أفقي وعمودي */
+    border-radius: 60px;   /* أنحف قليلاً */
+    background-color: #1A1A1A;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+}
+
+.device-item:hover {
+    background-color: #2E2E2E;
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+/* الجهاز المحدد */
+.device-item.selected {
+    border: 1.5px solid #1E6FD9;
+    background: linear-gradient(145deg, #1E2A3A, #0F1A2A);
+    box-shadow: 0 0 12px rgba(30,111,217,0.5), inset 0 1px 0 rgba(255,255,255,0.05);
+    transform: scale(1.02);
+}
+
+/* أيقونة الجهاز (الدائرة) */
+.device-circle {
+    width: 40px;          /* أكبر قليلاً */
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #0F0F0F;
+    color: #FFFFFF;
+    transition: 0.1s;
+}
+
+.device-circle svg {
+    width: 22px;
+    height: 22px;
+    stroke: currentColor;
+}
+
+/* ألوان الحالة */
+.status-connected .device-circle {
+    color: #1B8755;
+}
+.status-offline .device-circle {
+    color: #D32F2F;
+}
+
+/* اسم الجهاز */
+.device-name {
+    font-size: 0.9rem;    /* زيادة طفيفة */
+    font-weight: 600;
+    color: #FFFFFF;
+    margin: 0;
+}
+
+/* التفاصيل الصغيرة (موديل/إصدار) */
+.device-detail {
+    font-size: 0.65rem;
+    color: #A6A6A6;
+    margin-top: 2px;
+    line-height: 1.2;
+    max-width: 140px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* شارة الحالة (متصل/غير متصل) */
+.status-badge {
+    font-size: 0.7rem;
+    background-color: #2A2A2A;
+    padding: 4px 10px;
+    border-radius: 30px;
+    color: #B0B0B0;
+    font-weight: 500;
+}
+
+/* تنسيق عناوين الأقسام */
+.section-subheading {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: #E0E0E0;
+    text-align: center;
+}
+
+.offline-sub {
+    color: #A6A6A6;
+}
+
+/* حاوية الإدخال (لم تتغير كثيراً) */
+.routing-input-container {
+    display: flex;
+    background-color: #262626;
+    border-radius: 60px;
+    padding: 6px;
+    align-items: center;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.input-url {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    padding: 12px 20px;
+    color: #FFFFFF;
+    font-size: 0.9rem;
+    min-width: 180px;
+}
+
+.btn-route {
+    border-radius: 50px;
+    background-color: #1E6FD9;
+    border: none;
+    color: white;
+    padding: 10px 28px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: 0.2s;
+    white-space: nowrap;
+}
+
+.btn-route:hover {
+    background-color: #155bb0;
+    transform: scale(0.98);
+}
+</file>
+
+<file path="src/renderer/css/downloads.css">
+/* downloads.css - جدول التحميلات */
+.downloads-card {
+    background-color: #262626;
+    border-radius: 32px;
+    padding: 24px 20px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+    border: 1px solid #3A3A3A;
+    overflow-x: auto;
+}
+.right-align { text-align: right; margin-bottom: 20px; }
+.downloads-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 750px;
+}
+.downloads-table th {
+    color: #A6A6A6;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 14px 8px;
+    border-bottom: 2px solid #3A3A3A;
+    text-align: right;
+}
+.downloads-table td {
+    padding: 14px 8px;
+    border-bottom: 1px solid #333333;
+    vertical-align: middle;
+    font-size: 0.85rem;
+}
+.file-name { font-weight: 600; color: #FFFFFF; }
+.progress-wrapper { display: flex; align-items: center; gap: 10px; }
+.progress-track {
+    flex: 1;
+    height: 6px;
+    background-color: #1A1A1A;
+    border-radius: 4px;
+    overflow: hidden;
+}
+.progress-fill {
+    height: 100%;
+    background-color: #1E6FD9;
+    border-radius: 4px;
+    transition: width 0.2s, background-color 0.2s;
+}
+.progress-percentage { font-size: 0.7rem; font-weight: 600; color: #A6A6A6; min-width: 40px; text-align: left; }
+.file-size, .download-speed { color: #C0C0C0; font-family: monospace; font-size: 0.75rem; }
+.device-tag {
+    background-color: #333333;
+    color: #E0E0E0;
+    padding: 4px 12px;
+    border-radius: 30px;
+    font-size: 0.7rem;
+    font-weight: 500;
+    display: inline-block;
+}
+</file>
+
+<file path="src/renderer/css/layout.css">
+/* layout.css - شريط التنقل والتخطيط العام */
+.navbar {
+    background-color: #262626;
+    border-radius: 80px;
+    padding: 8px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+    border: 1px solid #333333;
+}
+
+.logo-text {
+    font-size: clamp(1.3rem, 4vw, 1.7rem);
+    font-weight: 800;
+    background: linear-gradient(135deg, #FFFFFF, #A6A6A6);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.nav-links {
+    display: flex;
+    gap: 8px;
+    background-color: #1A1A1A;
+    padding: 6px;
+    border-radius: 60px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.nav-item {
+    padding: 6px 16px;
+    color: #A6A6A6;
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: 40px;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.nav-item.active {
+    background-color: #1E6FD9;
+    color: white;
+    box-shadow: 0 2px 8px rgba(30,111,217,0.3);
+}
+
+.nav-icon {
+    width: 18px;
+    height: 18px;
+}
+
+.user-profile {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background-color: #1A1A1A;
+    padding: 4px 12px 4px 16px;
+    border-radius: 50px;
+    cursor: default;
+    transition: 0.2s;
+    border: 1px solid #3A3A3A;
+}
+
+.user-avatar {
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(145deg, #1E6FD9, #0F4C9E);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.user-avatar svg {
+    width: 18px;
+    height: 18px;
+    stroke: white;
+}
+
+.user-name {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #E0E0E0;
+}
+</file>
+
+<file path="src/renderer/css/main.css">
+/* main.css */
+@import url('base.css');
+@import url('layout.css');
+@import url('devices.css');     /* التعديلات الجديدة */
+@import url('modal.css');
+@import url('downloads.css');
+@import url('settings.css');
+@import url('responsive.css');  /* تأكد وجوده في النهاية */
+</file>
+
+<file path="src/renderer/css/modal.css">
+/* modal.css - نافذة معلومات الجهاز */
+.device-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.modal-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+}
+.modal-content {
+    position: relative;
+    background: linear-gradient(145deg, #262626, #1f1f1f);
+    border-radius: 32px;
+    width: 90%;
+    max-width: 400px;
+    padding: 24px 20px 28px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+    border: 1px solid #3a3a3a;
+    animation: modalFadeIn 0.2s ease;
+}
+@keyframes modalFadeIn {
+    from { opacity: 0; transform: scale(0.95);}
+    to { opacity: 1; transform: scale(1);}
+}
+.modal-close {
+    position: absolute;
+    top: 16px;
+    right: 20px;
+    background: none;
+    border: none;
+    color: #a6a6a6;
+    font-size: 28px;
+    cursor: pointer;
+}
+.modal-close:hover { color: #ffffff; }
+.modal-header { text-align: center; margin-bottom: 24px; }
+.device-icon-large {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 12px;
+    background: linear-gradient(135deg, #1e6fd9, #0f4c9e);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.device-icon-large svg { width: 48px; height: 48px; stroke: white; }
+.modal-device-name { font-size: 1.5rem; font-weight: 700; color: #ffffff; margin: 0; }
+.modal-body { margin-bottom: 28px; }
+.device-detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 10px 0;
+    border-bottom: 1px solid #333;
+}
+.detail-label { font-size: 0.85rem; color: #a6a6a6; font-weight: 500; }
+.detail-value { font-size: 0.9rem; color: #e0e0e0; font-weight: 500; text-align: left; direction: ltr; }
+.detail-value.code { font-family: monospace; font-size: 0.8rem; background: #1a1a1a; padding: 4px 8px; border-radius: 8px; }
+.status-badge-modal {
+    display: inline-block;
+    background-color: #2a2a2a;
+    padding: 4px 12px;
+    border-radius: 30px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+.status-badge-modal.connected { background-color: #1b8755; color: white; }
+.status-badge-modal.offline { background-color: #d32f2f; color: white; }
+.status-badge-modal.discovered { background-color: #f57c00; color: white; }
+.modal-actions { display: flex; gap: 16px; justify-content: center; }
+.modal-btn {
+    flex: 1;
+    padding: 12px 16px;
+    border: none;
+    border-radius: 40px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+.modal-btn.primary { background-color: #1e6fd9; color: white; }
+.modal-btn.primary:hover { background-color: #155bb0; transform: translateY(-2px); }
+.modal-btn.danger { background-color: transparent; border: 1px solid #d32f2f; color: #d32f2f; }
+.modal-btn.danger:hover { background-color: #d32f2f; color: white; }
+@media (max-width: 500px) {
+    .modal-content { width: 95%; padding: 20px 16px; }
+    .modal-actions { flex-direction: column; }
+}
+</file>
+
+<file path="src/renderer/css/responsive.css">
+/* responsive.css - استجابة كاملة ومتناسقة */
+
+/* للأجهزة المتوسطة (تابلت، شاشات صغيرة) */
+@media (max-width: 850px) {
+    .navbar {
+        border-radius: 40px;
+        justify-content: center;
     }
-
-    /**
-     * Resolves the application root directory where `resources/bin` is located.
-     * Prioritizes Electron app path if available, otherwise falls back to cwd.
-     */
-    _resolveAppRoot(explicitRoot) {
-        if (explicitRoot) {
-            return explicitRoot;
-        }
-
-        // Try to use Electron's app.getAppPath() if available
-        try {
-            const { app } = require('electron');
-            if (app && typeof app.getAppPath === 'function') {
-                // getAppPath returns the path to the app's root (where package.json is)
-                return app.getAppPath();
-            }
-        } catch (err) {
-            // Electron not available or not ready yet
-            if (this._logger) {
-                this._logger.warn('ToolPathResolver: Electron app not available, using cwd');
-            }
-        }
-
-        // Fallback to current working directory (development mode)
-        return process.cwd();
+    .logo, .user-profile {
+        position: static;
     }
-
-    /**
-     * Returns platform-specific binary subdirectory name.
-     */
-    _getBinSubDir() {
-        switch (this._platform) {
-            case 'win32':
-                return 'win';
-            case 'linux':
-                return 'linux';
-            case 'darwin':
-                return 'macos'; // أو 'darwin' حسب هيكل مجلداتك، نختار 'macos'
-            default:
-                throw new Error(`Unsupported platform: ${this._platform}`);
-        }
+    .nav-links {
+        order: 2;
+        width: 100%;
+        justify-content: center;
     }
-
-    /**
-     * Builds the full path to a binary inside resources/bin.
-     * @param {string} binaryName - e.g., 'adb', 'scrcpy', 'yt-dlp'
-     * @returns {string}
-     */
-    _getDefaultPath(binaryName) {
-        // On Windows, ensure .exe extension if not present
-        let finalBinaryName = binaryName;
-        if (this._platform === 'win32' && !finalBinaryName.toLowerCase().endsWith('.exe')) {
-            finalBinaryName += '.exe';
-        }
-        return path.join(this._appRoot, 'resources', 'bin', this._binSubDir, finalBinaryName);
+    .user-profile {
+        order: 3;
     }
-
-    /**
-     * Generic getter with environment variable override and existence check.
-     * @param {string} envVarName
-     * @param {string} binaryName
-     * @returns {string}
-     * @throws {Error} if binary not found
-     */
-    _getPath(envVarName, binaryName) {
-        // 1. Check environment variable
-        const envPath = process.env[envVarName];
-        if (envPath && typeof envPath === 'string' && envPath.trim()) {
-            if (fs.existsSync(envPath)) {
-                return envPath;
-            }
-            const msg = `ToolPathResolver: Environment override ${envVarName}=${envPath} points to non-existent file.`;
-            if (this._logger) {
-                this._logger.error(msg);
-            }
-            throw new Error(msg);
-        }
-
-        // 2. Default path inside resources/bin
-        const defaultPath = this._getDefaultPath(binaryName);
-        if (fs.existsSync(defaultPath)) {
-            return defaultPath;
-        }
-
-        // 3. Not found
-        const msg = `ToolPathResolver: Required binary "${binaryName}" not found at ${defaultPath}. Set ${envVarName} to override.`;
-        if (this._logger) {
-            this._logger.error(msg);
-        }
-        throw new Error(msg);
+    
+    /* تحسين كبسولات الأجهزة */
+    .devices-capsule-pill {
+        border-radius: 40px;
+        padding: 16px 20px;   /* مسافة أقل قليلاً */
+        gap: 16px;
     }
-
-    /**
-     * Returns full path to ADB executable.
-     * Override via LINKHUB_ADB_PATH environment variable.
-     */
-    getAdbPath() {
-        return this._getPath('LINKHUB_ADB_PATH', 'adb');
+    .device-item {
+        padding: 6px 14px;
+        gap: 8px;
     }
-
-    /**
-     * Returns full path to scrcpy executable.
-     * Override via LINKHUB_SCRCPY_PATH environment variable.
-     */
-    getScrcpyPath() {
-        return this._getPath('LINKHUB_SCRCPY_PATH', 'scrcpy');
+    .device-name {
+        font-size: 0.8rem;
     }
-
-    /**
-     * Returns full path to yt-dlp executable.
-     * Override via LINKHUB_YTDLP_PATH environment variable.
-     */
-    getYtDlpPath() {
-        return this._getPath('LINKHUB_YTDLP_PATH', 'yt-dlp');
+    .device-circle {
+        width: 34px;
+        height: 34px;
     }
-
-    /**
-     * Optional: Verify all required tools exist at once.
-     * @returns {Object} { adb: boolean, scrcpy: boolean, ytdlp: boolean }
-     */
-    verifyAll() {
-        const result = {
-            adb: false,
-            scrcpy: false,
-            ytdlp: false
-        };
-        try {
-            result.adb = !!this.getAdbPath();
-        } catch (e) { /* ignore */ }
-        try {
-            result.scrcpy = !!this.getScrcpyPath();
-        } catch (e) { /* ignore */ }
-        try {
-            result.ytdlp = !!this.getYtDlpPath();
-        } catch (e) { /* ignore */ }
-        return result;
+    .device-circle svg {
+        width: 18px;
+        height: 18px;
+    }
+    .btn-route {
+        padding: 8px 18px;
     }
 }
 
-module.exports = ToolPathResolver;
+/* للهواتف (شاشات صغيرة جداً) */
+@media (max-width: 600px) {
+    body {
+        padding: 12px;
+    }
+    
+    /* ترتيب الأجهزة بشكل عمودي تقريباً */
+    .devices-capsule-pill {
+        border-radius: 30px;
+        padding: 16px;
+        gap: 12px;
+        flex-direction: column;    /* جعل الأجهزة في عمود واحد */
+        align-items: stretch;
+    }
+    
+    .device-item {
+        width: 100%;
+        justify-content: space-between;
+        padding: 10px 16px;
+        gap: 12px;
+    }
+    
+    /* إعادة ترتيب المحتوى داخلياً */
+    .device-info {
+        flex: 1;
+    }
+    
+    .device-name {
+        font-size: 0.85rem;
+    }
+    
+    /* إخفاء التفاصيل الصغيرة إن ضاقت */
+    .device-detail {
+        display: none;
+    }
+    
+    .status-badge {
+        font-size: 0.6rem;
+        padding: 2px 8px;
+    }
+    
+    /* تحسين حقل الإدخال */
+    .routing-input-container {
+        border-radius: 30px;
+        flex-direction: column;
+        padding: 12px;
+        gap: 12px;
+    }
+    .input-url {
+        width: 100%;
+        text-align: center;
+        padding: 10px 14px;
+        font-size: 0.85rem;
+    }
+    .btn-route {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    /* العناوين */
+    .section-subheading {
+        font-size: 1rem;
+        margin-bottom: 8px;
+    }
+}
+
+/* للشاشات العريضة جداً (فائقة الاتساع) */
+@media (min-width: 1600px) {
+    .devices-capsule-pill {
+        gap: 28px;
+        padding: 24px 36px;
+    }
+    .device-item {
+        padding: 14px 26px;
+        gap: 16px;
+    }
+    .device-name {
+        font-size: 1rem;
+    }
+    .device-circle {
+        width: 48px;
+        height: 48px;
+    }
+    .device-circle svg {
+        width: 26px;
+        height: 26px;
+    }
+}
+</file>
+
+<file path="src/renderer/css/settings.css">
+/* settings.css - إعدادات */
+.settings-card {
+    background-color: #262626;
+    border-radius: 32px;
+    padding: 24px 28px;
+}
+.settings-placeholder p {
+    background-color: #1E1E1E;
+    padding: 12px 20px;
+    border-radius: 20px;
+    border-right: 4px solid #1E6FD9;
+    margin-bottom: 12px;
+}
+.btn-outline {
+    background: transparent;
+    border: 1px solid #1E6FD9;
+    color: #1E6FD9;
+    padding: 8px 20px;
+    border-radius: 40px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: 0.2s;
+}
+.btn-outline:hover {
+    background-color: #1E6FD9;
+    color: white;
+}
+</file>
+
+<file path="src/renderer/js/core/constants.js">
+// constants.js - الثوابت العامة
+export const DOM_IDS = {
+    navItems: '.nav-item',
+    homeSection: 'home-section',
+    downloadsSection: 'downloads-section',
+    settingsSection: 'settings-section',
+    registeredContainer: 'registered-devices',
+    discoveredContainer: 'discovered-devices',
+    downloadsTbody: 'downloads-tbody',
+    btnStart: 'btn-start-route',
+    mediaUrl: 'media-url',
+    refreshDevices: 'refresh-devices',
+    pairDevice: 'pair-device-btn',
+    // modal
+    deviceModal: 'device-modal',
+    modalClose: '.modal-close',
+    modalOverlay: '.modal-overlay',
+    modalDeviceName: 'modal-device-name',
+    modalDeviceModel: 'modal-device-model',
+    modalDeviceVersion: 'modal-device-version',
+    modalDeviceArch: 'modal-device-arch',
+    modalDeviceStatus: 'modal-device-status',
+    modalDeviceAdb: 'modal-device-adb',
+    modalStreamBtn: 'modal-stream-btn',
+    modalDisconnectBtn: 'modal-disconnect-btn'
+};
+</file>
+
+<file path="src/renderer/js/core/utils.js">
+// utils.js - دوال مساعدة
+export function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/[&<>]/g, function (m) {
+        if (m === '&') return '&amp;';
+        if (m === '<') return '&lt;';
+        if (m === '>') return '&gt;';
+        return m;
+    });
+}
+
+export function showToast(message, isError = false) {
+    const toast = document.createElement('div');
+    toast.textContent = message;
+    toast.style.position = 'fixed';
+    toast.style.bottom = '20px';
+    toast.style.right = '20px';
+    toast.style.backgroundColor = isError ? '#D32F2F' : '#1E6FD9';
+    toast.style.color = 'white';
+    toast.style.padding = '12px 24px';
+    toast.style.borderRadius = '8px';
+    toast.style.zIndex = '10000';
+    toast.style.fontSize = '0.9rem';
+    toast.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+    toast.style.opacity = '0';
+    toast.style.transition = 'opacity 0.3s';
+    document.body.appendChild(toast);
+    setTimeout(() => { toast.style.opacity = '1'; }, 10);
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 400);
+    }, 3000);
+}
+</file>
+
+<file path="src/renderer/js/handlers/pairHandler.js">
+// pairHandler.js - معالج إقران جهاز لاسلكي
+import { showToast } from '../core/utils.js';
+import { pairDevice as pairDeviceService } from '../services/deviceService.js';
+
+export async function handlePairDevice(loadDevicesCallback) {
+    const host = prompt('أدخل عنوان الاقتران (مثال: 192.168.1.10:37000)');
+    if (!host) return;
+    const code = prompt('أدخل رمز الاقتران المكون من 6 أرقام');
+    if (!code || !/^\d{6}$/.test(code)) {
+        showToast('رمز الاقتران يجب أن يكون 6 أرقام', true);
+        return;
+    }
+    try {
+        await pairDeviceService(host, code);
+        showToast('تم الاقتران بنجاح! سيظهر الجهاز قريباً.');
+        if (loadDevicesCallback) loadDevicesCallback();
+    } catch (err) {
+        showToast(`فشل الاقتران: ${err.message}`, true);
+    }
+}
+</file>
+
+<file path="src/renderer/js/handlers/startRouteHandler.js">
+// startRouteHandler.js - معالج زر بدء التوجيه والتحميل
+import { showToast } from '../core/utils.js';
+import { inspectUrl, startDownload } from '../services/downloadService.js';
+import { getSelectedDeviceIds } from '../ui/selectionManager.js';
+import { addDownloadRow } from '../ui/downloadManager.js';
+
+let registeredDevices = []; // سيتم ربطها من main
+
+export function setRegisteredDevicesGetter(getterFn) {
+    registeredDevices = getterFn;
+}
+
+export async function handleStartRoute(url, urlInputElement) {
+    const trimmedUrl = url.trim();
+    if (!trimmedUrl) {
+        showToast('الرجاء إدخال رابط الوسائط', true);
+        return false;
+    }
+
+    const selectedIds = getSelectedDeviceIds();
+    if (selectedIds.size === 0) {
+        showToast('الرجاء تحديد جهاز واحد أو أكثر أولاً.', true);
+        return false;
+    }
+
+    let inspection;
+    try {
+        inspection = await inspectUrl(trimmedUrl);
+        if (!inspection || !inspection.formats || inspection.formats.length === 0) {
+            showToast('لا توجد صيغ متاحة للتحميل من هذا الرابط.', true);
+            return false;
+        }
+    } catch (err) {
+        showToast(`فشل فحص الرابط: ${err.message}`, true);
+        return false;
+    }
+
+    let bestFormat = inspection.formats.find(f => f.vcodec && f.vcodec !== 'none' && f.resolution);
+    if (!bestFormat) bestFormat = inspection.formats.find(f => f.acodec && f.acodec !== 'none');
+    if (!bestFormat) bestFormat = inspection.formats[0];
+    const formatId = bestFormat.formatId;
+    const title = inspection.title || (() => {
+        try {
+            const lastSegment = new URL(trimmedUrl).pathname.split('/').pop();
+            return (lastSegment && lastSegment.includes('.')) ? lastSegment : 'media_' + Date.now();
+        } catch(e) { return 'media_' + Date.now(); }
+    })();
+
+    const devicesList = (typeof registeredDevices === 'function') ? registeredDevices() : registeredDevices;
+    for (const deviceId of selectedIds) {
+        const deviceData = devicesList.find(d => d.device.id === deviceId);
+        if (!deviceData) continue;
+        const deviceName = deviceData.device.deviceFriendlyName || deviceData.device.model || deviceId;
+        try {
+            const result = await startDownload(trimmedUrl, formatId, deviceId);
+            const downloadId = result.processId;
+            addDownloadRow(downloadId, title, deviceName, trimmedUrl);
+        } catch (err) {
+            showToast(`فشل التحميل على الجهاز ${deviceName}: ${err.message}`, true);
+        }
+    }
+
+    if (urlInputElement) urlInputElement.value = '';
+    return true;
+}
+</file>
+
+<file path="src/renderer/js/services/deviceService.js">
+// deviceService.js - التعامل مع أجهزة linkhub
+export async function getAllDevices() {
+    return await linkhub.devices.getAll();
+}
+
+export async function startStream(deviceId) {
+    return await linkhub.devices.stream.start(deviceId, { fullscreen: false });
+}
+
+export async function pairDevice(host, code) {
+    return await linkhub.devices.pair(host, code);
+}
+
+export async function disconnectDevice(adbTarget) {
+    if (typeof linkhub.devices.disconnect !== 'function') {
+        throw new Error('وظيفة قطع الاتصال غير متوفرة بعد، يرجى إضافة IPC handlers.');
+    }
+    return await linkhub.devices.disconnect(adbTarget);
+}
+</file>
+
+<file path="src/renderer/js/services/downloadService.js">
+// downloadService.js - عمليات التحميل
+export async function inspectUrl(url) {
+    return await linkhub.downloads.inspect(url);
+}
+
+export async function startDownload(url, formatId, deviceId) {
+    return await linkhub.downloads.start(url, formatId, deviceId, {});
+}
+
+export async function stopDownload(url) {
+    return await linkhub.downloads.stop(url);
+}
+</file>
+
+<file path="src/renderer/js/services/eventService.js">
+// eventService.js - تسجيل أحداث IPC
+export function setupEventListeners(handlers) {
+    if (!linkhub.on) return;
+    
+    linkhub.on('download:progress', (event, data) => {
+        if (data && data.downloadId && data.percent !== undefined) {
+            handlers.onProgress?.(data.downloadId, data.percent, data.speed, data.size);
+        }
+    });
+    linkhub.on('download:complete', (event, data) => {
+        if (data?.downloadId) handlers.onComplete?.(data.downloadId);
+    });
+    linkhub.on('download:error', (event, data) => {
+        if (data?.downloadId) handlers.onError?.(data.downloadId, data.error);
+    });
+    linkhub.on('download:stopped', (event, data) => {
+        if (data?.downloadId) handlers.onStopped?.(data.downloadId);
+    });
+    linkhub.on('device:stateChanged', () => handlers.onDeviceStateChanged?.());
+    linkhub.on('device:paired', () => handlers.onDevicePaired?.());
+    linkhub.on('device:removed', () => handlers.onDeviceRemoved?.());
+}
+</file>
+
+<file path="src/renderer/js/ui/deviceManager.js">
+// deviceManager.js - إنشاء وعرض عناصر الأجهزة
+import { escapeHtml } from '../core/utils.js';
+import { showToast } from '../core/utils.js';
+import { startStream } from '../services/deviceService.js';
+import { getSelectedDeviceIds, toggleSelectedDevice, updateElementSelection } from './selectionManager.js';
+
+let currentShowModalCallback = null; // سيتم ربطه من main.js
+
+export function setShowModalCallback(callback) {
+    currentShowModalCallback = callback;
+}
+
+export function createDeviceElement(deviceData, isRegistered) {
+    const device = deviceData.device;
+    const runtime = deviceData.runtimeState || {};
+    const status = runtime.status || 'offline';
+    const deviceId = device.id;
+    const displayName = device.deviceFriendlyName || device.model || device.id;
+    const model = (device.model && device.model !== 'Unknown') ? device.model : '';
+    const version = (device.version && device.version !== 'Unknown') ? device.version : '';
+    const detailsText = model && version ? `${model} (${version})` : (model || version || '');
+
+    const div = document.createElement('div');
+    div.className = `device-item ${status === 'connected' ? 'status-connected' : 'status-offline'}`;
+    div.setAttribute('data-device-id', deviceId);
+    div.setAttribute('data-device-name', displayName);
+    if (detailsText) div.setAttribute('title', detailsText);
+
+    const selectedSet = getSelectedDeviceIds();
+    if (isRegistered && selectedSet.has(deviceId)) {
+        div.classList.add('selected');
+    }
+
+    div.innerHTML = `
+        <div class="device-circle">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+                <line x1="12" y1="18" x2="12.01" y2="18"></line>
+            </svg>
+        </div>
+        <div class="device-info">
+            <h3 class="device-name">${escapeHtml(displayName)}</h3>
+            ${detailsText ? `<div class="device-detail">${escapeHtml(detailsText)}</div>` : ''}
+        </div>
+        <span class="status-badge">${status === 'connected' ? 'متصل' : (status === 'offline' ? 'غير متصل' : status)}</span>
+        <button class="stream-btn" data-device-id="${deviceId}" style="background: none; border: none; cursor: pointer; margin-right: 8px;" title="بدء البث">📺</button>
+    `;
+
+    // فتح النافذة عند النقر على الجهاز (ليس على زر البث)
+    div.addEventListener('click', (e) => {
+        if (e.target.classList?.contains('stream-btn') || e.target.closest('.stream-btn')) return;
+        e.stopPropagation();
+        if (currentShowModalCallback) currentShowModalCallback(deviceData);
+    });
+
+    // زر البث المباشر
+    const streamBtn = div.querySelector('.stream-btn');
+    if (streamBtn) {
+        streamBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            if (status !== 'connected') {
+                showToast('الجهاز غير متصل حالياً، لا يمكن بدء البث.', true);
+                return;
+            }
+            try {
+                await startStream(deviceId);
+                showToast(`بدأ بث الشاشة للجهاز ${displayName}`);
+            } catch (err) {
+                showToast(`فشل بدء البث: ${err.message}`, true);
+            }
+        });
+    }
+
+    // دعم النقر المزدوج أيضاً
+    div.addEventListener('dblclick', async (e) => {
+        e.stopPropagation();
+        if (status !== 'connected') {
+            showToast('الجهاز غير متصل حالياً، لا يمكن بدء البث.', true);
+            return;
+        }
+        try {
+            await startStream(deviceId);
+            showToast(`بدأ بث الشاشة للجهاز ${displayName}`);
+        } catch (err) {
+            showToast(`فشل بدء البث: ${err.message}`, true);
+        }
+    });
+
+    // إضافة منطق التحديد (للأجهزة المسجلة فقط)
+    if (isRegistered && status === 'connected') {
+        div.addEventListener('click', (e) => {
+            if (e.target.classList?.contains('stream-btn') || e.target.closest('.stream-btn')) return;
+            e.stopPropagation();
+            const nowSelected = toggleSelectedDevice(deviceId);
+            updateElementSelection(div, deviceId, nowSelected);
+        });
+    }
+
+    return div;
+}
+
+export function renderDevices(registeredDevices, registeredContainer, discoveredContainer) {
+    if (registeredContainer) {
+        if (!registeredDevices || registeredDevices.length === 0) {
+            registeredContainer.innerHTML = '<div class="placeholder-text">لا توجد أجهزة مسجلة</div>';
+        } else {
+            registeredContainer.innerHTML = '';
+            registeredDevices.forEach(deviceData => {
+                const el = createDeviceElement(deviceData, true);
+                registeredContainer.appendChild(el);
+            });
+        }
+    }
+    if (discoveredContainer) {
+        const newDevices = registeredDevices.filter(d => d.device.isNew === true);
+        if (newDevices.length === 0) {
+            discoveredContainer.innerHTML = '<div class="placeholder-text">لا توجد أجهزة جديدة مكتشفة</div>';
+        } else {
+            discoveredContainer.innerHTML = '';
+            newDevices.forEach(deviceData => {
+                const el = createDeviceElement(deviceData, false);
+                discoveredContainer.appendChild(el);
+            });
+        }
+    }
+}
+</file>
+
+<file path="src/renderer/js/ui/downloadManager.js">
+// downloadManager.js - إدارة جدول التحميلات
+import { escapeHtml } from '../core/utils.js';
+import { showToast } from '../core/utils.js';
+import { stopDownload } from '../services/downloadService.js';
+
+let downloadsTbody = null;
+
+export function initDownloadTable(tbodyElement) {
+    downloadsTbody = tbodyElement;
+}
+
+export function addDownloadRow(downloadId, fileName, targetDeviceName, url) {
+    if (!downloadsTbody) return;
+    const row = document.createElement('tr');
+    row.setAttribute('data-download-id', downloadId);
+    row.setAttribute('data-url', url);
+    row.innerHTML = `
+        <td class="file-name">${escapeHtml(fileName)}</td>
+        <td>
+            <div class="progress-wrapper">
+                <div class="progress-track">
+                    <div class="progress-fill" style="width: 0%;"></div>
+                </div>
+                <span class="progress-percentage">0%</span>
+            </div>
+        </td>
+        <td class="file-size">--</td>
+        <td class="download-speed">--</td>
+        <td><span class="device-tag">${escapeHtml(targetDeviceName)}</span></td>
+        <td>
+            <button class="btn-stop-download" data-url="${escapeHtml(url)}" style="background: #D32F2F; border: none; color: white; padding: 4px 12px; border-radius: 20px; cursor: pointer; font-size: 0.7rem;">إيقاف</button>
+        </td>
+    `;
+    const emptyRow = downloadsTbody.querySelector('.empty-row');
+    if (emptyRow) emptyRow.remove();
+    downloadsTbody.prepend(row);
+
+    const stopBtn = row.querySelector('.btn-stop-download');
+    if (stopBtn) {
+        stopBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const targetUrl = stopBtn.getAttribute('data-url');
+            if (targetUrl && confirm('هل تريد إيقاف هذا التحميل؟')) {
+                try {
+                    await stopDownload(targetUrl);
+                    showToast(`تم إيقاف التحميل: ${fileName}`);
+                    stopBtn.textContent = 'تم الإيقاف';
+                    stopBtn.disabled = true;
+                    stopBtn.style.background = '#666';
+                } catch (err) {
+                    showToast(`فشل إيقاف التحميل: ${err.message}`, true);
+                }
+            }
+        });
+    }
+    return row;
+}
+
+export function updateDownloadProgress(downloadId, percent, speed, size) {
+    if (!downloadsTbody) return;
+    const row = downloadsTbody.querySelector(`tr[data-download-id="${downloadId}"]`);
+    if (!row) return;
+    const fill = row.querySelector('.progress-fill');
+    const percentSpan = row.querySelector('.progress-percentage');
+    const speedSpan = row.querySelector('.download-speed');
+    const sizeSpan = row.querySelector('.file-size');
+    if (fill) fill.style.width = `${percent}%`;
+    if (percentSpan) percentSpan.textContent = `${percent}%`;
+    if (speedSpan && speed) speedSpan.textContent = speed;
+    if (sizeSpan && size) sizeSpan.textContent = size;
+    if (fill) {
+        const hue = 210 - (percent / 100) * 90;
+        fill.style.backgroundColor = `hsl(${hue}, 70%, 55%)`;
+    }
+}
+
+export function markDownloadComplete(downloadId) {
+    if (!downloadsTbody) return;
+    const row = downloadsTbody.querySelector(`tr[data-download-id="${downloadId}"]`);
+    if (!row) return;
+    const fill = row.querySelector('.progress-fill');
+    const percentSpan = row.querySelector('.progress-percentage');
+    const speedSpan = row.querySelector('.download-speed');
+    if (fill) fill.style.width = '100%';
+    if (percentSpan) percentSpan.textContent = '100%';
+    if (speedSpan) speedSpan.textContent = '0 MB/s';
+    if (fill) fill.style.backgroundColor = 'hsl(120, 70%, 55%)';
+    const stopBtn = row.querySelector('.btn-stop-download');
+    if (stopBtn) {
+        stopBtn.textContent = 'مكتمل';
+        stopBtn.disabled = true;
+        stopBtn.style.background = '#388E3C';
+    }
+}
+
+export function markDownloadError(downloadId, errorMsg) {
+    if (!downloadsTbody) return;
+    const row = downloadsTbody.querySelector(`tr[data-download-id="${downloadId}"]`);
+    if (!row) return;
+    const percentSpan = row.querySelector('.progress-percentage');
+    if (percentSpan) percentSpan.textContent = 'فشل';
+    const stopBtn = row.querySelector('.btn-stop-download');
+    if (stopBtn) {
+        stopBtn.textContent = 'فشل';
+        stopBtn.disabled = true;
+        stopBtn.style.background = '#D32F2F';
+    }
+    showToast(`فشل التحميل: ${errorMsg}`, true);
+}
+</file>
+
+<file path="src/renderer/js/ui/modalManager.js">
+// modalManager.js - التحكم بنافذة معلومات الجهاز
+import { startStream, disconnectDevice } from '../services/deviceService.js';
+import { showToast } from '../core/utils.js';
+import { loadDevices } from '../main.js'; // سنقوم بتصدير loadDevices من main
+
+let modalElement = null;
+let currentDevice = null;
+
+// عناصر DOM
+let modalClose, modalOverlay, modalDeviceName, modalDeviceModel, modalDeviceVersion, modalDeviceArch, modalDeviceStatus, modalDeviceAdb, modalStreamBtn, modalDisconnectBtn;
+
+export function initModal(modalDom, closeBtn, overlay, nameEl, modelEl, versionEl, archEl, statusEl, adbEl, streamBtn, disconnectBtn) {
+    modalElement = modalDom;
+    modalClose = closeBtn;
+    modalOverlay = overlay;
+    modalDeviceName = nameEl;
+    modalDeviceModel = modelEl;
+    modalDeviceVersion = versionEl;
+    modalDeviceArch = archEl;
+    modalDeviceStatus = statusEl;
+    modalDeviceAdb = adbEl;
+    modalStreamBtn = streamBtn;
+    modalDisconnectBtn = disconnectBtn;
+
+    modalClose.addEventListener('click', hideModal);
+    modalOverlay.addEventListener('click', hideModal);
+    modalStreamBtn.addEventListener('click', onStreamClick);
+    modalDisconnectBtn.addEventListener('click', onDisconnectClick);
+}
+
+export function showDeviceModal(deviceData) {
+    const device = deviceData.device;
+    const runtime = deviceData.runtimeState || {};
+    const status = runtime.status || 'offline';
+    const adbTarget = runtime.adbTarget || device.id;
+
+    currentDevice = { device, runtime, deviceData };
+
+    modalDeviceName.textContent = device.deviceFriendlyName || device.model || device.id;
+    modalDeviceModel.textContent = (device.model && device.model !== 'Unknown') ? device.model : 'غير معروف';
+    modalDeviceVersion.textContent = (device.version && device.version !== 'Unknown') ? device.version : 'غير معروف';
+    modalDeviceArch.textContent = (device.arch && device.arch !== 'Unknown') ? device.arch : 'غير معروف';
+    modalDeviceAdb.textContent = adbTarget;
+
+    let statusText = '', statusClass = '';
+    if (status === 'connected') { statusText = 'متصل'; statusClass = 'connected'; }
+    else if (status === 'offline') { statusText = 'غير متصل'; statusClass = 'offline'; }
+    else if (status === 'discovered') { statusText = 'مكتشف'; statusClass = 'discovered'; }
+    else { statusText = status; statusClass = ''; }
+    modalDeviceStatus.textContent = statusText;
+    modalDeviceStatus.className = `detail-value status-badge-modal ${statusClass}`;
+
+    const isConnected = status === 'connected';
+    modalStreamBtn.disabled = !isConnected;
+    modalStreamBtn.style.opacity = isConnected ? '1' : '0.5';
+    modalStreamBtn.style.cursor = isConnected ? 'pointer' : 'not-allowed';
+
+    modalElement.style.display = 'flex';
+}
+
+export function hideModal() {
+    if (modalElement) modalElement.style.display = 'none';
+    currentDevice = null;
+}
+
+async function onStreamClick() {
+    if (!currentDevice) return;
+    const deviceId = currentDevice.device.id;
+    const status = currentDevice.runtime.status;
+    if (status !== 'connected') {
+        showToast('الجهاز غير متصل حالياً', true);
+        return;
+    }
+    try {
+        await startStream(deviceId);
+        showToast(`بدأ بث الشاشة للجهاز ${currentDevice.device.deviceFriendlyName}`);
+        hideModal();
+    } catch (err) {
+        showToast(`فشل بدء البث: ${err.message}`, true);
+    }
+}
+
+async function onDisconnectClick() {
+    if (!currentDevice) return;
+    const adbTarget = currentDevice.runtime.adbTarget || currentDevice.device.id;
+    try {
+        await disconnectDevice(adbTarget);
+        showToast(`تم قطع الاتصال عن الجهاز`);
+        hideModal();
+        setTimeout(() => {
+            if (typeof loadDevices === 'function') loadDevices();
+        }, 1000);
+    } catch (err) {
+        showToast(`فشل قطع الاتصال: ${err.message}`, true);
+    }
+}
+</file>
+
+<file path="src/renderer/js/ui/selectionManager.js">
+// selectionManager.js - إدارة تحديد الأجهزة (متعدد)
+let selectedDeviceIds = new Set();
+
+export function getSelectedDeviceIds() {
+    return new Set(selectedDeviceIds);
+}
+
+export function addSelectedDevice(deviceId) {
+    selectedDeviceIds.add(deviceId);
+}
+
+export function removeSelectedDevice(deviceId) {
+    selectedDeviceIds.delete(deviceId);
+}
+
+export function toggleSelectedDevice(deviceId) {
+    if (selectedDeviceIds.has(deviceId)) {
+        selectedDeviceIds.delete(deviceId);
+        return false;
+    } else {
+        selectedDeviceIds.add(deviceId);
+        return true;
+    }
+}
+
+export function clearSelected() {
+    selectedDeviceIds.clear();
+}
+
+// لتحديث واجهة العنصر عند التحديد
+export function updateElementSelection(element, deviceId, isSelected) {
+    if (isSelected) element.classList.add('selected');
+    else element.classList.remove('selected');
+}
+</file>
+
+<file path="src/renderer/js/ui/tabManager.js">
+// tabManager.js - التبديل بين التبويبات
+export function initTabs(navItems, sections) {
+    navItems.forEach(item => {
+        item.addEventListener('click', (e) => {
+            e.preventDefault();
+            const tabId = item.getAttribute('data-tab');
+            switchTab(tabId, navItems, sections);
+        });
+    });
+}
+
+export function switchTab(tabId, navItems, sections) {
+    Object.values(sections).forEach(section => section?.classList.remove('active-section'));
+    if (sections[tabId]) sections[tabId].classList.add('active-section');
+    navItems.forEach(item => {
+        const itemTab = item.getAttribute('data-tab');
+        if (itemTab === tabId) item.classList.add('active');
+        else item.classList.remove('active');
+    });
+}
+</file>
+
+<file path="src/renderer/js/main.js">
+// main.js - نقطة الدخول للتطبيق
+import { DOM_IDS } from './core/constants.js';
+import { showToast } from './core/utils.js';
+import { getAllDevices } from './services/deviceService.js';
+import { setupEventListeners } from './services/eventService.js';
+import { initDownloadTable, addDownloadRow, updateDownloadProgress, markDownloadComplete, markDownloadError } from './ui/downloadManager.js';
+import { renderDevices, setShowModalCallback } from './ui/deviceManager.js';
+import { initModal, showDeviceModal } from './ui/modalManager.js';
+import { initTabs, switchTab } from './ui/tabManager.js';
+import { getSelectedDeviceIds, clearSelected } from './ui/selectionManager.js';
+import { handleStartRoute } from './handlers/startRouteHandler.js';
+import { handlePairDevice } from './handlers/pairHandler.js';
+
+let registeredDevices = [];
+
+// ربط عناصر DOM
+const navItems = document.querySelectorAll(DOM_IDS.navItems);
+const sections = {
+    home: document.getElementById(DOM_IDS.homeSection),
+    downloads: document.getElementById(DOM_IDS.downloadsSection),
+    settings: document.getElementById(DOM_IDS.settingsSection)
+};
+const registeredContainer = document.getElementById(DOM_IDS.registeredContainer);
+const discoveredContainer = document.getElementById(DOM_IDS.discoveredContainer);
+const downloadsTbody = document.getElementById(DOM_IDS.downloadsTbody);
+const btnStart = document.getElementById(DOM_IDS.btnStart);
+const urlInput = document.getElementById(DOM_IDS.mediaUrl);
+const refreshBtn = document.getElementById(DOM_IDS.refreshDevices);
+const pairBtn = document.getElementById(DOM_IDS.pairDevice);
+
+// عناصر المودال
+const modal = document.getElementById(DOM_IDS.deviceModal);
+const modalClose = document.querySelector(DOM_IDS.modalClose);
+const modalOverlay = document.querySelector(DOM_IDS.modalOverlay);
+const modalDeviceName = document.getElementById(DOM_IDS.modalDeviceName);
+const modalDeviceModel = document.getElementById(DOM_IDS.modalDeviceModel);
+const modalDeviceVersion = document.getElementById(DOM_IDS.modalDeviceVersion);
+const modalDeviceArch = document.getElementById(DOM_IDS.modalDeviceArch);
+const modalDeviceStatus = document.getElementById(DOM_IDS.modalDeviceStatus);
+const modalDeviceAdb = document.getElementById(DOM_IDS.modalDeviceAdb);
+const modalStreamBtn = document.getElementById(DOM_IDS.modalStreamBtn);
+const modalDisconnectBtn = document.getElementById(DOM_IDS.modalDisconnectBtn);
+
+// تهيئة المودال وربط callback
+initModal(modal, modalClose, modalOverlay, modalDeviceName, modalDeviceModel, modalDeviceVersion, modalDeviceArch, modalDeviceStatus, modalDeviceAdb, modalStreamBtn, modalDisconnectBtn);
+setShowModalCallback(showDeviceModal);
+
+// تهيئة جدول التحميلات
+initDownloadTable(downloadsTbody);
+
+// دالة تحميل الأجهزة
+export async function loadDevices() {
+    try {
+        const devices = await getAllDevices();
+        registeredDevices = devices;
+        renderDevices(registeredDevices, registeredContainer, discoveredContainer);
+    } catch (err) {
+        console.error('Failed to load devices:', err);
+        if (registeredContainer) registeredContainer.innerHTML = '<div class="placeholder-text">خطأ في تحميل الأجهزة</div>';
+    }
+}
+
+// ربط handlers الأحداث
+setupEventListeners({
+    onProgress: (downloadId, percent, speed, size) => updateDownloadProgress(downloadId, percent, speed, size),
+    onComplete: (downloadId) => markDownloadComplete(downloadId),
+    onError: (downloadId, error) => markDownloadError(downloadId, error),
+    onStopped: (downloadId) => showToast('تم إيقاف التحميل'),
+    onDeviceStateChanged: () => loadDevices(),
+    onDevicePaired: () => loadDevices(),
+    onDeviceRemoved: () => loadDevices()
+});
+
+// التبويبات
+initTabs(navItems, sections);
+switchTab('home', navItems, sections);
+
+// زر بدء التوجيه
+btnStart.addEventListener('click', async () => {
+    const url = urlInput.value;
+    const success = await handleStartRoute(url, urlInput);
+    if (success) urlInput.focus();
+});
+
+// تحديث الأجهزة
+if (refreshBtn) refreshBtn.addEventListener('click', () => loadDevices());
+// إقران جهاز
+if (pairBtn) pairBtn.addEventListener('click', () => handlePairDevice(loadDevices));
+
+// تحميل أولي
+loadDevices();
 </file>
 
 <file path="src/main/application/orchestrators/DeviceOrchestrator.js">
+// src/main/application/orchestrators/DeviceOrchestrator.js
 'use strict';
 
 const Device = require('../../domain/entities/Device');
@@ -344,7 +1568,7 @@ class DeviceOrchestrator {
             await this._connectionService.connect(target);
         }
 
-        // إنشاء كيان الجهاز
+        // إنشاء كيان الجهاز (بيانات أولية غير معروفة)
         const deviceId = `device-${target.replace(/:/g, '-')}-${Date.now()}`;
         const device = new Device({
             id: deviceId,
@@ -352,7 +1576,7 @@ class DeviceOrchestrator {
             model: 'Unknown',
             version: 'Unknown',
             arch: 'Unknown',
-            isNew: !this._deviceRegistry.hasDevice(deviceId)
+            isNew: true
         });
 
         // تسجيل الجهاز في الـ Registry
@@ -365,6 +1589,25 @@ class DeviceOrchestrator {
             connectionType,
             lastSeen: new Date()
         });
+
+        // === جلب معلومات الجهاز الحقيقية من ADB (بعد الاتصال) ===
+        try {
+            const deviceInfo = await this._connectionService.getDeviceInfo(target);
+            if (deviceInfo) {
+                device.updateDetails(deviceInfo.model, deviceInfo.version, deviceInfo.arch);
+                this._logger?.info(`Device info updated for ${target}: ${deviceInfo.model} (${deviceInfo.version})`);
+                
+                // تحديث الـ runtime state بمعلومات إضافية اختيارية
+                this._deviceRegistry.updateState(device.id, {
+                    model: deviceInfo.model,
+                    version: deviceInfo.version,
+                    arch: deviceInfo.arch
+                });
+            }
+        } catch (err) {
+            this._logger?.warn(`Could not fetch detailed device info for ${target}: ${err.message}`);
+            // لا نمنع الاتصال بسبب فشل جلب التفاصيل، نستمر مع البيانات الافتراضية
+        }
 
         return device;
     }
@@ -391,7 +1634,13 @@ class DeviceOrchestrator {
      * @param {string} deviceId - معرف الجهاز
      */
     stopStreaming(deviceId) {
-        return this._scrcpyAdapter.stopMirroring(deviceId);
+        const device = this._deviceRegistry.getDevice(deviceId);
+        if (!device) {
+            throw new Error(`Device ${deviceId} not found`);
+        }
+        const runtimeState = this._deviceRegistry.getRuntimeState(deviceId);
+        const adbTarget = runtimeState?.adbTarget || device.id;
+        return this._scrcpyAdapter.stopMirroring(adbTarget);
     }
 
     /**
@@ -438,12 +1687,18 @@ class DownloadOrchestrator {
         return this._ytdlpAdapter.inspectFormats(url);
     }
 
-    startDownload(file, secondaryFile = null) {
-        if (!file) {
-            throw new Error('file is required');
+    async getMetadata(url) {
+        return this._ytdlpAdapter.extractMetadata(url);
+    }
+
+    async startDownload(url, formatId, deviceId = null, options = {}) {
+        if (!url || !formatId) {
+            throw new Error('url and formatId are required');
         }
 
-        return this._ytdlpAdapter.startDownload(file, secondaryFile);
+        // Merge deviceId into options for adapter
+        const adapterOptions = { ...options, deviceId };
+        return this._ytdlpAdapter.startDownload(url, formatId, adapterOptions);
     }
 
     stopDownload(fileId) {
@@ -452,129 +1707,6 @@ class DownloadOrchestrator {
 }
 
 module.exports = DownloadOrchestrator;
-</file>
-
-<file path="src/main/bootstrap/ApplicationBootstrap.js">
-// src/main/bootstrap/ApplicationBootstrap.js
-'use strict';
-
-const path = require('path');
-const container = require('./container');
-const WindowManager = require('../infrastructure/windows/WindowManager');
-const WindowRegistry = require('../infrastructure/windows/WindowRegistry');
-
-class ApplicationBootstrap {
-    constructor() {
-        this._windowManager = null;
-        this._windowRegistry = null;
-    }
-
-    async run() {
-        console.log('[Bootstrap] Starting application...');
-
-        // 1. Initialize dependency container
-        container.initialize();
-        console.log('[Bootstrap] Container initialized.');
-
-        // 2. Initialize error central service (logger)
-        const errorService = container.resolve('errorCentralService');
-        if (errorService && typeof errorService.init === 'function') {
-            errorService.init();
-            console.log('[Bootstrap] ErrorCentralService initialized.');
-        }
-
-        // 2.5. Verify required tools (adb, scrcpy, yt-dlp) - NEW
-        const toolPathResolver = container.resolve('toolPathResolver');
-        if (toolPathResolver && typeof toolPathResolver.verifyAll === 'function') {
-            const toolsStatus = toolPathResolver.verifyAll();
-            console.log('[Bootstrap] Tool verification results:', toolsStatus);
-            
-            if (!toolsStatus.adb) {
-                console.warn('[Bootstrap] Warning: ADB not found. Device discovery and pairing will not work.');
-                if (errorService) {
-                    errorService.warn('ADB binary not found. Please ensure resources/bin/win/adb.exe or LINKHUB_ADB_PATH is set.', {
-                        source: 'ApplicationBootstrap'
-                    });
-                }
-            }
-            if (!toolsStatus.scrcpy) {
-                console.warn('[Bootstrap] Warning: scrcpy not found. Screen mirroring will not work.');
-                if (errorService) {
-                    errorService.warn('scrcpy binary not found. Please ensure resources/bin/win/scrcpy.exe or LINKHUB_SCRCPY_PATH is set.', {
-                        source: 'ApplicationBootstrap'
-                    });
-                }
-            }
-            if (!toolsStatus.ytdlp) {
-                console.warn('[Bootstrap] Warning: yt-dlp not found. Downloading will not work.');
-                if (errorService) {
-                    errorService.warn('yt-dlp binary not found. Please ensure resources/bin/win/yt-dlp.exe or LINKHUB_YTDLP_PATH is set.', {
-                        source: 'ApplicationBootstrap'
-                    });
-                }
-            }
-        } else {
-            console.warn('[Bootstrap] ToolPathResolver not available, skipping tool verification.');
-        }
-
-        // 3. Initialize database (if needed)
-        const dbManager = container.resolve('databaseManager');
-        if (dbManager && typeof dbManager.initDb === 'function') {
-            await dbManager.initDb();
-            console.log('[Bootstrap] Database initialized.');
-        }
-
-        // 4. Retrieve core services for monitoring
-        const connectionService = container.resolve('connectionService');
-        const deviceRegistry = container.resolve('deviceRegistry'); // for reference, not used directly
-
-        // 5. Start ADB monitoring and wireless discovery
-        if (connectionService) {
-            if (typeof connectionService.startAdbMonitoring === 'function') {
-                connectionService.startAdbMonitoring(5000);
-                console.log('[Bootstrap] ADB monitoring started.');
-            }
-            if (typeof connectionService.startWirelessDiscovery === 'function') {
-                connectionService.startWirelessDiscovery();
-                console.log('[Bootstrap] Wireless discovery started.');
-            }
-        }
-
-        // 6. Initialize window management infrastructure
-        this._windowRegistry = new WindowRegistry();
-        this._windowManager = new WindowManager(this._windowRegistry);
-
-        // 7. Create main window
-        await this.createMainWindow();
-
-        console.log('[Bootstrap] Application ready.');
-    }
-
-    async createMainWindow() {
-        const indexPath = path.join(__dirname, '../../renderer/index.html');
-        const mainWindow = this._windowManager.createMainWindow({
-            loadFile: indexPath,
-            show: false
-        });
-        mainWindow.once('ready-to-show', () => {
-            mainWindow.show();
-            if (process.env.NODE_ENV === 'development') {
-                mainWindow.webContents.openDevTools();
-            }
-        });
-        return mainWindow;
-    }
-
-    getWindowManager() {
-        return this._windowManager;
-    }
-
-    getWindowRegistry() {
-        return this._windowRegistry;
-    }
-}
-
-module.exports = ApplicationBootstrap;
 </file>
 
 <file path="src/main/domain/entities/AudioFile.js">
@@ -653,22 +1785,22 @@ module.exports = BaseFile;
 </file>
 
 <file path="src/main/domain/entities/BaseNode.js">
+// src/main/domain/entities/BaseNode.js
 /**
  * Pure base entity for all nodes/devices in the system.
  * Contains only immutable identity and structural data.
+ * 
+ * NOTE: Instances are NOT frozen to allow updates in derived classes.
  */
 class BaseNode {
     constructor({ id, deviceFriendlyName, type }) {
         this._id = id;
         this._deviceFriendlyName = deviceFriendlyName;
         this._type = type;
-
-        // Freeze instance to prevent accidental mutation
-        Object.freeze(this);
+        // No longer freezing - allows controlled updates in subclasses
     }
 
-    // --- Read-only getters ---
-
+    // --- Read-only getters (but internal setters exist for updates) ---
     get id() {
         return this._id;
     }
@@ -685,6 +1817,11 @@ class BaseNode {
         return this._deviceFriendlyName;
     }
 
+    // Protected setter for controlled updates (used by Device.updateDetails)
+    _setFriendlyName(name) {
+        this._deviceFriendlyName = name;
+    }
+
     toJSON() {
         return {
             id: this._id,
@@ -698,11 +1835,13 @@ module.exports = BaseNode;
 </file>
 
 <file path="src/main/domain/entities/Device.js">
+// src/main/domain/entities/Device.js
 const BaseNode = require('./BaseNode');
 
 /**
  * Pure device entity.
- * Contains only immutable definitional data.
+ * Contains immutable definitional data but allows controlled updates
+ * for device details (model, version, arch) after connection.
  */
 class Device extends BaseNode {
     constructor({
@@ -724,12 +1863,10 @@ class Device extends BaseNode {
         this._arch = arch || 'Unknown';
         this._isNew = isNew ?? true;
 
-        // Freeze after construction
-        Object.freeze(this);
+        // No freeze - allows updateDetails
     }
 
     // --- Read-only getters ---
-
     get model() {
         return this._model;
     }
@@ -746,6 +1883,20 @@ class Device extends BaseNode {
         return this._isNew;
     }
 
+    /**
+     * Update device details after obtaining real information from ADB.
+     * @param {string} model - Device model
+     * @param {string} version - Android version
+     * @param {string} arch - CPU architecture
+     */
+    updateDetails(model, version, arch) {
+        if (model && typeof model === 'string') this._model = model;
+        if (version && typeof version === 'string') this._version = version;
+        if (arch && typeof arch === 'string') this._arch = arch;
+        // Mark as not new after first update
+        if (this._isNew) this._isNew = false;
+    }
+
     toJSON() {
         return {
             ...super.toJSON(),
@@ -759,8 +1910,7 @@ class Device extends BaseNode {
     static fromJSON(data) {
         return new Device({
             id: data.id,
-            deviceFriendlyName:
-                data.deviceFriendlyName || data.friendly_name,
+            deviceFriendlyName: data.deviceFriendlyName || data.friendly_name,
             model: data.model,
             version: data.version,
             arch: data.arch,
@@ -1079,195 +2229,6 @@ module.exports = FileStatus;
 
 </file>
 
-<file path="src/main/infrastructure/adb/AdbCommandExecutor.js">
-// src/main/infrastructure/adb/AdbCommandExecutor.js
-'use strict';
-
-const path = require('path');
-const { randomUUID } = require('crypto');
-
-class AdbCommandExecutor {
-    constructor({
-        processSupervisor,
-        logger = null,
-        adbPath = null,
-        toolPathResolver = null   // <-- جديد: محلل المسار الموحد
-    }) {
-        this._processSupervisor = processSupervisor;
-        this._logger = logger;
-        this._toolPathResolver = toolPathResolver;
-
-        // تحديد مسار ADB (الأولوية: adbPath المُمرر > toolPathResolver > المسار القديم)
-        if (adbPath) {
-            this._adbPath = adbPath;
-        } else if (this._toolPathResolver) {
-            this._adbPath = this._toolPathResolver.getAdbPath();
-        } else {
-            // احتياطي: الطريقة القديمة (للتوافق مع الكود القديم)
-            this._adbPath = this._resolveAdbPathLegacy();
-        }
-    }
-
-    async getDevices() {
-        const lines =
-            await this._executeQuickAdbCommand(
-                ['devices']
-            );
-
-        return lines
-            .slice(1)
-            .map(
-                (line) => line.trim()
-            )
-            .filter(Boolean)
-            .map((line) => {
-                const parts =
-                    line.split(/\s+/);
-
-                return {
-                    serial:
-                        parts[0],
-                    state:
-                        parts[1] ||
-                        'unknown'
-                };
-            });
-    }
-
-    async getDeviceInfo(
-        serial
-    ) {
-        if (!serial) {
-            throw new Error(
-                'serial is required'
-            );
-        }
-
-        const [
-            model,
-            version,
-            arch
-        ] = await Promise.all([
-            this._executeShellCommand(
-                serial,
-                [
-                    'getprop',
-                    'ro.product.model'
-                ]
-            ),
-            this._executeShellCommand(
-                serial,
-                [
-                    'getprop',
-                    'ro.build.version.release'
-                ]
-            ),
-            this._executeShellCommand(
-                serial,
-                [
-                    'getprop',
-                    'ro.product.cpu.abi'
-                ]
-            )
-        ]);
-
-        return {
-            serial,
-            model:
-                model.trim(),
-            version:
-                version.trim(),
-            arch:
-                arch.trim()
-        };
-    }
-
-    async connect(
-        target
-    ) {
-        return this._executeQuickAdbCommand([
-            'connect',
-            target
-        ]);
-    }
-
-    async pair(
-        host,
-        pairingCode
-    ) {
-        return this._executeQuickAdbCommand([
-            'pair',
-            host,
-            pairingCode
-        ]);
-    }
-
-    async disconnect(
-        target = null
-    ) {
-        const args =
-            target
-                ? [
-                      'disconnect',
-                      target
-                  ]
-                : [
-                      'disconnect'
-                  ];
-
-        return this._executeQuickAdbCommand(
-            args
-        );
-    }
-
-    async _executeShellCommand(
-        serial,
-        shellArgs
-    ) {
-        const result =
-            await this._executeQuickAdbCommand(
-                [
-                    '-s',
-                    serial,
-                    'shell',
-                    ...shellArgs
-                ]
-            );
-
-        return result.join('\n');
-    }
-
-    async _executeQuickAdbCommand(
-        args = []
-    ) {
-        return this._processSupervisor
-            .executeQuickTaskArray(
-                this._adbPath,
-                args
-            );
-    }
-
-    // الطريقة القديمة محفوظة كخيار احتياطي (تم تعديل اسمها قليلاً)
-    _resolveAdbPathLegacy() {
-        const isWin =
-            process.platform ===
-            'win32';
-
-        return path.join(
-            process.cwd(),
-            'resources',
-            'bin',
-            isWin
-                ? 'win/adb.exe'
-                : 'linux/adb'
-        );
-    }
-}
-
-module.exports =
-    AdbCommandExecutor;
-</file>
-
 <file path="src/main/infrastructure/ipc/DeviceHandlers.js">
 'use strict';
 
@@ -1349,18 +2310,13 @@ module.exports = DeviceHandlers;
 </file>
 
 <file path="src/main/infrastructure/ipc/DownloadHandlers.js">
+// src/main/infrastructure/ipc/DownloadHandlers.js
 'use strict';
 
 /**
  * DownloadHandlers
  * 
  * Thin IPC layer for download-related operations.
- * Responsibilities ONLY:
- * - Register IPC channels with Electron's ipcMain
- * - Forward requests to DownloadOrchestrator
- * - Return results/errors
- * 
- * NO business logic, NO runtime state, NO process execution.
  */
 class DownloadHandlers {
     constructor(downloadOrchestrator) {
@@ -1370,44 +2326,35 @@ class DownloadHandlers {
         this._downloadOrchestrator = downloadOrchestrator;
     }
 
-    /**
-     * Register all download IPC channels
-     */
     register(ipcMain) {
         if (!ipcMain || typeof ipcMain.handle !== 'function') {
             throw new Error('Valid ipcMain instance required');
         }
 
-        // Inspect a URL (get formats and metadata)
         ipcMain.handle('download:inspect', async (event, url) => {
-            if (!url) {
-                throw new Error('URL is required');
-            }
+            if (!url) throw new Error('URL is required');
             return this._downloadOrchestrator.inspectLink(url);
         });
 
-        // Start downloading a specific format
         ipcMain.handle('download:start', async (event, url, formatId, deviceId = null, options = {}) => {
-            if (!url || !formatId) {
-                throw new Error('url and formatId are required');
-            }
+            if (!url || !formatId) throw new Error('url and formatId are required');
             return this._downloadOrchestrator.startDownload(url, formatId, deviceId, options);
         });
 
-        // Stop an ongoing download by URL
+        // التعديل الأساسي: نمرر URL وليس processId
         ipcMain.handle('download:stop', async (event, url) => {
-            if (!url) {
-                throw new Error('URL is required');
-            }
+            if (!url) throw new Error('URL is required');
             return this._downloadOrchestrator.stopDownload(url);
         });
 
-        // Get metadata only (lightweight, no formats)
         ipcMain.handle('download:metadata', async (event, url) => {
-            if (!url) {
-                throw new Error('URL is required');
-            }
+            if (!url) throw new Error('URL is required');
             return this._downloadOrchestrator.getMetadata(url);
+        });
+        
+        // إضافة جديدة: الحصول على قائمة التحميلات النشطة (اختياري)
+        ipcMain.handle('download:active', async () => {
+            return this._downloadOrchestrator.getActiveDownloads();
         });
     }
 }
@@ -1450,262 +2397,263 @@ module.exports = {
 </file>
 
 <file path="src/main/infrastructure/persistence/DatabaseManager.js">
+// src/main/infrastructure/persistence/DatabaseManager.js
 'use strict';
 
-const fs =
-    require('fs/promises');
-
-const path =
-    require('path');
+const fs = require('fs/promises');
+const path = require('path');
 
 /**
  * DatabaseManager
  *
- * Responsible only for persistence.
- *
- * No ADB logic.
- * No runtime logic.
- * No business logic.
+ * Responsible only for persistence of devices (and possibly other data).
+ * 
+ * Features:
+ * - Initialize database directory and file
+ * - Load all devices
+ * - Save all devices
+ * - Insert/update/delete individual devices
+ * - Close (placeholder for future DB upgrades)
+ * 
+ * No ADB logic. No runtime logic. No business logic.
  */
 class DatabaseManager {
-    constructor({
-        databasePath
-    } = {}) {
-        this._databasePath =
-            databasePath ||
-            path.join(
-                process.cwd(),
-                'data',
-                'devices.json'
-            );
+    constructor({ databasePath } = {}) {
+        this._databasePath = databasePath || path.join(process.cwd(), 'data', 'devices.json');
+        this._initialized = false;
     }
 
-    async loadDevices() {
+    /**
+     * Initialize the database: ensure directory exists and create empty JSON file if missing.
+     * Should be called once during application startup.
+     */
+    async initDb() {
         try {
-            const content =
-                await fs.readFile(
-                    this._databasePath,
-                    'utf8'
-                );
-
-            const parsed =
-                JSON.parse(content);
-
-            return Array.isArray(
-                parsed
-            )
-                ? parsed
-                : [];
+            await this._ensureDirectory();
+            await this._ensureFile();
+            this._initialized = true;
+            console.log('[DatabaseManager] Initialized successfully at', this._databasePath);
         } catch (error) {
-            if (
-                error.code ===
-                'ENOENT'
-            ) {
-                return [];
-            }
-
+            console.error('[DatabaseManager] Failed to initialize:', error);
             throw error;
         }
     }
 
-    async saveDevices(
-        devices = []
-    ) {
-        await this._ensureDirectory();
-
-        await fs.writeFile(
-            this._databasePath,
-            JSON.stringify(
-                devices,
-                null,
-                4
-            ),
-            'utf8'
-        );
-    }
-
-    async insertDevice(
-        device
-    ) {
-        const devices =
-            await this.loadDevices();
-
-        devices.push(device);
-
-        await this.saveDevices(
-            devices
-        );
-
-        return device;
-    }
-
-    async updateDevice(
-        deviceId,
-        updater
-    ) {
-        const devices =
-            await this.loadDevices();
-
-        const index =
-            devices.findIndex(
-                device =>
-                    device.id ===
-                    deviceId
-            );
-
-        if (index === -1) {
-            return null;
-        }
-
-        const current =
-            devices[index];
-
-        devices[index] =
-            typeof updater ===
-            'function'
-                ? updater(current)
-                : {
-                      ...current,
-                      ...updater
-                  };
-
-        await this.saveDevices(
-            devices
-        );
-
-        return devices[index];
-    }
-
-    async deleteDevice(
-        deviceId
-    ) {
-        const devices =
-            await this.loadDevices();
-
-        const filtered =
-            devices.filter(
-                device =>
-                    device.id !==
-                    deviceId
-            );
-
-        await this.saveDevices(
-            filtered
-        );
-    }
-
+    /**
+     * Ensure the directory for the database file exists.
+     */
     async _ensureDirectory() {
-        const directory =
-            path.dirname(
-                this._databasePath
-            );
-
-        await fs.mkdir(
-            directory,
-            {
-                recursive: true
-            }
-        );
-    }
-}
-
-module.exports =
-    DatabaseManager;
-</file>
-
-<file path="src/main/infrastructure/streaming/ScrcpyAdapter.js">
-// src/main/infrastructure/streaming/ScrcpyAdapter.js
-'use strict';
-
-/**
- * ScrcpyAdapter
- * مسؤول فقط عن تشغيل وإيقاف انعكاس الشاشة عبر scrcpy
- * بدون أي منطق أعمال أو إدارة أجهزة
- */
-class ScrcpyAdapter {
-    constructor({
-        processSupervisor,
-        scrcpyPath = null,
-        toolPathResolver = null,   // <-- جديد: محلل المسار الموحد
-        logger = null
-    }) {
-        this._processSupervisor = processSupervisor;
-        this._logger = logger;
-        this._toolPathResolver = toolPathResolver;
-
-        // تحديد مسار scrcpy (الأولوية: scrcpyPath المُمرر > toolPathResolver > القيمة الاحتياطية)
-        this._scrcpyPath = this._resolveScrcpyPath(scrcpyPath);
-
-        this._activeProcesses = new Map();
+        const directory = path.dirname(this._databasePath);
+        await fs.mkdir(directory, { recursive: true });
     }
 
     /**
-     * Resolves scrcpy binary path with proper priority.
-     * @param {string|null} explicitPath - Direct override from constructor
-     * @returns {string}
-     * @throws {Error} if no valid path found
+     * Ensure the database file exists; if not, create it with an empty array.
      */
-    _resolveScrcpyPath(explicitPath) {
-        if (explicitPath) {
-            return explicitPath;
-        }
-
-        if (this._toolPathResolver) {
-            return this._toolPathResolver.getScrcpyPath();
-        }
-
-        // Fallback: assume 'scrcpy' is in PATH (development convenience)
-        const fallbackPath = 'scrcpy';
-        if (this._logger) {
-            this._logger.warn(`ScrcpyAdapter: No toolPathResolver provided, using fallback: ${fallbackPath}`);
-        }
-        return fallbackPath;
-    }
-
-    startMirroring(deviceId, options = {}) {
-        if (!deviceId) {
-            throw new Error('deviceId is required');
-        }
-
-        const processId = `scrcpy:${deviceId}`;
-
-        const args = [
-            '-s',
-            deviceId,
-            ...(options.fullscreen ? ['--fullscreen'] : []),
-            ...(options.bitrate ? ['--bit-rate', String(options.bitrate)] : [])
-        ];
-
-        this._processSupervisor.startManagedProcess({
-            processId,
-            binPath: this._scrcpyPath,
-            args,
-            type: 'scrcpy',
-            metadata: {
-                deviceId
+    async _ensureFile() {
+        try {
+            await fs.access(this._databasePath);
+        } catch (err) {
+            if (err.code === 'ENOENT') {
+                // File does not exist, create with empty array
+                await fs.writeFile(this._databasePath, JSON.stringify([], null, 4), 'utf8');
+                console.log('[DatabaseManager] Created new database file');
+            } else {
+                throw err;
             }
-        });
-
-        this._activeProcesses.set(deviceId, processId);
-
-        return processId;
+        }
     }
 
-    stopMirroring(deviceId) {
-        const processId = this._activeProcesses.get(deviceId);
-
-        if (!processId) {
-            return false;
+    /**
+     * Load all devices from the JSON file.
+     * @returns {Promise<Array>} Array of device objects
+     */
+    async loadDevices() {
+        await this._ensureInitialized();
+        try {
+            const content = await fs.readFile(this._databasePath, 'utf8');
+            const parsed = JSON.parse(content);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (error) {
+            if (error.code === 'ENOENT') {
+                return [];
+            }
+            console.error('[DatabaseManager] Failed to load devices:', error);
+            throw error;
         }
+    }
 
-        this._processSupervisor.stopManagedProcess(processId);
-        this._activeProcesses.delete(deviceId);
+    /**
+     * Save all devices to the JSON file.
+     * @param {Array} devices - Array of device objects
+     */
+    async saveDevices(devices = []) {
+        await this._ensureInitialized();
+        await this._ensureDirectory();
+        await fs.writeFile(this._databasePath, JSON.stringify(devices, null, 4), 'utf8');
+    }
 
+    /**
+     * Insert a new device into the database.
+     * @param {Object} device - Device object to insert
+     * @returns {Promise<Object>} The inserted device
+     */
+    async insertDevice(device) {
+        const devices = await this.loadDevices();
+        devices.push(device);
+        await this.saveDevices(devices);
+        return device;
+    }
+
+    /**
+     * Update an existing device by ID.
+     * @param {string} deviceId - ID of the device to update
+     * @param {Object|Function} updater - Either a partial object or a function that receives current and returns updated
+     * @returns {Promise<Object|null>} Updated device or null if not found
+     */
+    async updateDevice(deviceId, updater) {
+        const devices = await this.loadDevices();
+        const index = devices.findIndex(device => device.id === deviceId);
+        if (index === -1) return null;
+
+        const current = devices[index];
+        const updated = typeof updater === 'function' ? updater(current) : { ...current, ...updater };
+        devices[index] = updated;
+        await this.saveDevices(devices);
+        return updated;
+    }
+
+    /**
+     * Delete a device by ID.
+     * @param {string} deviceId - ID of the device to delete
+     * @returns {Promise<boolean>} True if deleted, false if not found
+     */
+    async deleteDevice(deviceId) {
+        const devices = await this.loadDevices();
+        const filtered = devices.filter(device => device.id !== deviceId);
+        if (filtered.length === devices.length) return false;
+        await this.saveDevices(filtered);
         return true;
+    }
+
+    /**
+     * Close the database connection (placeholder for future enhancements like using better-sqlite3).
+     * Currently no-op but kept for API compatibility.
+     */
+    async close() {
+        // Future implementation: close DB connection if using SQLite
+        console.log('[DatabaseManager] Closed (no-op)');
+    }
+
+    /**
+     * Ensure that initDb has been called before any operation.
+     * @private
+     */
+    async _ensureInitialized() {
+        if (!this._initialized) {
+            await this.initDb();
+        }
     }
 }
 
-module.exports = ScrcpyAdapter;
+module.exports = DatabaseManager;
+</file>
+
+<file path="src/main/infrastructure/tools/ToolPathResolver.js">
+// src/main/infrastructure/tools/ToolPathResolver.js
+'use strict';
+
+const path = require('path');
+const fs = require('fs');
+
+class ToolPathResolver {
+    constructor(options = {}) {
+        this._logger = options.logger || null;
+        this._appRoot = this._resolveAppRoot(options.appRoot);
+        this._platform = process.platform;
+        this._binSubDir = this._getBinSubDir();
+    }
+
+    _resolveAppRoot(explicitRoot) {
+        if (explicitRoot) {
+            return explicitRoot;
+        }
+        try {
+            const { app } = require('electron');
+            if (app && typeof app.getAppPath === 'function') {
+                return app.getAppPath();
+            }
+        } catch (err) {
+            if (this._logger) {
+                this._logger.warn('ToolPathResolver: Electron app not available, using cwd');
+            }
+        }
+        return process.cwd();
+    }
+
+    _getBinSubDir() {
+        switch (this._platform) {
+            case 'win32': return 'win';
+            case 'linux': return 'linux';
+            case 'darwin': return 'macos';
+            default: throw new Error(`Unsupported platform: ${this._platform}`);
+        }
+    }
+
+    _getDefaultPath(binaryName) {
+        let finalBinaryName = binaryName;
+        if (this._platform === 'win32' && !finalBinaryName.toLowerCase().endsWith('.exe')) {
+            finalBinaryName += '.exe';
+        }
+        return path.join(this._appRoot, 'resources', 'bin', this._binSubDir, finalBinaryName);
+    }
+
+    _getPath(envVarName, binaryName) {
+        const envPath = process.env[envVarName];
+        if (envPath && typeof envPath === 'string' && envPath.trim()) {
+            if (fs.existsSync(envPath)) {
+                return envPath;
+            }
+            if (this._logger) {
+                this._logger.warn(`ToolPathResolver: Environment override ${envVarName} points to non-existent file.`);
+            }
+            return null; // تعيد null بدلاً من throw
+        }
+    
+        const defaultPath = this._getDefaultPath(binaryName);
+        if (fs.existsSync(defaultPath)) {
+            return defaultPath;
+        }
+    
+        // تم تحويلها إلى Warn بدلاً من Error وقمنا بإلغاء الـ throw
+        if (this._logger) {
+            this._logger.warn(`ToolPathResolver: Optional binary "${binaryName}" not found at ${defaultPath}.`);
+        }
+        return null; 
+    }
+
+    getAdbPath() {
+        return this._getPath('LINKHUB_ADB_PATH', 'adb');
+    }
+
+    getScrcpyPath() {
+        return this._getPath('LINKHUB_SCRCPY_PATH', 'scrcpy');
+    }
+
+    getYtDlpPath() {
+        return this._getPath('LINKHUB_YTDLP_PATH', 'yt-dlp_linux');
+    }
+
+    verifyAll() {
+        const result = { adb: false, scrcpy: false, ytdlp: false };
+        try { result.adb = !!this.getAdbPath(); } catch (e) { /* ignore */ }
+        try { result.scrcpy = !!this.getScrcpyPath(); } catch (e) { /* ignore */ }
+        try { result.ytdlp = !!this.getYtDlpPath(); } catch (e) { /* ignore */ }
+        return result;
+    }
+}
+
+module.exports = ToolPathResolver;
 </file>
 
 <file path="src/main/infrastructure/windows/AppWindow.js">
@@ -2121,6 +3069,8 @@ if (require('electron-squirrel-startup')) {
 }
 
 let bootstrap = null;
+// علم (Flag) لمنع التكرار والدخول في حلقة لانهائية
+let isCleanedUp = false; 
 
 // This method will be called when Electron has finished initialization and is ready to create browser windows.
 app.whenReady().then(async () => {
@@ -2154,28 +3104,40 @@ app.on('activate', () => {
 
 // Graceful shutdown: terminate all managed processes before quitting.
 app.on('before-quit', async (event) => {
-    // Prevent default quit to allow async cleanup
+    // إذا تمت عملية التنظيف مسبقاً، اسمح للتطبيق بالخروج فوراً دون اعتراض
+    if (isCleanedUp) {
+        return;
+    }
+
+    // منع الإغلاق التلقائي المؤقت لإتاحة الوقت للعمليات غير المتزامنة (Async)
     event.preventDefault();
     
     try {
+        console.log('[Main] Starting graceful shutdown...');
+
         const processManager = container.resolve('processManager');
-        if (processManager && processManager.terminateAll) {
+        if (processManager && typeof processManager.terminateAll === 'function') {
             await processManager.terminateAll();
         }
-        
+
         const dbManager = container.resolve('databaseManager');
-        if (dbManager && dbManager.close) {
+        if (dbManager && typeof dbManager.close === 'function') {
             await dbManager.close();
         }
-        
+
         const errorService = container.resolve('errorCentralService');
-        if (errorService && errorService.flush) {
+        if (errorService && typeof errorService.flush === 'function') {
             await errorService.flush();
         }
+
+        console.log('[Main] Cleanup completed successfully.');
     } catch (err) {
         console.error('[Main] Error during graceful shutdown:', err);
     } finally {
-        app.exit(0);
+        // نرفع العلم بأن التنظيف انتهى تماماً
+        isCleanedUp = true;
+        // الآن نستدعي app.quit() بأمان، وعندما يعود الحدث before-quit للعمل سيجد isCleanedUp = true ويخرج فوراً
+        app.quit();
     }
 });
 </file>
@@ -2349,8 +3311,9 @@ if (process.env.NODE_ENV === 'development') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>LinkFlow | التدفق الذكي</title>
-    <link rel="stylesheet" href="style.css">
+    <title>LinkHub</title>
+    <!-- تحديث المسار لملف CSS الرئيسي -->
+    <link rel="stylesheet" href="css/main.css">
 </head>
 <body>
 
@@ -2359,7 +3322,7 @@ if (process.env.NODE_ENV === 'development') {
         <header class="navbar-wrapper">
             <nav class="navbar">
                 <div class="logo">
-                    <span class="logo-text">LinkFlow</span>
+                    <span class="logo-text">LinkHub</span>
                 </div>
                 
                 <div class="nav-links" dir="ltr">
@@ -2403,7 +3366,6 @@ if (process.env.NODE_ENV === 'development') {
                     <div class="devices-capsule-wrapper">
                         <h2 class="section-subheading">الأجهزة المتصلة</h2>
                         <div class="devices-capsule-pill" id="registered-devices">
-                            <!-- سيتم تعبئتها ديناميكياً عبر JS -->
                             <div class="placeholder-text">جاري تحميل الأجهزة...</div>
                         </div>
                     </div>
@@ -2431,16 +3393,16 @@ if (process.env.NODE_ENV === 'development') {
                         <table class="downloads-table">
                             <thead>
                                 <tr>
-                                    <th style="width: 30%;">اسم الملف</th>
-                                    <th style="width: 20%;">التقدم</th>
-                                    <th style="width: 15%;">الحجم</th>
+                                    <th style="width: 20%;">اسم الملف</th>
+                                    <th style="width: 15%;">التقدم</th>
+                                    <th style="width: 10%;">الحجم</th>
                                     <th style="width: 15%;">السرعة</th>
                                     <th style="width: 20%;">الجهة الوجهة</th>
+                                    <th style="width: 20%;">الإجراءات</th>
                                 </tr>
                             </thead>
                             <tbody id="downloads-tbody">
-                                <!-- سيتم تعبئتها ديناميكياً -->
-                                <tr class="empty-row"><td colspan="5" style="text-align:center;">لا توجد تحميلات نشطة</td></tr>
+                                <tr class="empty-row"><td colspan="6" style="text-align:center;">لا توجد تحميلات نشطة</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -2456,738 +3418,60 @@ if (process.env.NODE_ENV === 'development') {
                         <p>✔️ حفظ الملفات على الجهاز: مفعل</p>
                         <p>✔️ إشعارات التحميل: مفعلة</p>
                         <button class="btn-outline" id="refresh-devices">تحديث الأجهزة</button>
+                        <button class="btn-outline" id="pair-device-btn" style="margin-right: 12px;">إقران جهاز لاسلكي</button>
                     </div>
                 </div>
             </div>
         </main>
     </div>
 
-    <script src="script.js"></script>
+    <!-- نافذة معلومات الجهاز (Modal) -->
+    <div id="device-modal" class="device-modal" style="display: none;">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <button class="modal-close">&times;</button>
+            <div class="modal-header">
+                <div class="device-icon-large">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+                        <line x1="12" y1="18" x2="12.01" y2="18"></line>
+                    </svg>
+                </div>
+                <h3 id="modal-device-name" class="modal-device-name"></h3>
+            </div>
+            <div class="modal-body">
+                <div class="device-detail-row">
+                    <span class="detail-label">الموديل:</span>
+                    <span id="modal-device-model" class="detail-value"></span>
+                </div>
+                <div class="device-detail-row">
+                    <span class="detail-label">الإصدار:</span>
+                    <span id="modal-device-version" class="detail-value"></span>
+                </div>
+                <div class="device-detail-row">
+                    <span class="detail-label">المعمارية:</span>
+                    <span id="modal-device-arch" class="detail-value"></span>
+                </div>
+                <div class="device-detail-row">
+                    <span class="detail-label">الحالة:</span>
+                    <span id="modal-device-status" class="detail-value status-badge-modal"></span>
+                </div>
+                <div class="device-detail-row">
+                    <span class="detail-label">معرف ADB:</span>
+                    <span id="modal-device-adb" class="detail-value code"></span>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="modal-stream-btn" class="modal-btn primary">📺 بث الشاشة</button>
+                <button id="modal-disconnect-btn" class="modal-btn danger">🔌 قطع الاتصال</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- تحديث المسار لملف الجافاسكريبت الرئيسي مع type="module" -->
+    <script type="module" src="js/main.js"></script>
 </body>
 </html>
-</file>
-
-<file path="src/renderer/script.js">
-// LinkFlow - جاهز للتكامل مع Electron IPC
-// لا يحتوي على بيانات وهمية، فقط هيكل للربط
-
-document.addEventListener('DOMContentLoaded', () => {
-    // ------------------- تبديل الأقسام -------------------
-    const navItems = document.querySelectorAll('.nav-item');
-    const sections = {
-        home: document.getElementById('home-section'),
-        downloads: document.getElementById('downloads-section'),
-        settings: document.getElementById('settings-section')
-    };
-
-    function switchTab(tabId) {
-        Object.values(sections).forEach(section => section?.classList.remove('active-section'));
-        if (sections[tabId]) sections[tabId].classList.add('active-section');
-        navItems.forEach(item => {
-            const itemTab = item.getAttribute('data-tab');
-            if (itemTab === tabId) item.classList.add('active');
-            else item.classList.remove('active');
-        });
-    }
-
-    navItems.forEach(item => {
-        item.addEventListener('click', (e) => {
-            e.preventDefault();
-            switchTab(item.getAttribute('data-tab'));
-        });
-    });
-    switchTab('home');
-
-    // ------------------- إدارة الأجهزة (حقيقية) -------------------
-    let devices = [];        // قائمة الأجهزة المسجلة (من device:list)
-    let selectedDeviceIds = new Set();   // تخزين معرفات الأجهزة المحددة (لتوجيه التحميل)
-
-    const registeredContainer = document.getElementById('registered-devices');
-    const discoveredContainer = document.getElementById('discovered-devices');
-
-    // دالة لعرض الأجهزة (تقوم بتحديث الواجهة)
-    function renderDevices(registeredDevices, discoveredDevices) {
-        // عرض الأجهزة المسجلة (المتصلة)
-        if (registeredContainer) {
-            if (!registeredDevices || registeredDevices.length === 0) {
-                registeredContainer.innerHTML = '<div class="placeholder-text">لا توجد أجهزة متصلة</div>';
-            } else {
-                registeredContainer.innerHTML = '';
-                registeredDevices.forEach(device => {
-                    const deviceElement = createDeviceElement(device, true);
-                    registeredContainer.appendChild(deviceElement);
-                });
-            }
-        }
-
-        // عرض الأجهزة المكتشفة (غير المسجلة)
-        if (discoveredContainer) {
-            if (!discoveredDevices || discoveredDevices.length === 0) {
-                discoveredContainer.innerHTML = '<div class="placeholder-text">لا توجد أجهزة مكتشفة</div>';
-            } else {
-                discoveredContainer.innerHTML = '';
-                discoveredDevices.forEach(device => {
-                    const deviceElement = createDeviceElement(device, false);
-                    discoveredContainer.appendChild(deviceElement);
-                });
-            }
-        }
-    }
-
-    // إنشاء عنصر جهاز (UI) مع دعم التحديد المتعدد
-    function createDeviceElement(device, isRegistered) {
-        const div = document.createElement('div');
-        div.className = `device-item ${device.status === 'connected' ? 'status-connected' : 'status-offline'}`;
-        div.setAttribute('data-device-id', device.id);
-        div.setAttribute('data-device-name', device.deviceFriendlyName || device.model || device.id);
-
-        // إذا كان الجهاز مسجلاً ومحدداً، أضف class selected
-        if (isRegistered && selectedDeviceIds.has(device.id)) {
-            div.classList.add('selected');
-        }
-
-        div.innerHTML = `
-            <div class="device-circle">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
-                    <line x1="12" y1="18" x2="12.01" y2="18"></line>
-                </svg>
-            </div>
-            <h3 class="device-name">${escapeHtml(device.deviceFriendlyName || device.model || device.id)}</h3>
-            <span class="status-badge">${device.status === 'connected' ? 'متصل' : (device.status === 'available' ? 'متاح' : 'غير متصل')}</span>
-        `;
-
-        // إذا كان الجهاز مسجلاً (متصل أو متاح)، نمكن التحديد
-        if (isRegistered && (device.status === 'connected' || device.status === 'available')) {
-            div.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (selectedDeviceIds.has(device.id)) {
-                    selectedDeviceIds.delete(device.id);
-                    div.classList.remove('selected');
-                } else {
-                    selectedDeviceIds.add(device.id);
-                    div.classList.add('selected');
-                }
-                console.log('الأجهزة المحددة:', Array.from(selectedDeviceIds));
-            });
-        } else {
-            // الأجهزة غير المسجلة (مكتشفة) – نضيف اقتران عند النقر
-            div.addEventListener('click', async () => {
-                // TODO: استدعاء عملية الاقتران أو الاتصال عبر IPC
-                // سيكون لاحقاً: window.electronAPI.pairDevice(...) أو connectDevice
-                alert(`جهاز "${device.deviceFriendlyName}" غير مسجل. سيتم تنفيذ إجراء الاقتران/الاتصال لاحقاً.`);
-            });
-        }
-
-        return div;
-    }
-
-    function escapeHtml(str) {
-        if (!str) return '';
-        return str.replace(/[&<>]/g, function(m) {
-            if (m === '&') return '&amp;';
-            if (m === '<') return '&lt;';
-            if (m === '>') return '&gt;';
-            return m;
-        });
-    }
-
-    // ------------------- تحميل الأجهزة من الخلفية (IPC) -------------------
-    async function loadDevices() {
-        // TODO: بعد ربط IPC، استخدم window.electronAPI.getAllDevices()
-        // return await window.electronAPI.getAllDevices();
-        // حالياً نعيد بيانات وهمية فارغة لتجنب الأخطاء
-        console.log('سيتم استدعاء device:list لاحقاً');
-        return { registered: [], discovered: [] };
-    }
-
-    // تحديث واجهة الأجهزة
-    async function refreshDevicesUI() {
-        try {
-            const { registered, discovered } = await loadDevices();
-            devices = registered; // تخزين للأجهزة المسجلة
-            renderDevices(registered, discovered);
-        } catch (err) {
-            console.error('فشل تحميل الأجهزة:', err);
-            if (registeredContainer) registeredContainer.innerHTML = '<div class="placeholder-text">خطأ في تحميل الأجهزة</div>';
-        }
-    }
-
-    // ------------------- إدارة التحميلات -------------------
-    const downloadsTbody = document.getElementById('downloads-tbody');
-    const btnStart = document.getElementById('btn-start-route');
-    const urlInput = document.getElementById('media-url');
-
-    // إضافة صف تحميل جديد (يتم استدعاؤه عند بدء التحميل)
-    function addDownloadRow(fileName, targetDeviceId, targetDeviceName) {
-        // TODO: سيتم استدعاؤها من خلال IPC على progress و completion
-        const row = document.createElement('tr');
-        row.setAttribute('data-download-id', `dl-${Date.now()}-${targetDeviceId}`);
-        row.innerHTML = `
-            <td class="file-name">${escapeHtml(fileName)}</td>
-            <td>
-                <div class="progress-wrapper">
-                    <div class="progress-track">
-                        <div class="progress-fill" style="width: 0%;"></div>
-                    </div>
-                    <span class="progress-percentage">0%</span>
-                </div>
-            </td>
-            <td class="file-size">--</td>
-            <td class="download-speed">--</td>
-            <td><span class="device-tag">${escapeHtml(targetDeviceName)}</span></td>
-        `;
-        // إزالة رسالة "لا توجد تحميلات"
-        const emptyRow = downloadsTbody.querySelector('.empty-row');
-        if (emptyRow) emptyRow.remove();
-        downloadsTbody.prepend(row);
-        return row;
-    }
-
-    // تحديث تقدم التحميل (يتم استدعاؤها من مستمع IPC)
-    function updateDownloadProgress(rowId, percent, speed, size) {
-        const row = downloadsTbody.querySelector(`tr[data-download-id="${rowId}"]`);
-        if (!row) return;
-        const fill = row.querySelector('.progress-fill');
-        const percentSpan = row.querySelector('.progress-percentage');
-        const speedSpan = row.querySelector('.download-speed');
-        const sizeSpan = row.querySelector('.file-size');
-        if (fill) fill.style.width = `${percent}%`;
-        if (percentSpan) percentSpan.textContent = `${percent}%`;
-        if (speedSpan) speedSpan.textContent = speed;
-        if (sizeSpan && size) sizeSpan.textContent = size;
-        // تغيير لون شريط التقدم
-        if (fill) {
-            const hue = 210 - (percent / 100) * 90;
-            fill.style.backgroundColor = `hsl(${hue}, 70%, 55%)`;
-        }
-    }
-
-    // إكمال التحميل
-    function markDownloadComplete(rowId) {
-        const row = downloadsTbody.querySelector(`tr[data-download-id="${rowId}"]`);
-        if (!row) return;
-        const fill = row.querySelector('.progress-fill');
-        const percentSpan = row.querySelector('.progress-percentage');
-        const speedSpan = row.querySelector('.download-speed');
-        if (fill) fill.style.width = '100%';
-        if (percentSpan) percentSpan.textContent = '100%';
-        if (speedSpan) speedSpan.textContent = '0 MB/s';
-        if (fill) fill.style.backgroundColor = 'hsl(120, 70%, 55%)';
-    }
-
-    // بدء التحميل للأجهزة المحددة
-    async function startDownloadForSelectedDevices(url, fileName) {
-        if (selectedDeviceIds.size === 0) {
-            alert('الرجاء تحديد جهاز واحد أو أكثر أولاً من قسم الأجهزة المتصلة.');
-            return false;
-        }
-        // TODO: استدعاء download:start لكل جهاز محدد
-        for (let deviceId of selectedDeviceIds) {
-            const device = devices.find(d => d.id === deviceId);
-            if (!device) continue;
-            const deviceName = device.deviceFriendlyName || device.model || deviceId;
-            const row = addDownloadRow(fileName, deviceId, deviceName);
-            // هنا سيتم ربط IPC لبدء التحميل وتحديث التقدم
-            console.log(`بدء التحميل للجهاز ${deviceName} (${deviceId})`, row);
-            // مؤقتاً نضيف محاكاة صغيرة لعرض التقدم لاحقاً
-        }
-        return true;
-    }
-
-    // معالج زر التوجيه
-    btnStart.addEventListener('click', async () => {
-        let url = urlInput.value.trim();
-        if (!url) {
-            alert('الرجاء إدخال رابط الوسائط');
-            return;
-        }
-        let fileName = 'media_' + Date.now();
-        try {
-            const urlObj = new URL(url);
-            const lastSegment = urlObj.pathname.split('/').pop();
-            if (lastSegment && lastSegment.includes('.')) fileName = lastSegment;
-        } catch(e) {}
-        const success = await startDownloadForSelectedDevices(url, fileName);
-        if (success) urlInput.value = '';
-        urlInput.focus();
-    });
-
-    // ------------------- الإعدادات -------------------
-    const refreshBtn = document.getElementById('refresh-devices');
-    if (refreshBtn) {
-        refreshBtn.addEventListener('click', () => {
-            refreshDevicesUI();
-        });
-    }
-
-    // ------------------- استقبال التحديثات من الخلفية (IPC Events) -------------------
-    // TODO: ربط الأحداث القادمة من window.electronAPI
-    // مثال:
-    // window.electronAPI.onUpdateList(({ registered, discovered }) => {
-    //     devices = registered;
-    //     renderDevices(registered, discovered);
-    // });
-    // window.electronAPI.onProgress((data) => { updateDownloadProgress(data.id, data.progress, data.speed, data.size); });
-    // window.electronAPI.onFinished((data) => { markDownloadComplete(data.id); });
-
-    // تحميل أولي للأجهزة
-    refreshDevicesUI();
-});
-</file>
-
-<file path="src/renderer/style.css">
-/* LinkFlow - Modern Dark Theme (مرن ومتجاوب) */
-*,
-*::before,
-*::after {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-}
-
-body {
-    background-color: #1A1A1A;
-    color: #FFFFFF;
-    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
-    min-height: 100vh;
-    padding: clamp(16px, 4vw, 32px) clamp(16px, 5vw, 40px);
-    -webkit-font-smoothing: antialiased;
-}
-
-.app-container {
-    max-width: 1400px;
-    margin: 0 auto;
-    display: flex;
-    flex-direction: column;
-    gap: clamp(24px, 5vh, 48px);
-}
-
-/* ========== شريط التنقل ========== */
-.navbar {
-    background-color: #262626;
-    border-radius: 80px;
-    padding: 8px 20px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 16px;
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
-    border: 1px solid #333333;
-}
-
-.logo-text {
-    font-size: clamp(1.3rem, 4vw, 1.7rem);
-    font-weight: 800;
-    background: linear-gradient(135deg, #FFFFFF, #A6A6A6);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-}
-
-.nav-links {
-    display: flex;
-    gap: 8px;
-    background-color: #1A1A1A;
-    padding: 6px;
-    border-radius: 60px;
-    flex-wrap: wrap;
-    justify-content: center;
-}
-
-.nav-item {
-    padding: 6px 16px;
-    color: #A6A6A6;
-    text-decoration: none;
-    font-size: 0.85rem;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    border-radius: 40px;
-    transition: all 0.2s ease;
-    cursor: pointer;
-    white-space: nowrap;
-}
-
-.nav-item.active {
-    background-color: #1E6FD9;
-    color: white;
-    box-shadow: 0 2px 8px rgba(30,111,217,0.3);
-}
-
-.nav-icon {
-    width: 18px;
-    height: 18px;
-}
-
-/* ملف المستخدم */
-.user-profile {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    background-color: #1A1A1A;
-    padding: 4px 12px 4px 16px;
-    border-radius: 50px;
-    cursor: default;
-    transition: 0.2s;
-    border: 1px solid #3A3A3A;
-}
-
-.user-avatar {
-    width: 32px;
-    height: 32px;
-    background: linear-gradient(145deg, #1E6FD9, #0F4C9E);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.user-avatar svg {
-    width: 18px;
-    height: 18px;
-    stroke: white;
-}
-
-.user-name {
-    font-size: 0.85rem;
-    font-weight: 500;
-    color: #E0E0E0;
-}
-
-/* ========== الأقسام ========== */
-.tab-section {
-    display: none;
-    animation: fadeIn 0.25s ease;
-}
-
-.tab-section.active-section {
-    display: block;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(6px);}
-    to { opacity: 1; transform: translateY(0);}
-}
-
-/* ========== الأجهزة (تحديد متعدد) ========== */
-.devices-capsule-wrapper {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    width: 100%;
-    margin-bottom: 28px;
-}
-
-.devices-capsule-pill {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    align-items: center;
-    gap: 20px;
-    background-color: #262626;
-    padding: 16px 28px;
-    border-radius: 100px;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
-    width: auto;
-    max-width: 100%;
-}
-
-.offline-capsule {
-    background-color: #1F1F1F;
-    border: 1px solid #333333;
-}
-
-.device-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 8px 18px;
-    border-radius: 50px;
-    background-color: #1A1A1A;
-    cursor: pointer;
-    transition: all 0.2s;
-    border: 1px solid transparent;
-}
-
-.device-item:hover {
-    background-color: #2E2E2E;
-    transform: translateY(-2px);
-}
-
-/* الهالة العصرية للأجهزة المحددة (متعددة) */
-.device-item.selected {
-    border: 1.5px solid #1E6FD9;
-    background: linear-gradient(145deg, #1E2A3A, #0F1A2A);
-    box-shadow: 0 0 12px rgba(30,111,217,0.5), inset 0 1px 0 rgba(255,255,255,0.05);
-    transform: scale(1.02);
-}
-
-.device-circle {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background-color: #0F0F0F;
-    color: #FFFFFF;
-}
-
-.device-circle svg {
-    width: 20px;
-    height: 20px;
-    stroke: currentColor;
-}
-
-.status-connected .device-circle {
-    color: #1B8755;
-}
-
-.status-offline .device-circle {
-    color: #D32F2F;
-}
-
-.device-name {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: #FFFFFF;
-}
-
-.status-badge {
-    font-size: 0.7rem;
-    background-color: #2A2A2A;
-    padding: 4px 8px;
-    border-radius: 30px;
-    color: #B0B0B0;
-}
-
-/* ========== حقل الإدخال ========== */
-.routing-input-container {
-    display: flex;
-    background-color: #262626;
-    border-radius: 60px;
-    padding: 6px;
-    align-items: center;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
-    flex-wrap: wrap;
-    gap: 10px;
-}
-
-.input-url {
-    flex: 1;
-    background: transparent;
-    border: none;
-    outline: none;
-    padding: 12px 20px;
-    color: #FFFFFF;
-    font-size: 0.9rem;
-    min-width: 180px;
-}
-
-.input-url::placeholder {
-    color: #6A6A6A;
-}
-
-.btn-route {
-    border-radius: 50px;
-    background-color: #1E6FD9;
-    border: none;
-    color: white;
-    padding: 10px 28px;
-    font-size: 0.8rem;
-    font-weight: 700;
-    cursor: pointer;
-    transition: 0.2s;
-    white-space: nowrap;
-}
-
-.btn-route:hover {
-    background-color: #155bb0;
-    transform: scale(0.98);
-}
-
-/* ========== جدول التحميلات ========== */
-.downloads-card {
-    background-color: #262626;
-    border-radius: 32px;
-    padding: 24px 20px;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
-    border: 1px solid #3A3A3A;
-    overflow-x: auto;
-}
-
-.right-align {
-    text-align: right;
-    margin-bottom: 20px;
-}
-
-.downloads-table {
-    width: 100%;
-    border-collapse: collapse;
-    min-width: 750px;
-}
-
-.downloads-table th {
-    color: #A6A6A6;
-    font-size: 0.7rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    padding: 14px 8px;
-    border-bottom: 2px solid #3A3A3A;
-    text-align: right;
-}
-
-.downloads-table td {
-    padding: 14px 8px;
-    border-bottom: 1px solid #333333;
-    vertical-align: middle;
-    font-size: 0.85rem;
-}
-
-.file-name {
-    font-weight: 600;
-    color: #FFFFFF;
-}
-
-.progress-wrapper {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.progress-track {
-    flex: 1;
-    height: 6px;
-    background-color: #1A1A1A;
-    border-radius: 4px;
-    overflow: hidden;
-}
-
-.progress-fill {
-    height: 100%;
-    background-color: #1E6FD9;
-    border-radius: 4px;
-    transition: width 0.2s, background-color 0.2s;
-}
-
-.progress-percentage {
-    font-size: 0.7rem;
-    font-weight: 600;
-    color: #A6A6A6;
-    min-width: 40px;
-    text-align: left;
-}
-
-.file-size, .download-speed {
-    color: #C0C0C0;
-    font-family: monospace;
-    font-size: 0.75rem;
-}
-
-.device-tag {
-    background-color: #333333;
-    color: #E0E0E0;
-    padding: 4px 12px;
-    border-radius: 30px;
-    font-size: 0.7rem;
-    font-weight: 500;
-    display: inline-block;
-}
-
-/* ========== الإعدادات ========== */
-.settings-card {
-    background-color: #262626;
-    border-radius: 32px;
-    padding: 24px 28px;
-}
-
-.settings-placeholder p {
-    background-color: #1E1E1E;
-    padding: 12px 20px;
-    border-radius: 20px;
-    border-right: 4px solid #1E6FD9;
-    margin-bottom: 12px;
-}
-
-.btn-outline {
-    background: transparent;
-    border: 1px solid #1E6FD9;
-    color: #1E6FD9;
-    padding: 8px 20px;
-    border-radius: 40px;
-    cursor: pointer;
-    font-weight: 600;
-    transition: 0.2s;
-}
-
-.btn-outline:hover {
-    background-color: #1E6FD9;
-    color: white;
-}
-
-/* ========== تحسينات متجاوبة ========== */
-@media (max-width: 850px) {
-    .navbar {
-        border-radius: 40px;
-        justify-content: center;
-    }
-    .logo, .user-profile {
-        position: static;
-    }
-    .nav-links {
-        order: 2;
-        width: 100%;
-        justify-content: center;
-    }
-    .user-profile {
-        order: 3;
-    }
-    .devices-capsule-pill {
-        border-radius: 40px;
-        padding: 12px 16px;
-        gap: 12px;
-    }
-    .device-item {
-        padding: 4px 12px;
-        gap: 8px;
-    }
-    .device-name {
-        font-size: 0.75rem;
-    }
-    .btn-route {
-        padding: 8px 18px;
-    }
-}
-
-@media (max-width: 550px) {
-    .device-item {
-        flex-wrap: wrap;
-        justify-content: center;
-        text-align: center;
-        gap: 4px;
-    }
-    .device-circle {
-        width: 30px;
-        height: 30px;
-    }
-    .status-badge {
-        font-size: 0.6rem;
-    }
-    .routing-input-container {
-        border-radius: 30px;
-    }
-    .input-url {
-        padding: 10px 14px;
-        font-size: 0.8rem;
-    }
-    .btn-route {
-        width: 100%;
-    }
-}
 </file>
 
 <file path=".gitignore">
@@ -3207,170 +3491,408 @@ node_modules/
   }
 </file>
 
-<file path="src/main/infrastructure/adb/ConnectionService.js">
+<file path="src/main/bootstrap/ApplicationBootstrap.js">
+// src/main/bootstrap/ApplicationBootstrap.js
 'use strict';
 
-const EventEmitter =
-    require('events');
+const path = require('path');
+const container = require('./container');
+const WindowManager = require('../infrastructure/windows/WindowManager');
+const WindowRegistry = require('../infrastructure/windows/WindowRegistry');
 
-const {
-    Bonjour
-} = require(
-    'bonjour-service'
-);
+class ApplicationBootstrap {
+    constructor() {
+        this._windowManager = null;
+        this._windowRegistry = null;
+    }
 
-class ConnectionService
-    extends EventEmitter {
+    async run() {
+        console.log('[Bootstrap] Starting application...');
 
+        // 1. Initialize dependency container
+        container.initialize();
+        console.log('[Bootstrap] Container initialized.');
+
+        // 2. Initialize error central service (logger)
+        const errorService = container.resolve('errorCentralService');
+        if (errorService && typeof errorService.init === 'function') {
+            errorService.init();
+            console.log('[Bootstrap] ErrorCentralService initialized.');
+        }
+
+        // 2.5. Verify required tools (adb, scrcpy, yt-dlp)
+        const toolPathResolver = container.resolve('toolPathResolver');
+        if (toolPathResolver && typeof toolPathResolver.verifyAll === 'function') {
+            const toolsStatus = toolPathResolver.verifyAll();
+            console.log('[Bootstrap] Tool verification results:', toolsStatus);
+
+            if (!toolsStatus.adb) {
+                console.warn('[Bootstrap] Warning: ADB not found. Device discovery and pairing will not work.');
+                if (errorService) {
+                    errorService.warn('ADB binary not found. Please ensure resources/bin/win/adb.exe or LINKHUB_ADB_PATH is set.', {
+                        source: 'ApplicationBootstrap'
+                    });
+                }
+            }
+            if (!toolsStatus.scrcpy) {
+                console.warn('[Bootstrap] Warning: scrcpy not found. Screen mirroring will not work.');
+                if (errorService) {
+                    errorService.warn('scrcpy binary not found. Please ensure resources/bin/win/scrcpy.exe or LINKHUB_SCRCPY_PATH is set.', {
+                        source: 'ApplicationBootstrap'
+                    });
+                }
+            }
+            if (!toolsStatus.ytdlp) {
+                console.warn('[Bootstrap] Warning: yt-dlp not found. Downloading will not work.');
+                if (errorService) {
+                    errorService.warn('yt-dlp binary not found. Please ensure resources/bin/win/yt-dlp.exe or LINKHUB_YTDLP_PATH is set.', {
+                        source: 'ApplicationBootstrap'
+                    });
+                }
+            }
+        } else {
+            console.warn('[Bootstrap] ToolPathResolver not available, skipping tool verification.');
+        }
+
+        // 3. Initialize database (ensures directory and file exist)
+        const dbManager = container.resolve('databaseManager');
+        if (dbManager && typeof dbManager.initDb === 'function') {
+            await dbManager.initDb();
+            console.log('[Bootstrap] Database initialized.');
+        } else {
+            console.warn('[Bootstrap] DatabaseManager not available or missing initDb method.');
+        }
+
+        // 4. Retrieve core services for monitoring
+        const connectionService = container.resolve('connectionService');
+        const deviceRegistry = container.resolve('deviceRegistry'); // for reference, not used directly
+
+        // 5. Start ADB monitoring and wireless discovery
+        if (connectionService) {
+            if (typeof connectionService.startAdbMonitoring === 'function') {
+                connectionService.startAdbMonitoring(500);
+                console.log('[Bootstrap] ADB monitoring started.');
+            }
+            if (typeof connectionService.startWirelessDiscovery === 'function') {
+                connectionService.startWirelessDiscovery();
+                console.log('[Bootstrap] Wireless discovery started.');
+            }
+        }
+
+        // 6. Initialize window management infrastructure
+        this._windowRegistry = new WindowRegistry();
+        this._windowManager = new WindowManager(this._windowRegistry);
+
+        // 6.5. Pass windowManager to container for event broadcasting
+        container.setWindowManager(this._windowManager);
+
+        // 7. Create main window
+        await this.createMainWindow();
+
+        console.log('[Bootstrap] Application ready.');
+    }
+
+    async createMainWindow() {
+        const indexPath = path.join(__dirname, '../../renderer/index.html');
+        const mainWindow = this._windowManager.createMainWindow({
+            loadFile: indexPath,
+            show: false
+        });
+        mainWindow.once('ready-to-show', () => {
+            mainWindow.show();
+            if (process.env.NODE_ENV === 'development') {
+                mainWindow.webContents.openDevTools();
+            }
+        });
+        return mainWindow;
+    }
+
+    getWindowManager() {
+        return this._windowManager;
+    }
+
+    getWindowRegistry() {
+        return this._windowRegistry;
+    }
+}
+
+module.exports = ApplicationBootstrap;
+</file>
+
+<file path="src/main/infrastructure/adb/AdbCommandExecutor.js">
+// src/main/infrastructure/adb/AdbCommandExecutor.js
+'use strict';
+
+const path = require('path');
+const { randomUUID } = require('crypto');
+
+class AdbCommandExecutor {
     constructor({
-        adbExecutor,
-        logger = null
+        processSupervisor,
+        logger = null,
+        adbPath = null,
+        toolPathResolver = null   // <-- جديد: محلل المسار الموحد
     }) {
+        this._processSupervisor = processSupervisor;
+        this._logger = logger;
+        this._toolPathResolver = toolPathResolver;
+
+        // تحديد مسار ADB (الأولوية: adbPath المُمرر > toolPathResolver > المسار القديم)
+        if (adbPath) {
+            this._adbPath = adbPath;
+        } else if (this._toolPathResolver) {
+            this._adbPath = this._toolPathResolver.getAdbPath();
+        } else {
+            // احتياطي: الطريقة القديمة (للتوافق مع الكود القديم)
+            this._adbPath = this._resolveAdbPathLegacy();
+        }
+    }
+
+    async getDevices() {
+        try {
+            // الاستدعاء الصحيح المتوافق مع الكود الخاص بك لتنفيذ الأوامر السريعة لـ ADB
+            const output = await this._executeQuickAdbCommand(['devices']);
+            
+            // التحقق من أن المخرجات نصية وليست فارغة
+            if (!output || typeof output !== 'string') {
+                return [];
+            }
+    
+            // تقطيع النص إلى أسطر بشكل مرن يتعامل مع (\n) و (\r\n) بالتساوي بين الأنظمة
+            const lines = output.split(/\r?\n/);
+    
+            // التحقق الإضافي للتأكد من وجود أسطر صالحة للمعالجة
+            if (!Array.isArray(lines) || lines.length <= 1) {
+                return [];
+            }
+    
+            // تصفية الأسطر وتحليلها بأمان كامل
+            return lines
+                .slice(1) // تخطي السطر الأول العناوين "List of devices attached"
+                .filter(line => line.trim() !== '') // تجاهل الأسطر الفارغة
+                .map(line => {
+                    const [id, state] = line.split(/\s+/); // التقسيم بناءً على الفراغات بين المعرف والحالة
+                    return { serial: id, state: state || 'unknown' }; // إرجاع التركيبة التي يتوقعها نظامك (serial و state)
+                })
+                .filter(device => device.serial && device.state); // التأكد من نجاح التحليل لكل جهاز
+    
+        } catch (error) {
+            // حماية دورتك الزمنية (كل 5 ثوانٍ) من الانهيار وطباعة خطأ نظيف دون إسقاط Electron
+            if (this._logger && typeof this._logger.warn === 'function') {
+                this._logger.warn(`[ADB] Failed to get devices list: ${error.message || error}`);
+            } else {
+                console.warn('[ADB] Failed to get devices list:', error.message || error);
+            }
+            return [];
+        }
+    }
+    
+    async getDeviceInfo(
+        serial
+    ) {
+        if (!serial) {
+            throw new Error(
+                'serial is required'
+            );
+        }
+
+        const [
+            model,
+            version,
+            arch
+        ] = await Promise.all([
+            this._executeShellCommand(
+                serial,
+                [
+                    'getprop',
+                    'ro.product.model'
+                ]
+            ),
+            this._executeShellCommand(
+                serial,
+                [
+                    'getprop',
+                    'ro.build.version.release'
+                ]
+            ),
+            this._executeShellCommand(
+                serial,
+                [
+                    'getprop',
+                    'ro.product.cpu.abi'
+                ]
+            )
+        ]);
+
+        return {
+            serial,
+            model:
+                model.trim(),
+            version:
+                version.trim(),
+            arch:
+                arch.trim()
+        };
+    }
+
+    async connect(
+        target
+    ) {
+        return this._executeQuickAdbCommand([
+            'connect',
+            target
+        ]);
+    }
+
+    async pair(
+        host,
+        pairingCode
+    ) {
+        return this._executeQuickAdbCommand([
+            'pair',
+            host,
+            pairingCode
+        ]);
+    }
+
+    async disconnect(
+        target = null
+    ) {
+        const args =
+            target
+                ? [
+                      'disconnect',
+                      target
+                  ]
+                : [
+                      'disconnect'
+                  ];
+
+        return this._executeQuickAdbCommand(
+            args
+        );
+    }
+
+    async _executeShellCommand(
+        serial,
+        shellArgs
+    ) {
+        const result =
+            await this._executeQuickAdbCommand(
+                [
+                    '-s',
+                    serial,
+                    'shell',
+                    ...shellArgs
+                ]
+            );
+
+        return result.join('\n');
+    }
+
+    async _executeQuickAdbCommand(
+        args = []
+    ) {
+        return this._processSupervisor
+            .executeQuickTaskArray(
+                this._adbPath,
+                args
+            );
+    }
+
+    // الطريقة القديمة محفوظة كخيار احتياطي (تم تعديل اسمها قليلاً)
+    _resolveAdbPathLegacy() {
+        const isWin =
+            process.platform ===
+            'win32';
+
+        return path.join(
+            process.cwd(),
+            'resources',
+            'bin',
+            isWin
+                ? 'win/adb.exe'
+                : 'linux/adb'
+        );
+    }
+}
+
+module.exports =
+    AdbCommandExecutor;
+</file>
+
+<file path="src/main/infrastructure/adb/ConnectionService.js">
+// src/main/infrastructure/adb/ConnectionService.js
+'use strict';
+
+const EventEmitter = require('events');
+const { Bonjour } = require('bonjour-service');
+
+class ConnectionService extends EventEmitter {
+    constructor({ adbExecutor, logger = null }) {
         super();
-
-        this._adbExecutor =
-            adbExecutor;
-
-        this._logger =
-            logger;
-
-        this._bonjour =
-            new Bonjour();
-
-        this._adbMonitor =
-            null;
-
-        this._browser =
-            null;
+        this._adbExecutor = adbExecutor;
+        this._logger = logger;
+        this._bonjour = new Bonjour();
+        this._adbMonitor = null;
+        this._browser = null;
     }
 
     async discoverDevices() {
         try {
-            const devices =
-                await this
-                    ._adbExecutor
-                    .getDevices();
-
-            this.emit(
-                'devicesDiscovered',
-                devices
-            );
-
+            const devices = await this._adbExecutor.getDevices();
+            this.emit('devicesDiscovered', devices);
             return devices;
         } catch (error) {
-            this.emit(
-                'error',
-                error
-            );
-
+            this.emit('error', error);
             throw error;
         }
     }
 
-    startAdbMonitoring(
-        intervalMs = 5000
-    ) {
-        if (
-            this._adbMonitor
-        ) {
-            return;
-        }
-
-        this._adbMonitor =
-            setInterval(
-                async () => {
-                    try {
-                        const devices =
-                            await this
-                                ._adbExecutor
-                                .getDevices();
-
-                        this.emit(
-                            'adbDevices',
-                            devices
-                        );
-                    } catch (
-                    error
-                    ) {
-                        this.emit(
-                            'error',
-                            error
-                        );
-                    }
-                },
-                intervalMs
-            );
+    startAdbMonitoring(intervalMs = 5000) {
+        if (this._adbMonitor) return;
+        this._adbMonitor = setInterval(async () => {
+            try {
+                const devices = await this._adbExecutor.getDevices();
+                this.emit('adbDevices', devices);
+            } catch (error) {
+                this.emit('error', error);
+            }
+        }, intervalMs);
     }
 
     stopAdbMonitoring() {
-        if (
-            !this._adbMonitor
-        ) {
-            return;
-        }
-
-        clearInterval(
-            this._adbMonitor
-        );
-
-        this._adbMonitor =
-            null;
+        if (!this._adbMonitor) return;
+        clearInterval(this._adbMonitor);
+        this._adbMonitor = null;
     }
 
     startWirelessDiscovery() {
-        if (
-            this._browser
-        ) {
-            return;
-        }
-
-        this._browser =
-            this._bonjour.find(
-                {
-                    type: 'adb-tls-connect'
-                },
-                (service) => {
-                    this.emit(
-                        'wirelessServiceFound',
-                        {
-                            name:
-                                service.name,
-                            host:
-                                service.host,
-                            port:
-                                service.port,
-                            addresses:
-                                service.addresses
-                        }
-                    );
-                }
-            );
+        if (this._browser) return;
+        this._browser = this._bonjour.find({ type: 'adb-tls-connect' }, (service) => {
+            this.emit('wirelessServiceFound', {
+                name: service.name,
+                host: service.host,
+                port: service.port,
+                addresses: service.addresses
+            });
+        });
     }
 
     stopWirelessDiscovery() {
-        if (
-            !this._browser
-        ) {
-            return;
-        }
-
+        if (!this._browser) return;
         this._browser.stop();
-
-        this._browser =
-            null;
+        this._browser = null;
     }
 
     /**
- * Pair with a device over TCP/IP using a pairing code.
- * @param {string} host - Host:port for pairing (e.g., "192.168.1.10:37000")
- * @param {string} pairingCode - 6-digit pairing code shown on device
- * @returns {Promise<string[]>} Output lines from adb pair command
- */
+     * Pair with a device over TCP/IP using a pairing code.
+     * @param {string} host - Host:port for pairing (e.g., "192.168.1.10:37000")
+     * @param {string} pairingCode - 6-digit pairing code shown on device
+     * @returns {Promise<string[]>}
+     */
     async pair(host, pairingCode) {
-        if (!host || !pairingCode) {
-            throw new Error('Host and pairing code are required');
-        }
-
+        if (!host || !pairingCode) throw new Error('Host and pairing code are required');
         try {
             const result = await this._adbExecutor.pair(host, pairingCode);
             this.emit('pairSuccess', { host, pairingCode });
@@ -3384,13 +3906,10 @@ class ConnectionService
     /**
      * Connect to a device over TCP/IP (already paired or using adb connect).
      * @param {string} target - Host:port (e.g., "192.168.1.10:5555")
-     * @returns {Promise<string[]>} Output lines from adb connect command
+     * @returns {Promise<string[]>}
      */
     async connect(target) {
-        if (!target) {
-            throw new Error('Target is required');
-        }
-
+        if (!target) throw new Error('Target is required');
         try {
             const result = await this._adbExecutor.connect(target);
             this.emit('connectSuccess', { target });
@@ -3404,7 +3923,7 @@ class ConnectionService
     /**
      * Disconnect from a device or all devices.
      * @param {string|null} target - Optional host:port to disconnect, or null to disconnect all
-     * @returns {Promise<string[]>} Output lines from adb disconnect command
+     * @returns {Promise<string[]>}
      */
     async disconnect(target = null) {
         try {
@@ -3417,16 +3936,24 @@ class ConnectionService
         }
     }
 
+    /**
+     * Get detailed device information (model, version, arch) for a given target.
+     * @param {string} target - Device serial or host:port
+     * @returns {Promise<{serial: string, model: string, version: string, arch: string}>}
+     */
+    async getDeviceInfo(target) {
+        if (!target) throw new Error('Target is required');
+        return this._adbExecutor.getDeviceInfo(target);
+    }
+
     dispose() {
         this.stopAdbMonitoring();
         this.stopWirelessDiscovery();
-
         this._bonjour.destroy();
     }
 }
 
-module.exports =
-    ConnectionService;
+module.exports = ConnectionService;
 </file>
 
 <file path="src/main/infrastructure/logging/ErrorCentralService.js">
@@ -3783,11 +4310,10 @@ module.exports =
 </file>
 
 <file path="src/main/infrastructure/logging/index.js">
+// src/main/infrastructure/logging/index.js
 'use strict';
 
-const ErrorCentralService =
-    require('./ErrorCentralService');
-
+const ErrorCentralService = require('./ErrorCentralService');
 const {
     LOG_LEVELS,
     LOG_TYPES,
@@ -3795,12 +4321,12 @@ const {
     SEVERITY
 } = require('./logging.constants');
 
-const errorCentralService =
-    new ErrorCentralService();
+// إنشاء instance واحد فقط (Singleton)
+const errorCentralService = new ErrorCentralService();
 
 module.exports = Object.freeze({
-    errorCentralService,
-
+    errorCentralService,  // الـ instance الجاهز للاستخدام
+    ErrorCentralService,  // الكلاس (في حال الحاجة لإنشاء إضافي، لكن نادراً)
     LOG_LEVELS,
     LOG_TYPES,
     LOG_SOURCES,
@@ -3921,213 +4447,6 @@ module.exports = Object.freeze({
     LOG_SOURCES,
     SEVERITY
 });
-</file>
-
-<file path="src/main/infrastructure/media/YtdlpAdapter.js">
-// src/main/infrastructure/media/YtdlpAdapter.js
-'use strict';
-
-class YtdlpAdapter {
-    constructor({
-        processSupervisor,
-        ytdlpPath = null,
-        toolPathResolver = null,   // <-- جديد: محلل المسار الموحد
-        logger = null
-    }) {
-        this._processSupervisor = processSupervisor;
-        this._logger = logger;
-        this._toolPathResolver = toolPathResolver;
-
-        // تحديد مسار yt-dlp (الأولوية: ytdlpPath المُمرر > toolPathResolver > القيمة الاحتياطية)
-        this._ytdlpPath = this._resolveYtdlpPath(ytdlpPath);
-
-        this._activeDownloads = new Map(); // processId -> { resolve, reject, entity }
-    }
-
-    /**
-     * Resolves yt-dlp binary path with proper priority.
-     * @param {string|null} explicitPath - Direct override from constructor
-     * @returns {string}
-     * @throws {Error} if no valid path found
-     */
-    _resolveYtdlpPath(explicitPath) {
-        if (explicitPath) {
-            return explicitPath;
-        }
-
-        if (this._toolPathResolver) {
-            return this._toolPathResolver.getYtDlpPath();
-        }
-
-        // Fallback: assume 'yt-dlp' is in PATH (development convenience)
-        const fallbackPath = 'yt-dlp';
-        if (this._logger) {
-            this._logger.warn(`YtdlpAdapter: No toolPathResolver provided, using fallback: ${fallbackPath}`);
-        }
-        return fallbackPath;
-    }
-
-    /**
-     * Inspect available formats for a given URL without downloading.
-     * @param {string} url - Video/audio URL
-     * @returns {Promise<Object>} Formats and metadata
-     */
-    async inspectFormats(url) {
-        if (!url) {
-            throw new Error('URL is required');
-        }
-
-        const processId = `ytdlp-inspect-${Date.now()}`;
-        const args = ['-F', '--print-json', url];
-
-        // Use quick task to get output
-        const output = await this._processSupervisor.executeQuickTaskArray(
-            this._ytdlpPath,
-            args,
-            { timeout: 30000 }
-        );
-
-        // Parse JSON output (yt-dlp --print-json returns one JSON object per line for formats)
-        const lines = output.split('\n').filter(l => l.trim());
-        if (lines.length === 0) {
-            throw new Error('No output from yt-dlp');
-        }
-
-        // First line is video info, subsequent lines are format entries
-        const videoInfo = JSON.parse(lines[0]);
-        const formats = lines.slice(1).map(line => {
-            try {
-                return JSON.parse(line);
-            } catch (e) {
-                return null;
-            }
-        }).filter(f => f);
-
-        return {
-            title: videoInfo.title,
-            duration: videoInfo.duration,
-            thumbnail: videoInfo.thumbnail,
-            formats: formats.map(f => ({
-                formatId: f.format_id,
-                ext: f.ext,
-                resolution: f.resolution || null,
-                fps: f.fps || null,
-                acodec: f.acodec,
-                vcodec: f.vcodec,
-                filesize: f.filesize,
-                formatNote: f.format_note
-            }))
-        };
-    }
-
-    /**
-     * Extract metadata for a URL without downloading.
-     * @param {string} url - Video/audio URL
-     * @returns {Promise<Object>} Basic metadata (title, duration, thumbnail, etc.)
-     */
-    async extractMetadata(url) {
-        if (!url) {
-            throw new Error('URL is required');
-        }
-
-        const args = ['-j', '--flat-playlist', url];
-        const output = await this._processSupervisor.executeQuickTaskArray(
-            this._ytdlpPath,
-            args,
-            { timeout: 15000 }
-        );
-
-        const data = JSON.parse(output);
-        return {
-            id: data.id,
-            title: data.title,
-            duration: data.duration,
-            thumbnail: data.thumbnail,
-            uploader: data.uploader,
-            webpageUrl: data.webpage_url
-        };
-    }
-
-    /**
-     * Start downloading a video/audio format.
-     * @param {string} url - Source URL
-     * @param {string} formatId - Format ID to download
-     * @param {string} outputPath - Full output file path
-     * @param {Function} onProgress - Callback for progress updates
-     * @returns {Promise<Object>} Promise resolved when download completes
-     */
-    startDownload(url, formatId, outputPath, onProgress = null) {
-        return new Promise((resolve, reject) => {
-            const processId = `ytdlp-dl-${Date.now()}`;
-            const args = [
-                '-f', formatId,
-                '-o', outputPath,
-                '--newline',
-                '--progress',
-                url
-            ];
-
-            const process = this._processSupervisor.startManagedProcess({
-                processId,
-                binPath: this._ytdlpPath,
-                args,
-                type: 'ytdlp-download',
-                metadata: { url, formatId, outputPath },
-                onData: (chunk, streamType) => {
-                    if (streamType !== 'stderr') return;
-                    const text = chunk.toString();
-                    // Parse progress: [download]  45.2% of 10.23MiB at 1.2Mi/s ETA 00:05
-                    const match = text.match(/\[download\]\s+(\d+(?:\.\d+)?)%/);
-                    if (match && onProgress) {
-                        const percent = parseFloat(match[1]);
-                        onProgress({ percent, raw: text });
-                    }
-                }
-            });
-
-            this._activeDownloads.set(processId, { resolve, reject, process });
-
-            // Wait for process exit via monitoring? Actually startManagedProcess returns child
-            // We need to listen to exit via ProcessSupervisor? Simplified: we poll or use ProcessRegistry.
-            // Better: Use ProcessSupervisor to get status, but for simplicity we'll assume onData can detect completion.
-            // Since this is infrastructure, we can attach a one-time listener to the child process.
-            if (process && process.once) {
-                process.once('exit', (code) => {
-                    this._activeDownloads.delete(processId);
-                    if (code === 0) {
-                        resolve({ success: true, outputPath, processId });
-                    } else {
-                        reject(new Error(`Download failed with exit code ${code}`));
-                    }
-                });
-                process.once('error', (err) => {
-                    this._activeDownloads.delete(processId);
-                    reject(err);
-                });
-            } else {
-                reject(new Error('Failed to start process'));
-            }
-        });
-    }
-
-    /**
-     * Stop an ongoing download.
-     * @param {string} processId - ID returned from startDownload
-     * @returns {boolean} True if stopped
-     */
-    stopDownload(processId) {
-        if (!processId) return false;
-        const exists = this._activeDownloads.has(processId);
-        if (exists) {
-            this._processSupervisor.stopManagedProcess(processId);
-            this._activeDownloads.delete(processId);
-            return true;
-        }
-        return false;
-    }
-}
-
-module.exports = YtdlpAdapter;
 </file>
 
 <file path="src/main/infrastructure/process/index.js">
@@ -4393,73 +4712,40 @@ module.exports =
 </file>
 
 <file path="src/main/infrastructure/process/ProcessManager.js">
+// src/main/infrastructure/process/ProcessManager.js
 'use strict';
 
 const { spawn } = require('child_process');
-
 const ProcessEntity = require('./ProcessEntity');
-
-const {
-    PROCESS_TIMEOUTS,
-    PROCESS_SIGNALS
-} = require('./process.constants');
-
-const errorService = require(
-    '../logging/ErrorCentralService'
-);
+const { PROCESS_TIMEOUTS, PROCESS_SIGNALS } = require('./process.constants');
+const { errorCentralService } = require('../logging');
 
 class ProcessManager {
     constructor() {
-        this.activeProcesses = new Map();
+        this.activeProcesses = new Map(); // key: processId, value: { instance, data, type, startedAt, finishedAt }
     }
 
-    execute(
-        id,
-        binPath,
-        args = [],
-        type = 'generic',
-        onData = null,
-        maxBufferSize = 100
-    ) {
-        if (!id) {
-            throw new Error(
-                'Process id is required'
-            );
-        }
-
-        if (this.activeProcesses.has(id)) {
-            this.terminate(id);
-        }
+    /**
+     * Execute a long-running process and track it.
+     */
+    execute(id, binPath, args = [], type = 'generic', onData = null, maxBufferSize = 100) {
+        if (!id) throw new Error('Process id is required');
+        if (this.activeProcesses.has(id)) this.terminate(id);
 
         let child;
-
         try {
-            child = spawn(
-                binPath,
-                Array.isArray(args)
-                    ? args
-                    : []
-            );
+            child = spawn(binPath, Array.isArray(args) ? args : []);
         } catch (error) {
-            errorService.report({
+            errorCentralService.report({
                 type: 'PROCESS',
                 severity: 'HIGH',
-                id,
-                message:
-                    `Failed to spawn process: ${error.message}`
+                message: `Failed to spawn process ${id}: ${error.message}`,
+                source: 'ProcessManager'
             });
-
             throw error;
         }
 
-        const entity =
-            new ProcessEntity({
-                pid: child.pid,
-                type,
-                serial: id,
-                maxBufferSize
-            });
-
+        const entity = new ProcessEntity({ pid: child.pid, type, serial: id, maxBufferSize });
         const processRecord = {
             instance: child,
             data: entity,
@@ -4467,525 +4753,268 @@ class ProcessManager {
             startedAt: Date.now(),
             finishedAt: null
         };
+        this.activeProcesses.set(id, processRecord);
 
-        this.activeProcesses.set(
-            id,
-            processRecord
-        );
-
-        const feed =
-            (chunk, streamType) => {
-                const text =
-                    chunk.toString();
-
-                entity.addLog(
-                    text,
-                    streamType
-                );
-
-                if (
-                    typeof onData !==
-                    'function'
-                ) {
-                    return;
-                }
-
+        const feed = (chunk, streamType) => {
+            const text = chunk.toString();
+            entity.addLog(text, streamType);
+            if (typeof onData === 'function') {
                 try {
-                    onData(
-                        text,
-                        streamType
-                    );
-                } catch (error) {
-                    errorService.report({
+                    onData(text, streamType);
+                } catch (err) {
+                    errorCentralService.report({
                         type: 'PROCESS',
                         severity: 'LOW',
-                        id,
-                        message:
-                            `Consumer callback failed: ${error.message}`
+                        message: `Consumer callback failed for ${id}: ${err.message}`,
+                        source: 'ProcessManager'
                     });
                 }
-            };
-
-        child.stdout?.on(
-            'data',
-            data =>
-                feed(
-                    data,
-                    'stdout'
-                )
-        );
-
-        child.stderr?.on(
-            'data',
-            data =>
-                feed(
-                    data,
-                    'stderr'
-                )
-        );
-
-        child.once(
-            'error',
-            error => {
-                entity.markAsFailed(
-                    error.message
-                );
-
-                processRecord.instance =
-                    null;
-
-                processRecord.finishedAt =
-                    Date.now();
-
-                errorService.report({
-                    type: 'PROCESS',
-                    severity: 'HIGH',
-                    id,
-                    message:
-                        `Process error: ${error.message}`
-                });
             }
-        );
+        };
 
-        child.once(
-            'exit',
-            code => {
-                entity.markAsExited(
-                    code
-                );
+        child.stdout?.on('data', data => feed(data, 'stdout'));
+        child.stderr?.on('data', data => feed(data, 'stderr'));
 
-                processRecord.instance =
-                    null;
+        // Cleanup on error
+        child.once('error', error => {
+            entity.markAsFailed(error.message);
+            processRecord.instance = null;
+            processRecord.finishedAt = Date.now();
+            // Remove from map to prevent memory leak
+            this.activeProcesses.delete(id);
+            errorCentralService.report({
+                type: 'PROCESS',
+                severity: 'HIGH',
+                message: `Process ${id} error: ${error.message}`,
+                source: 'ProcessManager'
+            });
+        });
 
-                processRecord.finishedAt =
-                    Date.now();
-
-                errorService.report({
-                    type: 'PROCESS',
-                    severity: 'INFO',
-                    id,
-                    message:
-                        `Process exited with code ${code}`
-                });
-            }
-        );
+        // Cleanup on exit
+        child.once('exit', code => {
+            entity.markAsExited(code);
+            processRecord.instance = null;
+            processRecord.finishedAt = Date.now();
+            // Remove from map to prevent memory leak
+            this.activeProcesses.delete(id);
+            errorCentralService.report({
+                type: 'PROCESS',
+                severity: 'INFO',
+                message: `Process ${id} exited with code ${code}`,
+                source: 'ProcessManager'
+            });
+        });
 
         return child;
     }
 
-    executeAndWatch(
-        id,
-        binPath,
-        args,
-        successSentinel,
-        timeoutMs =
-            PROCESS_TIMEOUTS.WATCH_DEFAULT_TIMEOUT_MS
-    ) {
-        return new Promise(
-            (
-                resolve,
-                reject
-            ) => {
-                let child;
-                let resolved = false;
+    /**
+     * Execute a process and watch for a success sentinel in output.
+     */
+    executeAndWatch(id, binPath, args, successSentinel, timeoutMs = PROCESS_TIMEOUTS.WATCH_DEFAULT_TIMEOUT_MS) {
+        return new Promise((resolve, reject) => {
+            let child;
+            let resolved = false;
+            let output = '';
 
-                let output = '';
-
-                try {
-                    child = spawn(
-                        binPath,
-                        Array.isArray(args)
-                            ? args
-                            : []
-                    );
-                } catch (error) {
-                    reject(error);
-                    return;
-                }
-
-                const safeResolve =
-                    result => {
-                        if (resolved) {
-                            return;
-                        }
-
-                        resolved = true;
-
-                        clearTimeout(
-                            timeout
-                        );
-
-                        resolve(
-                            result
-                        );
-                    };
-
-                const timeout =
-                    setTimeout(
-                        () => {
-                            try {
-                                child.kill(
-                                    PROCESS_SIGNALS.GRACEFUL
-                                );
-                            } catch { }
-
-                            safeResolve({
-                                success: false,
-                                output:
-                                    output +
-                                    '\n[Timeout]'
-                            });
-                        },
-                        timeoutMs
-                    );
-
-                const handleData =
-                    chunk => {
-                        const text =
-                            chunk.toString();
-
-                        if (
-                            output.length <
-                            PROCESS_TIMEOUTS.MAX_WATCH_OUTPUT_SIZE
-                        ) {
-                            output += text;
-
-                            if (
-                                output.length >
-                                PROCESS_TIMEOUTS.MAX_WATCH_OUTPUT_SIZE
-                            ) {
-                                output =
-                                    output.substring(
-                                        0,
-                                        PROCESS_TIMEOUTS.MAX_WATCH_OUTPUT_SIZE
-                                    );
-                            }
-                        }
-
-                        if (
-                            text.includes(
-                                successSentinel
-                            )
-                        ) {
-                            try {
-                                child.kill(
-                                    PROCESS_SIGNALS.GRACEFUL
-                                );
-                            } catch { }
-
-                            safeResolve({
-                                success: true,
-                                output
-                            });
-                        }
-                    };
-
-                child.stdout?.on(
-                    'data',
-                    handleData
-                );
-
-                child.stderr?.on(
-                    'data',
-                    handleData
-                );
-
-                child.once(
-                    'error',
-                    error => {
-                        if (
-                            resolved
-                        ) {
-                            return;
-                        }
-
-                        clearTimeout(
-                            timeout
-                        );
-
-                        reject(
-                            error
-                        );
-                    }
-                );
-
-                child.once(
-                    'exit',
-                    code => {
-                        safeResolve({
-                            success:
-                                code ===
-                                0,
-                            output
-                        });
-                    }
-                );
+            try {
+                child = spawn(binPath, Array.isArray(args) ? args : []);
+            } catch (error) {
+                reject(error);
+                return;
             }
-        );
-    }
 
-    executeQuickTaskArray(
-        binPath,
-        args = [],
-        options = {}
-    ) {
-        return new Promise(
-            (
-                resolve,
-                reject
-            ) => {
-                let child;
+            const safeResolve = (result) => {
+                if (resolved) return;
+                resolved = true;
+                clearTimeout(timeout);
+                resolve(result);
+            };
 
+            const timeout = setTimeout(() => {
                 try {
-                    child = spawn(
-                        binPath,
-                        Array.isArray(args)
-                            ? args
-                            : []
-                    );
-                } catch (error) {
-                    reject(error);
-                    return;
+                    child.kill(PROCESS_SIGNALS.GRACEFUL);
+                } catch { }
+                safeResolve({ success: false, output: output + '\n[Timeout]' });
+            }, timeoutMs);
+
+            const handleData = (chunk) => {
+                const text = chunk.toString();
+                if (output.length < PROCESS_TIMEOUTS.MAX_WATCH_OUTPUT_SIZE) {
+                    output += text;
+                    if (output.length > PROCESS_TIMEOUTS.MAX_WATCH_OUTPUT_SIZE)
+                        output = output.substring(0, PROCESS_TIMEOUTS.MAX_WATCH_OUTPUT_SIZE);
                 }
+                if (text.includes(successSentinel)) {
+                    try {
+                        child.kill(PROCESS_SIGNALS.GRACEFUL);
+                    } catch { }
+                    safeResolve({ success: true, output });
+                }
+            };
 
-                let stdout = '';
-                let stderr = '';
+            child.stdout?.on('data', handleData);
+            child.stderr?.on('data', handleData);
 
-                const timeout =
-                    setTimeout(
-                        () => {
-                            try {
-                                child.kill(
-                                    PROCESS_SIGNALS.GRACEFUL
-                                );
-                            } catch { }
-
-                            reject({
-                                error:
-                                    new Error(
-                                        'Command timeout'
-                                    ),
-                                stderr:
-                                    'Timeout'
-                            });
-                        },
-                        options.timeout ??
-                        PROCESS_TIMEOUTS.QUICK_TASK_TIMEOUT_MS
-                    );
-
-                child.stdout?.on(
-                    'data',
-                    chunk => {
-                        stdout +=
-                            chunk.toString();
-                    }
-                );
-
-                child.stderr?.on(
-                    'data',
-                    chunk => {
-                        stderr +=
-                            chunk.toString();
-                    }
-                );
-
-                child.once(
-                    'error',
-                    error => {
-                        clearTimeout(
-                            timeout
-                        );
-
-                        reject({
-                            error,
-                            stderr
-                        });
-                    }
-                );
-
-                child.once(
-                    'exit',
-                    code => {
-                        clearTimeout(
-                            timeout
-                        );
-
-                        if (
-                            code === 0
-                        ) {
-                            resolve(
-                                stdout.trim()
-                            );
-                            return;
-                        }
-
-                        if (
-                            stdout
-                        ) {
-                            resolve(
-                                stdout.trim()
-                            );
-                            return;
-                        }
-
-                        reject({
-                            error:
-                                new Error(
-                                    `Process exited with code ${code}`
-                                ),
-                            stderr
-                        });
-                    }
-                );
-            }
-        );
-    }
-
-    terminate(id) {
-        const entry =
-            this.activeProcesses.get(
-                id
-            );
-
-        if (
-            !entry ||
-            !entry.instance
-        ) {
-            return false;
-        }
-
-        const child =
-            entry.instance;
-
-        entry.data?.markAsExited(
-            -1
-        );
-
-        try {
-            child.kill(
-                PROCESS_SIGNALS.GRACEFUL
-            );
-        } catch (
-        error
-        ) {
-            errorService.report({
-                type: 'PROCESS',
-                severity: 'LOW',
-                id,
-                message:
-                    `SIGTERM failed: ${error.message}`
+            child.once('error', error => {
+                if (resolved) return;
+                clearTimeout(timeout);
+                reject(error);
             });
 
+            child.once('exit', code => {
+                safeResolve({ success: code === 0, output });
+            });
+        });
+    }
+
+    /**
+     * Execute a quick one-off task and return its stdout.
+     */
+    executeQuickTaskArray(binPath, args = [], options = {}) {
+        return new Promise((resolve, reject) => {
+            let child;
+            try {
+                child = spawn(binPath, Array.isArray(args) ? args : []);
+            } catch (error) {
+                reject(error);
+                return;
+            }
+
+            let stdout = '';
+            let stderr = '';
+
+            const timeout = setTimeout(() => {
+                try {
+                    child.kill(PROCESS_SIGNALS.GRACEFUL);
+                } catch { }
+                reject(new Error(`Command timeout after ${options.timeout || PROCESS_TIMEOUTS.QUICK_TASK_TIMEOUT_MS}ms`));
+            }, options.timeout || PROCESS_TIMEOUTS.QUICK_TASK_TIMEOUT_MS);
+
+            child.stdout?.on('data', chunk => { stdout += chunk.toString(); });
+            child.stderr?.on('data', chunk => { stderr += chunk.toString(); });
+
+            child.once('error', error => {
+                clearTimeout(timeout);
+                reject(error);
+            });
+
+            child.once('exit', code => {
+                clearTimeout(timeout);
+                if (code === 0 || stdout) {
+                    resolve(stdout.trim());
+                } else {
+                    reject(new Error(`Process exited with code ${code}: ${stderr}`));
+                }
+            });
+        });
+    }
+
+    /**
+     * Terminate a tracked process gracefully (SIGTERM), then force kill after timeout.
+     * Does NOT immediately delete from map; removal happens on 'exit' event.
+     */
+    terminate(id) {
+        const entry = this.activeProcesses.get(id);
+        if (!entry || !entry.instance) return false;
+
+        const child = entry.instance;
+        entry.data?.markAsExited(-1);
+
+        try {
+            child.kill(PROCESS_SIGNALS.GRACEFUL);
+        } catch (error) {
+            errorCentralService.report({
+                type: 'PROCESS',
+                severity: 'LOW',
+                message: `SIGTERM failed for ${id}: ${error.message}`,
+                source: 'ProcessManager'
+            });
             return false;
         }
 
-        setTimeout(
-            () => {
-                if (
-                    child.exitCode ===
-                    null
-                ) {
-                    try {
-                        child.kill(
-                            PROCESS_SIGNALS.FORCE
-                        );
-                    } catch { }
-                }
-            },
-            PROCESS_TIMEOUTS.GRACEFUL_TERMINATION_MS
-        );
+        // Force kill after graceful timeout if still alive
+        setTimeout(() => {
+            if (child.exitCode === null) {
+                try {
+                    child.kill(PROCESS_SIGNALS.FORCE);
+                } catch { }
+            }
+        }, PROCESS_TIMEOUTS.GRACEFUL_TERMINATION_MS);
 
         return true;
     }
 
+    /**
+     * Terminate all tracked processes and wait for them to finish.
+     * Improved to actually wait for exit events before resolving.
+     */
     async terminateAll() {
-        const entries =
-            Array.from(
-                this.activeProcesses.entries()
-            );
+        const entries = Array.from(this.activeProcesses.entries());
+        const terminationPromises = [];
 
-        for (const [
-            id,
-            entry
-        ] of entries) {
-            try {
-                entry.data?.markAsExited(
-                    -1
-                );
+        for (const [id, entry] of entries) {
+            const promise = new Promise((resolve) => {
+                if (!entry.instance) {
+                    // Already dead, just remove and resolve
+                    this.activeProcesses.delete(id);
+                    return resolve();
+                }
 
-                entry.instance?.kill(
-                    PROCESS_SIGNALS.GRACEFUL
-                );
-            } catch (
-            error
-            ) {
-                errorService.report({
-                    type: 'PROCESS',
-                    severity: 'LOW',
-                    id,
-                    message:
-                        error.message
-                });
-            }
+                const onExit = () => {
+                    this.activeProcesses.delete(id);
+                    resolve();
+                };
+
+                // Listen for exit/error events
+                entry.instance.once('exit', onExit);
+                entry.instance.once('error', onExit);
+
+                // Send SIGTERM
+                try {
+                    entry.instance.kill(PROCESS_SIGNALS.GRACEFUL);
+                } catch (err) {
+                    onExit(); // force resolve if kill fails
+                }
+
+                // Force kill after timeout if still running
+                setTimeout(() => {
+                    if (entry.instance && !entry.instance.killed && entry.instance.exitCode === null) {
+                        try {
+                            entry.instance.kill(PROCESS_SIGNALS.FORCE);
+                        } catch { }
+                    }
+                }, PROCESS_TIMEOUTS.GRACEFUL_TERMINATION_MS);
+            });
+            terminationPromises.push(promise);
         }
 
-        await new Promise(
-            resolve =>
-                setTimeout(
-                    resolve,
-                    PROCESS_TIMEOUTS.GRACEFUL_TERMINATION_MS
-                )
-        );
+        // Wait for all processes to be cleaned up (with timeout safeguard)
+        await Promise.all(terminationPromises);
 
-        for (const [
-            ,
-            entry
-        ] of entries) {
-            const child =
-                entry.instance;
-
-            if (
-                child &&
-                child.exitCode ===
-                null
-            ) {
+        // Final cleanup: any remaining entries (should be none, but just in case)
+        for (const [id, entry] of this.activeProcesses.entries()) {
+            if (entry.instance && !entry.instance.killed) {
                 try {
-                    child.kill(
-                        PROCESS_SIGNALS.FORCE
-                    );
+                    entry.instance.kill(PROCESS_SIGNALS.FORCE);
                 } catch { }
             }
+            this.activeProcesses.delete(id);
         }
     }
 
     getLogs(id) {
-        return (
-            this.activeProcesses
-                .get(id)
-                ?.data
-                ?.getLogs?.() ??
-            null
-        );
+        return this.activeProcesses.get(id)?.data?.getLogs?.() ?? null;
     }
 
     getProcessInfo(id) {
-        return (
-            this.activeProcesses
-                .get(id)
-                ?.data ?? null
-        );
+        return this.activeProcesses.get(id)?.data ?? null;
     }
 
     getProcessStatus(id) {
-        const entry =
-            this.activeProcesses.get(id);
-
-        if (!entry) {
-            return null;
-        }
-
+        const entry = this.activeProcesses.get(id);
+        if (!entry) return null;
         const entity = entry.data;
-
         return {
             pid: entity.pid,
             type: entity.type,
@@ -4998,8 +5027,91 @@ class ProcessManager {
     }
 }
 
-module.exports =
-    new ProcessManager();
+// Singleton export
+module.exports = new ProcessManager();
+</file>
+
+<file path="src/main/infrastructure/streaming/ScrcpyAdapter.js">
+'use strict';
+
+/**
+ * ScrcpyAdapter
+ * مسؤول فقط عن تشغيل وإيقاف انعكاس الشاشة عبر scrcpy
+ * بدون أي منطق أعمال أو إدارة أجهزة
+ * 
+ * @param {string} adbTarget - معرّف ADB للجهاز (serial أو host:port)
+ */
+class ScrcpyAdapter {
+    constructor({
+        processSupervisor,
+        scrcpyPath = null,
+        toolPathResolver = null,
+        logger = null
+    }) {
+        this._processSupervisor = processSupervisor;
+        this._logger = logger;
+        this._toolPathResolver = toolPathResolver;
+        this._scrcpyPath = this._resolveScrcpyPath(scrcpyPath);
+        this._activeProcesses = new Map(); // key: adbTarget, value: processId
+    }
+
+    _resolveScrcpyPath(explicitPath) {
+        if (explicitPath) return explicitPath;
+        if (this._toolPathResolver) return this._toolPathResolver.getScrcpyPath();
+        const fallbackPath = 'scrcpy';
+        if (this._logger) {
+            this._logger.warn(`ScrcpyAdapter: No toolPathResolver provided, using fallback: ${fallbackPath}`);
+        }
+        return fallbackPath;
+    }
+
+    /**
+     * بدء انعكاس الشاشة لجهاز معرّف بواسطة adbTarget
+     * @param {string} adbTarget - معرّف ADB (serial مثل "emulator-5554" أو "192.168.1.10:5555")
+     * @param {Object} options - { fullscreen, bitrate }
+     * @returns {string} processId
+     */
+    startMirroring(adbTarget, options = {}) {
+        if (!adbTarget) {
+            throw new Error('adbTarget is required');
+        }
+
+        const processId = `scrcpy:${adbTarget}`;
+
+        const args = [
+            '-s', adbTarget,
+            ...(options.fullscreen ? ['--fullscreen'] : []),
+            ...(options.bitrate ? ['--bit-rate', String(options.bitrate)] : [])
+        ];
+
+        this._processSupervisor.startManagedProcess({
+            processId,
+            binPath: this._scrcpyPath,
+            args,
+            type: 'scrcpy',
+            metadata: { adbTarget }
+        });
+
+        this._activeProcesses.set(adbTarget, processId);
+        return processId;
+    }
+
+    /**
+     * إيقاف انعكاس الشاشة لجهاز معرّف بواسطة adbTarget
+     * @param {string} adbTarget - نفس المعرّف المستخدم في startMirroring
+     * @returns {boolean} نجاح العملية
+     */
+    stopMirroring(adbTarget) {
+        const processId = this._activeProcesses.get(adbTarget);
+        if (!processId) return false;
+
+        this._processSupervisor.stopManagedProcess(processId);
+        this._activeProcesses.delete(adbTarget);
+        return true;
+    }
+}
+
+module.exports = ScrcpyAdapter;
 </file>
 
 <file path="src/main/runtime/devices/DeviceRegistry.js">
@@ -5396,7 +5508,7 @@ module.exports =
   "main": "src/main/index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "electron . --no-sandbox",
+    "start": "electron . --disable-gpu --no-sandbox",
     "build": "electron-builder"
   },
   "keywords": [],
@@ -5419,376 +5531,558 @@ module.exports =
 }
 </file>
 
+<file path="src/main/infrastructure/media/YtdlpAdapter.js">
+// src/main/infrastructure/media/YtdlpAdapter.js
+'use strict';
+
+const os = require('os');
+const path = require('path');
+
+class YtdlpAdapter {
+    constructor({
+        processSupervisor,
+        ytdlpPath = null,
+        toolPathResolver = null,
+        logger = null
+    }) {
+        this._processSupervisor = processSupervisor;
+        this._logger = logger;
+        this._toolPathResolver = toolPathResolver;
+        this._ytdlpPath = this._resolveYtdlpPath(ytdlpPath);
+        this._activeDownloads = new Map(); // processId -> { resolve, reject, process, status }
+        this._windowManager = null;
+    }
+
+    setWindowManager(windowManager) {
+        this._windowManager = windowManager;
+    }
+
+    _resolveYtdlpPath(explicitPath) {
+        if (explicitPath) return explicitPath;
+        if (this._toolPathResolver) return this._toolPathResolver.getYtDlpPath();
+        const fallbackPath = 'yt-dlp';
+        if (this._logger) {
+            this._logger.warn(`YtdlpAdapter: No toolPathResolver provided, using fallback: ${fallbackPath}`);
+        }
+        return fallbackPath;
+    }
+
+    /**
+     * إصلاح دالة inspectFormats لاستخدام -j (JSON واحد) بدلاً من -F --print-json
+     */
+    async inspectFormats(url) {
+        if (!url) {
+            throw new Error('URL is required');
+        }
+
+        const args = ['-j', url];  // استخراج JSON كامل يحتوي على الميتاداتا والتنسيقات
+        const output = await this._processSupervisor.executeQuickTaskArray(
+            this._ytdlpPath,
+            args,
+            { timeout: 30000 }
+        );
+
+        const data = JSON.parse(output);
+        
+        // تحويل التنسيقات إلى صيغة مبسطة للواجهة
+        const formats = (data.formats || []).map(f => ({
+            formatId: f.format_id,
+            ext: f.ext,
+            resolution: f.resolution || null,
+            fps: f.fps || null,
+            acodec: f.acodec,
+            vcodec: f.vcodec,
+            filesize: f.filesize,
+            formatNote: f.format_note
+        }));
+
+        return {
+            title: data.title,
+            duration: data.duration,
+            thumbnail: data.thumbnail,
+            formats: formats
+        };
+    }
+
+    async extractMetadata(url) {
+        if (!url) {
+            throw new Error('URL is required');
+        }
+
+        const args = ['-j', '--flat-playlist', url];
+        const output = await this._processSupervisor.executeQuickTaskArray(
+            this._ytdlpPath,
+            args,
+            { timeout: 15000 }
+        );
+
+        const data = JSON.parse(output);
+        return {
+            id: data.id,
+            title: data.title,
+            duration: data.duration,
+            thumbnail: data.thumbnail,
+            uploader: data.uploader,
+            webpageUrl: data.webpage_url
+        };
+    }
+
+    async startDownload(url, formatId, options = {}) {
+        return new Promise((resolve, reject) => {
+            const { outputPath, onProgress, deviceId } = options;
+            let finalOutputPath = outputPath;
+            if (!finalOutputPath) {
+                const timestamp = Date.now();
+                const defaultDir = path.join(os.homedir(), 'Downloads');
+                finalOutputPath = path.join(defaultDir, `linkhub_${timestamp}_${formatId}.%(ext)s`);
+            }
+
+            const processId = `ytdlp-dl-${Date.now()}`;
+            const args = [
+                '-f', formatId,
+                '-o', finalOutputPath,
+                '--newline',
+                '--progress',
+                url
+            ];
+
+            const process = this._processSupervisor.startManagedProcess({
+                processId,
+                binPath: this._ytdlpPath,
+                args,
+                type: 'ytdlp-download',
+                metadata: { url, formatId, outputPath: finalOutputPath, deviceId },
+                onData: (chunk, streamType) => {
+                    if (streamType !== 'stderr') return;
+                    const text = chunk.toString();
+                    const match = text.match(/\[download\]\s+(\d+(?:\.\d+)?)%/);
+                    if (match) {
+                        const percent = parseFloat(match[1]);
+                        if (onProgress) onProgress({ percent, raw: text });
+                        if (this._windowManager) {
+                            this._windowManager.broadcast('download:progress', {
+                                downloadId: processId,
+                                percent: percent,
+                                raw: text,
+                                deviceId: deviceId,
+                                url: url
+                            });
+                        }
+                    }
+                }
+            });
+
+            // تخزين حالة التحميل
+            this._activeDownloads.set(processId, {
+                resolve,
+                reject,
+                process,
+                status: 'downloading',
+                url,
+                formatId,
+                outputPath: finalOutputPath,
+                deviceId
+            });
+
+            if (process && process.once) {
+                process.once('exit', (code) => {
+                    const entry = this._activeDownloads.get(processId);
+                    if (!entry) return;
+                    
+                    if (code === 0) {
+                        entry.status = 'completed';
+                        if (this._windowManager) {
+                            this._windowManager.broadcast('download:complete', {
+                                downloadId: processId,
+                                outputPath: finalOutputPath,
+                                deviceId: deviceId,
+                                url: url
+                            });
+                        }
+                        entry.resolve({ success: true, outputPath: finalOutputPath, processId });
+                    } else {
+                        entry.status = 'failed';
+                        if (this._windowManager) {
+                            this._windowManager.broadcast('download:error', {
+                                downloadId: processId,
+                                error: `Exit code ${code}`,
+                                deviceId: deviceId,
+                                url: url
+                            });
+                        }
+                        entry.reject(new Error(`Download failed with exit code ${code}`));
+                    }
+                    this._activeDownloads.delete(processId);
+                });
+                
+                process.once('error', (err) => {
+                    const entry = this._activeDownloads.get(processId);
+                    if (entry) {
+                        entry.status = 'failed';
+                        if (this._windowManager) {
+                            this._windowManager.broadcast('download:error', {
+                                downloadId: processId,
+                                error: err.message,
+                                deviceId: deviceId,
+                                url: url
+                            });
+                        }
+                        entry.reject(err);
+                        this._activeDownloads.delete(processId);
+                    }
+                });
+            } else {
+                reject(new Error('Failed to start process'));
+            }
+        });
+    }
+
+    stopDownload(processId) {
+        if (!processId) return false;
+        const entry = this._activeDownloads.get(processId);
+        if (!entry) return false;
+        
+        entry.status = 'stopped';
+        const stopped = this._processSupervisor.stopManagedProcess(processId);
+        if (stopped) {
+            this._activeDownloads.delete(processId);
+            if (this._windowManager) {
+                this._windowManager.broadcast('download:stopped', {
+                    downloadId: processId,
+                    url: entry.url
+                });
+            }
+        }
+        return stopped;
+    }
+    
+    /**
+     * الحصول على حالة التحميل (للاستخدام الداخلي)
+     */
+    getDownloadStatus(processId) {
+        const entry = this._activeDownloads.get(processId);
+        return entry ? entry.status : null;
+    }
+}
+
+module.exports = YtdlpAdapter;
+</file>
+
 <file path="src/main/bootstrap/container.js">
 // src/main/bootstrap/container.js
 'use strict';
 
-const ErrorCentralService =
-    require(
-        '../infrastructure/logging'
-    );
+// استيراد الـ instance بدلاً من الكلاس
+const { errorCentralService } = require('../infrastructure/logging');
 
-const ProcessManager =
-    require(
-        '../infrastructure/process'
-    );
-
-const DatabaseManager =
-    require(
-        '../infrastructure/persistence/DatabaseManager'
-    );
-
-const AdbCommandExecutor =
-    require(
-        '../infrastructure/adb/AdbCommandExecutor'
-    );
-
-const ConnectionService =
-    require(
-        '../infrastructure/adb/ConnectionService'
-    );
-
-const ProcessRegistry =
-    require(
-        '../runtime/processes/ProcessRegistry'
-    );
-
-const ProcessSupervisor =
-    require(
-        '../runtime/processes/ProcessSupervisor'
-    );
-
-const DeviceRegistry =
-    require(
-        '../runtime/devices/DeviceRegistry'
-    );
-
-// --- المكونات الجديدة للمرحلة الخامسة ---
-const ScrcpyAdapter =
-    require(
-        '../infrastructure/streaming/ScrcpyAdapter'
-    );
-
-const YtdlpAdapter =
-    require(
-        '../infrastructure/media/YtdlpAdapter'
-    );
-
-const DeviceOrchestrator =
-    require(
-        '../application/orchestrators/DeviceOrchestrator'
-    );
-
-const DownloadOrchestrator =
-    require(
-        '../application/orchestrators/DownloadOrchestrator'
-    );
-
-// --- أداة حل المسارات الموحدة (المهمة 1) ---
-const ToolPathResolver =
-    require(
-        '../infrastructure/tools/ToolPathResolver'
-    );
+const ProcessManager = require('../infrastructure/process');
+const DatabaseManager = require('../infrastructure/persistence/DatabaseManager');
+const AdbCommandExecutor = require('../infrastructure/adb/AdbCommandExecutor');
+const ConnectionService = require('../infrastructure/adb/ConnectionService');
+const ProcessRegistry = require('../runtime/processes/ProcessRegistry');
+const ProcessSupervisor = require('../runtime/processes/ProcessSupervisor');
+const DeviceRegistry = require('../runtime/devices/DeviceRegistry');
+const ScrcpyAdapter = require('../infrastructure/streaming/ScrcpyAdapter');
+const YtdlpAdapter = require('../infrastructure/media/YtdlpAdapter');
+const DeviceOrchestrator = require('../application/orchestrators/DeviceOrchestrator');
+const DownloadOrchestrator = require('../application/orchestrators/DownloadOrchestrator');
+const ToolPathResolver = require('../infrastructure/tools/ToolPathResolver');
+const Device = require('../domain/entities/Device');
 
 class BootstrapContainer {
     constructor() {
-        this._services =
-            new Map();
-
-        this._initialized =
-            false;
+        this._services = new Map();
+        this._initialized = false;
+        this._windowManager = null;
     }
 
     initialize() {
-        if (
-            this._initialized
-        ) {
+        if (this._initialized) {
             return this;
         }
 
-        const processRegistry =
-            new ProcessRegistry();
+        // تهيئة الـ logger أولاً (هام جداً)
+        errorCentralService.init();
 
-        const processSupervisor =
-            new ProcessSupervisor({
-                processManager:
-                    ProcessManager,
-                processRegistry,
-                logger:
-                    ErrorCentralService
-            });
-
-        const deviceRegistry =
-            new DeviceRegistry();
-
-        const databaseManager =
-            new DatabaseManager();
-
-        // --- تهيئة محلل المسار الموحد (مع دعم logger اختياري) ---
-        const toolPathResolver = new ToolPathResolver({
-            logger: ErrorCentralService
+        const processRegistry = new ProcessRegistry();
+        const processSupervisor = new ProcessSupervisor({
+            processManager: ProcessManager,
+            processRegistry,
+            logger: errorCentralService
         });
 
-        // --- إنشاء AdbCommandExecutor باستخدام محلل المسار ---
-        const adbCommandExecutor =
-            new AdbCommandExecutor({
-                processSupervisor,
-                logger: ErrorCentralService,
-                toolPathResolver: toolPathResolver
-                // لم نمرر adbPath -> سيتم حله تلقائياً عبر toolPathResolver
-            });
+        const deviceRegistry = new DeviceRegistry();
+        const databaseManager = new DatabaseManager();
 
-        const connectionService =
-            new ConnectionService({
-                adbExecutor:
-                    adbCommandExecutor,
-                logger:
-                    ErrorCentralService
-            });
+        const toolPathResolver = new ToolPathResolver({
+            logger: errorCentralService
+        });
 
-        // --- ربط أحداث ConnectionService مع DeviceRegistry (المهمة 0) ---
+        const adbCommandExecutor = new AdbCommandExecutor({
+            processSupervisor,
+            logger: errorCentralService,
+            toolPathResolver: toolPathResolver
+        });
 
-        // 1. حدث الأجهزة المكتشفة عبر ADB (USB أو TCP/IP المتصل)
-        connectionService.on(
-            'adbDevices',
-            devices => {
-                if (
-                    !Array.isArray(
-                        devices
-                    )
-                ) {
-                    return;
+        const connectionService = new ConnectionService({
+            adbExecutor: adbCommandExecutor,
+            logger: errorCentralService
+        });
+
+        // ==================== معالج ADB Devices المتقدم ====================
+        connectionService.on('adbDevices', devices => {
+            if (!Array.isArray(devices)) return;
+
+            // 1. جمع الـ serials الحالية من ADB
+            const currentSerials = new Set();
+            for (const device of devices) {
+                if (device?.serial) currentSerials.add(device.serial);
+            }
+
+            // 2. معالجة الأجهزة الموجودة حالياً
+            for (const device of devices) {
+                if (!device?.serial) continue;
+                const deviceId = device.serial;
+
+                // إنشاء كيان الجهاز إذا لم يكن موجوداً
+                if (!deviceRegistry.hasDevice(deviceId)) {
+                    const newDevice = new Device({
+                        id: deviceId,
+                        deviceFriendlyName: device.serial,
+                        model: 'Unknown',
+                        version: 'Unknown',
+                        arch: 'Unknown',
+                        isNew: true
+                    });
+                    deviceRegistry.registerDevice(newDevice);
                 }
 
-                for (
-                    const device of devices
-                ) {
-                    if (
-                        !device ||
-                        !device.serial
-                    ) {
-                        continue;
-                    }
+                // تحديث الحالة التشغيلية (متصل)
+                const newStatus = (device.state === 'device') ? 'connected' : (device.state || 'unknown');
+                deviceRegistry.updateState(deviceId, {
+                    status: newStatus,
+                    adbTarget: device.serial,
+                    connectionType: device.serial.includes(':') ? 'TCPIP' : 'USB',
+                    lastSeen: new Date()
+                });
 
-                    deviceRegistry
-                        .updateState(
-                            device.serial,
-                            {
-                                status:
-                                    device.state ||
-                                    'unknown',
-                                adbTarget:
-                                    device.serial,
-                                lastSeen:
-                                    new Date()
-                            }
-                        );
+                if (this._windowManager) {
+                    this._windowManager.broadcast('device:stateChanged', {
+                        deviceId: deviceId,
+                        state: newStatus,
+                        adbTarget: device.serial
+                    });
                 }
             }
-        );
 
-        // 2. حدث اكتشاف جهاز لاسلكي عبر mDNS (قبل الاقتران)
+            // 3. معالجة الأجهزة المفقودة (غير موجودة في القائمة الحالية)
+            const allDevices = deviceRegistry.getAllDevices();
+            for (const registeredDevice of allDevices) {
+                const deviceId = registeredDevice.id;
+                const runtimeState = deviceRegistry.getRuntimeState(deviceId);
+                
+                // إذا كان الجهاز غير موجود في الـ serials الحالية
+                if (!currentSerials.has(deviceId)) {
+                    // الجهاز غير مسجل (isNew = true) => إزالته بالكامل من السجل
+                    if (registeredDevice.isNew === true) {
+                        deviceRegistry.removeDevice(deviceId);
+                        if (this._windowManager) {
+                            this._windowManager.broadcast('device:removed', { deviceId });
+                        }
+                    } 
+                    // الجهاز مسجل (isNew = false) => تحديث حالته إلى offline
+                    else if (runtimeState && runtimeState.status !== 'offline') {
+                        deviceRegistry.updateState(deviceId, { status: 'offline', lastSeen: new Date() });
+                        if (this._windowManager) {
+                            this._windowManager.broadcast('device:stateChanged', {
+                                deviceId: deviceId,
+                                state: 'offline',
+                                adbTarget: deviceId
+                            });
+                        }
+                    }
+                }
+            }
+        });
+
+        // ==================== معالج اكتشاف الأجهزة اللاسلكية ====================
         connectionService.on('wirelessServiceFound', (service) => {
-            if (!service || !service.host || !service.port) return;
-
+            if (!service?.host || !service?.port) return;
             const adbTarget = `${service.host}:${service.port}`;
-            // نبحث عن جهاز موجود بنفس الهدف
             let deviceId = deviceRegistry.findDeviceIdByAdbTarget(adbTarget);
 
             if (!deviceId) {
-                // جهاز جديد غير مسجل بعد – لا ننشئ Device كامل هنا، فقط نحدث الحالة التشغيلية
-                // سنستخدم عنوان الهدف كمعرف مؤقت لحين الاقتران الفعلي
                 deviceId = `wireless-${adbTarget.replace(/:/g, '-')}`;
-                // تسجيل حالة تشغيلية فقط (بدون Device entity) لتظهر في الواجهة كجهاز مكتشف
-                deviceRegistry.updateState(deviceId, {
-                    status: 'discovered',
-                    adbTarget: adbTarget,
-                    ip: service.host,
-                    port: service.port,
-                    connectionType: 'WIRELESS_DISCOVERED',
-                    lastSeen: new Date()
-                });
-                // ملاحظة: لم يتم استدعاء registerDevice، لذلك هذا الجهاز لن يظهر في getAllDevices()
-                // إلا إذا أردنا ذلك. لكن يمكن للواجهة عرض runtimeStates مباشرة إذا احتاجت.
-                // لتجنب التعقيد، سنكتفي بتحديث الحالة فقط.
-            } else {
-                deviceRegistry.updateState(deviceId, {
-                    status: 'discovered',
-                    ip: service.host,
-                    port: service.port,
-                    lastSeen: new Date()
+                if (!deviceRegistry.hasDevice(deviceId)) {
+                    const newDevice = new Device({
+                        id: deviceId,
+                        deviceFriendlyName: service.name || adbTarget,
+                        model: 'Unknown',
+                        version: 'Unknown',
+                        arch: 'Unknown',
+                        isNew: true
+                    });
+                    deviceRegistry.registerDevice(newDevice);
+                }
+            }
+
+            deviceRegistry.updateState(deviceId, {
+                status: 'discovered',
+                adbTarget: adbTarget,
+                ip: service.host,
+                port: service.port,
+                connectionType: 'WIRELESS_DISCOVERED',
+                lastSeen: new Date()
+            });
+
+            if (this._windowManager) {
+                this._windowManager.broadcast('device:stateChanged', {
+                    deviceId: deviceId,
+                    state: 'discovered',
+                    adbTarget: adbTarget
                 });
             }
         });
 
-        // 3. حدث نجاح الاقتران (pair)
+        // ==================== باقي معالجات الأحداث ====================
         connectionService.on('pairSuccess', ({ host, pairingCode }) => {
             if (!host) return;
-            // host مثال "192.168.1.10:37000" – قد لا يكون هو هدف الاتصال النهائي
-            // نقوم بتحديث الحالة لأي جهاز له adbTarget يبدأ بنفس المضيف (بدون منفذ الاقتران)
-            const baseHost = host.split(':')[0];
-            // نبحث في runtimeStates عن أي جهاز adbTarget يبدأ بـ baseHost
-            // هذا تقريبي، لكن الأفضل انتظار حدث connectSuccess الذي يعطي الهدف النهائي.
-            // نكتفي بتسجيل الاقتران كملاحظة:
-            console.log(`[Container] Pair success for ${host}`);
+            errorCentralService.info(`Pair success for ${host}`, { source: 'Container' });
+            if (this._windowManager) {
+                this._windowManager.broadcast('device:paired', { host, pairingCode });
+            }
         });
 
-        // 4. حدث نجاح الاتصال (connect) – بعد الاقتران أو الاتصال المباشر
         connectionService.on('connectSuccess', ({ target }) => {
             if (!target) return;
-            // target مثال "192.168.1.10:5555"
             let deviceId = deviceRegistry.findDeviceIdByAdbTarget(target);
+            
             if (!deviceId) {
-                // جهاز غير مسجل بعد – ننشئ معرف مؤقت
                 deviceId = `device-${target.replace(/:/g, '-')}-${Date.now()}`;
-                // نقوم بتحديث الحالة فقط، بدون كيان Device. سيتم إنشاء Device حقيقي
-                // عندما يقوم DeviceOrchestrator.connectDevice باستدعاء registerDevice.
-                // هنا نحن ننبه الـ registry أن هذا الجهاز أصبح متصلاً.
+                if (!deviceRegistry.hasDevice(deviceId)) {
+                    const newDevice = new Device({
+                        id: deviceId,
+                        deviceFriendlyName: target,
+                        model: 'Unknown',
+                        version: 'Unknown',
+                        arch: 'Unknown',
+                        isNew: true
+                    });
+                    deviceRegistry.registerDevice(newDevice);
+                }
             }
+            
             deviceRegistry.updateState(deviceId, {
                 status: 'connected',
                 adbTarget: target,
                 connectionType: 'TCPIP',
                 lastSeen: new Date()
             });
+            
+            if (this._windowManager) {
+                this._windowManager.broadcast('device:stateChanged', {
+                    deviceId: deviceId,
+                    state: 'connected',
+                    adbTarget: target
+                });
+            }
         });
 
-        // 5. حدث قطع الاتصال
         connectionService.on('disconnect', ({ target }) => {
             if (!target || target === 'all') {
-                // قطع كل الأجهزة – نبحث عن كل الأجهزة المتصلة ونحدثها
                 for (const deviceId of deviceRegistry.getAllDevices().map(d => d.id)) {
                     const state = deviceRegistry.getRuntimeState(deviceId);
                     if (state && state.status === 'connected') {
-                        deviceRegistry.updateState(deviceId, { status: 'offline' });
+                        deviceRegistry.updateState(deviceId, { status: 'offline', lastSeen: new Date() });
+                        if (this._windowManager) {
+                            this._windowManager.broadcast('device:stateChanged', {
+                                deviceId: deviceId,
+                                state: 'offline'
+                            });
+                        }
                     }
                 }
                 return;
             }
             const deviceId = deviceRegistry.findDeviceIdByAdbTarget(target);
             if (deviceId) {
-                deviceRegistry.updateState(deviceId, { status: 'offline' });
+                deviceRegistry.updateState(deviceId, { status: 'offline', lastSeen: new Date() });
+                if (this._windowManager) {
+                    this._windowManager.broadcast('device:stateChanged', {
+                        deviceId: deviceId,
+                        state: 'offline',
+                        adbTarget: target
+                    });
+                }
             }
         });
 
-        // --- إنشاء محولات Infrastructure باستخدام محلل المسار الموحد ---
+        // ==================== تهيئة المحولات والمنسقين ====================
         const scrcpyAdapter = new ScrcpyAdapter({
             processSupervisor,
-            logger: ErrorCentralService,
+            logger: errorCentralService,
             toolPathResolver: toolPathResolver
-            // لم نمرر scrcpyPath -> سيتم حله تلقائياً عبر toolPathResolver
         });
 
         const ytdlpAdapter = new YtdlpAdapter({
             processSupervisor,
-            logger: ErrorCentralService,
+            logger: errorCentralService,
             toolPathResolver: toolPathResolver
-            // لم نمرر ytdlpPath -> سيتم حله تلقائياً عبر toolPathResolver
-            // ملاحظة: الخاصية الصحيحة هي `ytdlpPath` (وليس `ytDlpPath`).
         });
 
-        // --- إنشاء الـ Orchestrators (طبقة Application) ---
         const deviceOrchestrator = new DeviceOrchestrator({
             deviceRegistry,
             connectionService,
             scrcpyAdapter,
-            logger: ErrorCentralService
+            logger: errorCentralService
         });
 
         const downloadOrchestrator = new DownloadOrchestrator({
             ytdlpAdapter,
             deviceRegistry,
-            logger: ErrorCentralService
+            logger: errorCentralService
         });
 
-        // --- تسجيل طبقة IPC الرقيقة (المرحلة 6) ---
         const { registerIpcHandlers } = require('../infrastructure/ipc');
         registerIpcHandlers(deviceOrchestrator, downloadOrchestrator);
 
-        // --- تسجيل جميع الخدمات في الخريطة ---
-        this._services.set(
-            'errorCentralService',
-            ErrorCentralService
-        );
+        // ==================== تسجيل الخدمات ====================
+        this._services.set('errorCentralService', errorCentralService);
+        this._services.set('processManager', ProcessManager);
+        this._services.set('processRegistry', processRegistry);
+        this._services.set('processSupervisor', processSupervisor);
+        this._services.set('deviceRegistry', deviceRegistry);
+        this._services.set('databaseManager', databaseManager);
+        this._services.set('adbCommandExecutor', adbCommandExecutor);
+        this._services.set('connectionService', connectionService);
+        this._services.set('scrcpyAdapter', scrcpyAdapter);
+        this._services.set('ytdlpAdapter', ytdlpAdapter);
+        this._services.set('deviceOrchestrator', deviceOrchestrator);
+        this._services.set('downloadOrchestrator', downloadOrchestrator);
+        this._services.set('toolPathResolver', toolPathResolver);
 
-        this._services.set(
-            'processManager',
-            ProcessManager
-        );
-
-        this._services.set(
-            'processRegistry',
-            processRegistry
-        );
-
-        this._services.set(
-            'processSupervisor',
-            processSupervisor
-        );
-
-        this._services.set(
-            'deviceRegistry',
-            deviceRegistry
-        );
-
-        this._services.set(
-            'databaseManager',
-            databaseManager
-        );
-
-        this._services.set(
-            'adbCommandExecutor',
-            adbCommandExecutor
-        );
-
-        this._services.set(
-            'connectionService',
-            connectionService
-        );
-
-        // --- تسجيل المكونات الجديدة ---
-        this._services.set(
-            'scrcpyAdapter',
-            scrcpyAdapter
-        );
-
-        this._services.set(
-            'ytdlpAdapter',
-            ytdlpAdapter
-        );
-
-        this._services.set(
-            'deviceOrchestrator',
-            deviceOrchestrator
-        );
-
-        this._services.set(
-            'downloadOrchestrator',
-            downloadOrchestrator
-        );
-
-        this._services.set(
-            'toolPathResolver',
-            toolPathResolver
-        );
-
-        this._initialized =
-            true;
-
+        this._initialized = true;
         return this;
     }
 
     resolve(name) {
-        return (
-            this._services.get(
-                name
-            ) || null
-        );
+        return this._services.get(name) || null;
+    }
+
+    setWindowManager(windowManager) {
+        this._windowManager = windowManager;
+        const ytdlpAdapter = this._services.get('ytdlpAdapter');
+        if (ytdlpAdapter && typeof ytdlpAdapter.setWindowManager === 'function') {
+            ytdlpAdapter.setWindowManager(windowManager);
+        }
+    }
+
+    getWindowManager() {
+        return this._windowManager;
     }
 }
 
-module.exports =
-    new BootstrapContainer();
+module.exports = new BootstrapContainer();
 </file>
 
 </files>
