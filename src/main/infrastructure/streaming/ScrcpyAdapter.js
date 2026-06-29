@@ -21,6 +21,28 @@ class ScrcpyAdapter {
         this._activeProcesses = new Map(); // key: adbTarget, value: processId
     }
 
+    /**
+     * Validate and sanitize adbTarget input to prevent command injection
+     * @param {string} input - The adbTarget to validate
+     * @returns {string} The validated input
+     * @throws {Error} If input contains dangerous characters
+     */
+    _sanitizeAdbTarget(input) {
+        if (!input || typeof input !== 'string') {
+            throw new Error('adbTarget must be a non-empty string');
+        }
+
+        // Allow alphanumeric, hyphens, underscores, dots, colons, and spaces
+        // Reject characters commonly used in command injection: ;, &, |, `, $, (, ), <, >
+        const dangerousPattern = /[;&|`$()<>]/;
+        if (dangerousPattern.test(input)) {
+            throw new Error(`Invalid adbTarget: contains dangerous characters`);
+        }
+
+        // Trim whitespace
+        return input.trim();
+    }
+
     _resolveScrcpyPath(explicitPath) {
         if (explicitPath) return explicitPath;
         if (this._toolPathResolver) return this._toolPathResolver.getScrcpyPath();
@@ -38,48 +60,46 @@ class ScrcpyAdapter {
      * @returns {string} processId
      */
     startMirroring(adbTarget, options = {}) {
-        if (!adbTarget) {
-            throw new Error('adbTarget is required');
-        }
-    
+        const sanitizedTarget = this._sanitizeAdbTarget(adbTarget);
+
         // التحقق من وجود عملية بث نشطة لهذا الجهاز
-        const existingProcessId = this._activeProcesses.get(adbTarget);
+        const existingProcessId = this._activeProcesses.get(sanitizedTarget);
         if (existingProcessId) {
             const processStatus = this._processSupervisor.getProcessStatus(existingProcessId);
             if (processStatus && processStatus.status === 'RUNNING') {
                 throw new Error('Screen mirroring is already active for this device');
             } else {
                 // العملية القديمة انتهت (أو فشلت) – نقوم بتنظيف المفتاح
-                this._activeProcesses.delete(adbTarget);
+                this._activeProcesses.delete(sanitizedTarget);
             }
         }
-    
-        const processId = `scrcpy:${adbTarget}`;
+
+        const processId = `scrcpy:${sanitizedTarget}`;
         const args = [
-            '-s', adbTarget,
+            '-s', sanitizedTarget,
             ...(options.fullscreen ? ['--fullscreen'] : []),
             ...(options.bitrate ? ['--bit-rate', String(options.bitrate)] : [])
         ];
-    
+
         const childProcess = this._processSupervisor.startManagedProcess({
             processId,
             binPath: this._scrcpyPath,
             args,
             type: 'scrcpy',
-            metadata: { adbTarget }
+            metadata: { adbTarget: sanitizedTarget }
         });
-    
+
         // تنظيف الخريطة عند انتهاء العملية (لأي سبب)
         if (childProcess && typeof childProcess.once === 'function') {
             childProcess.once('exit', () => {
-                this._activeProcesses.delete(adbTarget);
+                this._activeProcesses.delete(sanitizedTarget);
             });
             childProcess.once('error', () => {
-                this._activeProcesses.delete(adbTarget);
+                this._activeProcesses.delete(sanitizedTarget);
             });
         }
-    
-        this._activeProcesses.set(adbTarget, processId);
+
+        this._activeProcesses.set(sanitizedTarget, processId);
         return processId;
     }
 
@@ -89,11 +109,13 @@ class ScrcpyAdapter {
      * @returns {boolean} نجاح العملية
      */
     stopMirroring(adbTarget) {
-        const processId = this._activeProcesses.get(adbTarget);
+        if (!adbTarget) return false;
+        const sanitizedTarget = this._sanitizeAdbTarget(adbTarget);
+        const processId = this._activeProcesses.get(sanitizedTarget);
         if (!processId) return false;
 
         this._processSupervisor.stopManagedProcess(processId);
-        this._activeProcesses.delete(adbTarget);
+        this._activeProcesses.delete(sanitizedTarget);
         return true;
     }
 }

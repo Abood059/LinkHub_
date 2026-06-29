@@ -3,14 +3,16 @@
 
 const os = require('os');
 const path = require('path');
+const EventEmitter = require('events');
 
-class YtdlpAdapter {
+class YtdlpAdapter extends EventEmitter {
     constructor({
         processSupervisor,
         ytdlpPath = null,
         toolPathResolver = null,
         logger = null
     }) {
+        super();
         this._processSupervisor = processSupervisor;
         this._logger = logger;
         this._toolPathResolver = toolPathResolver;
@@ -94,6 +96,10 @@ class YtdlpAdapter {
     }
 
     async startDownload(url, formatId, options = {}) {
+        if (!formatId || typeof formatId !== 'string' || formatId.trim() === '') {
+            throw new Error('formatId is required and must be a non-empty string');
+        }
+        
         return new Promise((resolve, reject) => {
             const { outputPath, onProgress, deviceId } = options;
             let finalOutputPath = outputPath;
@@ -125,15 +131,12 @@ class YtdlpAdapter {
                     if (match) {
                         const percent = parseFloat(match[1]);
                         if (onProgress) onProgress({ percent, raw: text });
-                        if (this._windowManager) {
-                            this._windowManager.broadcast('download:progress', {
-                                downloadId: processId,
-                                percent: percent,
-                                raw: text,
-                                deviceId: deviceId,
-                                url: url
-                            });
-                        }
+                        this.emit('downloadProgress', {
+                            downloadId: processId,
+                            percent: percent,
+                            deviceId: deviceId,
+                            url: url
+                        });
                     }
                 }
             });
@@ -157,25 +160,21 @@ class YtdlpAdapter {
                     
                     if (code === 0) {
                         entry.status = 'completed';
-                        if (this._windowManager) {
-                            this._windowManager.broadcast('download:complete', {
-                                downloadId: processId,
-                                outputPath: finalOutputPath,
-                                deviceId: deviceId,
-                                url: url
-                            });
-                        }
+                        this.emit('downloadComplete', {
+                            downloadId: processId,
+                            outputPath: finalOutputPath,
+                            deviceId: deviceId,
+                            url: url
+                        });
                         entry.resolve({ success: true, outputPath: finalOutputPath, processId });
                     } else {
                         entry.status = 'failed';
-                        if (this._windowManager) {
-                            this._windowManager.broadcast('download:error', {
-                                downloadId: processId,
-                                error: `Exit code ${code}`,
-                                deviceId: deviceId,
-                                url: url
-                            });
-                        }
+                        this.emit('downloadError', {
+                            downloadId: processId,
+                            error: `Exit code ${code}`,
+                            deviceId: deviceId,
+                            url: url
+                        });
                         entry.reject(new Error(`Download failed with exit code ${code}`));
                     }
                     this._activeDownloads.delete(processId);
@@ -185,14 +184,12 @@ class YtdlpAdapter {
                     const entry = this._activeDownloads.get(processId);
                     if (entry) {
                         entry.status = 'failed';
-                        if (this._windowManager) {
-                            this._windowManager.broadcast('download:error', {
-                                downloadId: processId,
-                                error: err.message,
-                                deviceId: deviceId,
-                                url: url
-                            });
-                        }
+                        this.emit('downloadError', {
+                            downloadId: processId,
+                            error: err.message,
+                            deviceId: deviceId,
+                            url: url
+                        });
                         entry.reject(err);
                         this._activeDownloads.delete(processId);
                     }
@@ -212,12 +209,10 @@ class YtdlpAdapter {
         const stopped = this._processSupervisor.stopManagedProcess(processId);
         if (stopped) {
             this._activeDownloads.delete(processId);
-            if (this._windowManager) {
-                this._windowManager.broadcast('download:stopped', {
-                    downloadId: processId,
-                    url: entry.url
-                });
-            }
+            this.emit('downloadStopped', {
+                downloadId: processId,
+                url: entry.url
+            });
         }
         return stopped;
     }

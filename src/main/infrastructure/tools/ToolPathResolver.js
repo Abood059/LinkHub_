@@ -3,6 +3,7 @@
 
 const path = require('path');
 const fs = require('fs');
+const { sanitizePath } = require('../../utils/pathSanitizer');
 
 class ToolPathResolver {
     constructor(options = {}) {
@@ -49,13 +50,14 @@ class ToolPathResolver {
     _getPath(envVarName, binaryName) {
         const envPath = process.env[envVarName];
         if (envPath && typeof envPath === 'string' && envPath.trim()) {
-            if (fs.existsSync(envPath)) {
-                return envPath;
+            const sanitizedPath = sanitizePath(this._appRoot, envPath, this._logger);
+            if (sanitizedPath && fs.existsSync(sanitizedPath)) {
+                return sanitizedPath;
             }
             if (this._logger) {
-                this._logger.warn(`ToolPathResolver: Environment override ${envVarName} points to non-existent file.`);
+                this._logger.warn(`ToolPathResolver: Environment override ${envVarName} points to non-existent or invalid file.`);
             }
-            return null; // تعيد null بدلاً من throw
+            return null;
         }
     
         const defaultPath = this._getDefaultPath(binaryName);
@@ -63,7 +65,6 @@ class ToolPathResolver {
             return defaultPath;
         }
     
-        // تم تحويلها إلى Warn بدلاً من Error وقمنا بإلغاء الـ throw
         if (this._logger) {
             this._logger.warn(`ToolPathResolver: Optional binary "${binaryName}" not found at ${defaultPath}.`);
         }

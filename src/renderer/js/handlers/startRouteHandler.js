@@ -1,14 +1,9 @@
 // startRouteHandler.js - معالج زر بدء التوجيه والتحميل
+'use strict';
+
 import { showToast } from '../core/utils.js';
 import { inspectUrl, startDownload } from '../services/downloadService.js';
-import { getSelectedDeviceIds } from '../ui/selectionManager.js';
-import { addDownloadRow } from '../ui/downloadManager.js';
-
-let registeredDevices = []; // سيتم ربطها من main
-
-export function setRegisteredDevicesGetter(getterFn) {
-    registeredDevices = getterFn;
-}
+import store from '../store/appStore.js';
 
 export async function handleStartRoute(url, urlInputElement) {
     const trimmedUrl = url.trim();
@@ -17,7 +12,8 @@ export async function handleStartRoute(url, urlInputElement) {
         return false;
     }
 
-    const selectedIds = getSelectedDeviceIds();
+    const state = store.getState();
+    const selectedIds = state.selectedDeviceIds || new Set();
     if (selectedIds.size === 0) {
         showToast('الرجاء تحديد جهاز واحد أو أكثر أولاً.', true);
         return false;
@@ -46,15 +42,13 @@ export async function handleStartRoute(url, urlInputElement) {
         } catch(e) { return 'media_' + Date.now(); }
     })();
 
-    const devicesList = (typeof registeredDevices === 'function') ? registeredDevices() : registeredDevices;
+    const devices = store.getState().devices;
     for (const deviceId of selectedIds) {
-        const deviceData = devicesList.find(d => d.device.id === deviceId);
+        const deviceData = devices.find(d => d.device.id === deviceId);
         if (!deviceData) continue;
         const deviceName = deviceData.device.deviceFriendlyName || deviceData.device.model || deviceId;
         try {
-            const result = await startDownload(trimmedUrl, formatId, deviceId);
-            const downloadId = result.processId;
-            addDownloadRow(downloadId, title, deviceName, trimmedUrl);
+            await startDownload(trimmedUrl, formatId, deviceId);
         } catch (err) {
             showToast(`فشل التحميل على الجهاز ${deviceName}: ${err.message}`, true);
         }

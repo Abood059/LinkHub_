@@ -7,6 +7,6 @@ export async function startDownload(url, formatId, deviceId) {
     return await linkhub.downloads.start(url, formatId, deviceId, {});
 }
 
-export async function stopDownload(url) {
-    return await linkhub.downloads.stop(url);
+export async function stopDownload(processId) {
+    return await linkhub.downloads.stop(processId);
 }

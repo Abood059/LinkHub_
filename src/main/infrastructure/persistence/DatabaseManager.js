@@ -3,6 +3,7 @@
 
 const fs = require('fs/promises');
 const path = require('path');
+const { sanitizePath } = require('../../utils/pathSanitizer');
 
 /**
  * DatabaseManager
@@ -20,7 +21,8 @@ const path = require('path');
  */
 class DatabaseManager {
     constructor({ databasePath } = {}) {
-        this._databasePath = databasePath || path.join(process.cwd(), 'data', 'devices.json');
+        this._appRoot = process.cwd();
+        this._databasePath = sanitizePath(this._appRoot, databasePath) || path.join(this._appRoot, 'data', 'devices.json');
         this._initialized = false;
     }
 

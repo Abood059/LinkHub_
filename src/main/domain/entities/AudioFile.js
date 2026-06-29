@@ -22,6 +22,30 @@ class AudioFile extends BaseFile {
         this.codec = codec;
         this.fileSizeApprox = fileSizeApprox;
     }
+
+    toJSON() {
+        return {
+            ...super.toJSON(),
+            formatId: this.formatId,
+            abr: this.abr,
+            codec: this.codec,
+            fileSizeApprox: this.fileSizeApprox
+        };
+    }
+
+    static fromJSON(data) {
+        return new AudioFile({
+            id: data.id,
+            name: data.name,
+            extension: data.extension,
+            sourceUrl: data.sourceUrl,
+            storagePath: data.storagePath,
+            formatId: data.formatId,
+            abr: data.abr,
+            codec: data.codec,
+            fileSizeApprox: data.fileSizeApprox
+        });
+    }
 }
 
 module.exports = AudioFile;

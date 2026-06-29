@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const FileStatus = require('./FileStatus');
+const FileStatus = require('../value-objects/FileStatus');
 
 /**
  * HttpFile Model

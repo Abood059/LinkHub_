@@ -72,6 +72,11 @@ class DeviceRegistry {
         deviceId,
         state = {}
     ) {
+        // Handle null, undefined, or non-object state gracefully
+        if (!state || typeof state !== 'object') {
+            state = {};
+        }
+
         let runtimeState =
             this._runtimeStates.get(
                 deviceId
@@ -87,12 +92,20 @@ class DeviceRegistry {
             );
         }
 
-        runtimeState.update({
-            ...state,
-            lastSeen:
-                state.lastSeen ||
-                new Date()
-        });
+        // Only update known properties of DeviceRuntimeState
+        // Only include properties that are actually present in the state object
+        const knownProperties = {};
+        
+        if (state.status !== undefined) knownProperties.status = state.status;
+        if (state.ip !== undefined) knownProperties.ip = state.ip;
+        if (state.port !== undefined) knownProperties.port = state.port;
+        if (state.connectionType !== undefined) knownProperties.connectionType = state.connectionType;
+        if (state.adbTarget !== undefined) knownProperties.adbTarget = state.adbTarget;
+        
+        // Always update lastSeen if not provided, or use provided value
+        knownProperties.lastSeen = state.lastSeen || new Date();
+
+        runtimeState.update(knownProperties);
 
         return runtimeState;
     }

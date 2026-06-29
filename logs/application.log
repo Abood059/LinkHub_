@@ -305,3 +305,69 @@
 [2026-06-06 12:37:25.704] [info]  [2026-06-06T09:37:25.703Z] | [INFO] | [PROCESS] | [INFO] | [ProcessManager] | Process scrcpy:RZ8RC1K2ZLE exited with code 0 |  | 
 [2026-06-06 12:37:40.554] [info]  [2026-06-06T09:37:40.554Z] | [INFO] | [PROCESS] | [INFO] | [ProcessManager] | Process scrcpy:RZ8RC1K2ZLE exited with code 0 |  | 
 [2026-06-06 12:37:45.138] [info]  [2026-06-06T09:37:45.138Z] | [INFO] | [PROCESS] | [INFO] | [ProcessManager] | Process scrcpy:RZ8RC1K2ZLE exited with code 0 |  | 
+[2026-06-07 21:05:09.637] [info]  [2026-06-07T18:05:09.637Z] | [INFO] | [PROCESS] | [INFO] | [ProcessManager] | Process scrcpy:RZ8T21QQ9RY exited with code 0 |  | 
+[2026-06-08 12:14:02.971] [warn]  [2026-06-08T09:14:02.963Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:03.462] [warn]  [2026-06-08T09:14:03.462Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:03.962] [warn]  [2026-06-08T09:14:03.962Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:04.462] [warn]  [2026-06-08T09:14:04.462Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:04.962] [warn]  [2026-06-08T09:14:04.962Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:05.456] [warn]  [2026-06-08T09:14:05.456Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:05.964] [warn]  [2026-06-08T09:14:05.964Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:06.466] [warn]  [2026-06-08T09:14:06.466Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:06.957] [warn]  [2026-06-08T09:14:06.957Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:07.473] [warn]  [2026-06-08T09:14:07.473Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:07.962] [warn]  [2026-06-08T09:14:07.962Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:13.976] [warn]  [2026-06-08T09:14:13.976Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:14.474] [warn]  [2026-06-08T09:14:14.474Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:14.980] [warn]  [2026-06-08T09:14:14.980Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:15.475] [warn]  [2026-06-08T09:14:15.475Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:15.977] [warn]  [2026-06-08T09:14:15.977Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:16.479] [warn]  [2026-06-08T09:14:16.479Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:16.977] [warn]  [2026-06-08T09:14:16.977Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:17.478] [warn]  [2026-06-08T09:14:17.478Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:17.980] [warn]  [2026-06-08T09:14:17.980Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:18.480] [warn]  [2026-06-08T09:14:18.480Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:18.978] [warn]  [2026-06-08T09:14:18.978Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:19.478] [warn]  [2026-06-08T09:14:19.478Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:19.981] [warn]  [2026-06-08T09:14:19.981Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:20.480] [warn]  [2026-06-08T09:14:20.480Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:20.982] [warn]  [2026-06-08T09:14:20.982Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:21.481] [warn]  [2026-06-08T09:14:21.481Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:21.980] [warn]  [2026-06-08T09:14:21.980Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:22.484] [warn]  [2026-06-08T09:14:22.484Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:22.984] [warn]  [2026-06-08T09:14:22.984Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:23.480] [warn]  [2026-06-08T09:14:23.480Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:23.982] [warn]  [2026-06-08T09:14:23.982Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:24.485] [warn]  [2026-06-08T09:14:24.485Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:24.983] [warn]  [2026-06-08T09:14:24.983Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:25.483] [warn]  [2026-06-08T09:14:25.483Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:25.983] [warn]  [2026-06-08T09:14:25.983Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:26.486] [warn]  [2026-06-08T09:14:26.486Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:26.989] [warn]  [2026-06-08T09:14:26.989Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:27.488] [warn]  [2026-06-08T09:14:27.488Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:27.986] [warn]  [2026-06-08T09:14:27.986Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:28.487] [warn]  [2026-06-08T09:14:28.487Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:28.988] [warn]  [2026-06-08T09:14:28.988Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:29.487] [warn]  [2026-06-08T09:14:29.487Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:29.990] [warn]  [2026-06-08T09:14:29.990Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-08 12:14:30.488] [warn]  [2026-06-08T09:14:30.488Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | [ADB] Failed to get devices list: Command timeout after 5000ms |  | 
+[2026-06-29 21:08:40.007] [error] [2026-06-29T18:08:40.005Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Uncaught Exception |  | Error: setRawMode EIO
+    at ReadStream.setRawMode (node:tty:76:24)
+    at Program.destroy (/home/abood/Project/LinkHub_/node_modules/neo-blessed/lib/program.js:494:22)
+    at Screen.destroy (/home/abood/Project/LinkHub_/node_modules/neo-blessed/lib/widgets/screen.js:442:16)
+    at /home/abood/Project/LinkHub_/node_modules/neo-blessed/lib/widgets/screen.js:239:14
+    at Array.forEach (<anonymous>)
+    at process.on.Screen._exitHandler (/home/abood/Project/LinkHub_/node_modules/neo-blessed/lib/widgets/screen.js:238:30)
+    at process.emit (node:events:536:35)
+    at process.exit (node:internal/process/per_thread:184:15)
+    at Timeout._onTimeout (/home/abood/Project/LinkHub_/src/cli/index.js:132:21)
+    at listOnTimeout (node:internal/timers:581:17)
+[2026-06-29 22:05:53.688] [info]  [2026-06-29T19:05:53.687Z] | [INFO] | [PROCESS] | [INFO] | [ProcessManager] | Process scrcpy:RZ8RC21JT3P exited with code 0 |  | 
+[2026-06-29 22:06:23.128] [info]  [2026-06-29T19:06:23.128Z] | [INFO] | [PROCESS] | [INFO] | [ProcessManager] | Process scrcpy:RZ8T30BNMWF exited with code 0 |  | 
+[2026-06-29 22:06:40.043] [info]  [2026-06-29T19:06:40.043Z] | [INFO] | [PROCESS] | [INFO] | [ProcessManager] | Process scrcpy:RZ8RC21JT3P exited with code 0 |  | 
+[2026-06-29 22:08:43.301] [info]  [2026-06-29T19:08:43.301Z] | [INFO] | [PROCESS] | [INFO] | [ProcessManager] | Process scrcpy:RZ8RC21JT3P exited with code 0 |  | 
+[2026-06-29 22:08:45.833] [info]  [2026-06-29T19:08:45.833Z] | [INFO] | [PROCESS] | [INFO] | [ProcessManager] | Process scrcpy:RZ8T30BNMWF exited with code 0 |  | 
+[2026-06-29 22:12:11.169] [info]  [2026-06-29T19:12:11.169Z] | [INFO] | [PROCESS] | [INFO] | [ProcessManager] | Process ytdlp-dl-1782760330404 exited with code 1 |  | 
+[2026-06-29 22:12:11.802] [info]  [2026-06-29T19:12:11.802Z] | [INFO] | [PROCESS] | [INFO] | [ProcessManager] | Process ytdlp-dl-1782760331181 exited with code 1 |  | 
+[2026-06-29 22:12:30.576] [info]  [2026-06-29T19:12:30.576Z] | [INFO] | [PROCESS] | [INFO] | [ProcessManager] | Process ytdlp-dl-1782760349939 exited with code 1 |  | 
+[2026-06-29 22:12:31.209] [info]  [2026-06-29T19:12:31.209Z] | [INFO] | [PROCESS] | [INFO] | [ProcessManager] | Process ytdlp-dl-1782760350585 exited with code 1 |  | 

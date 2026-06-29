@@ -29,10 +29,9 @@ class DownloadHandlers {
             return this._downloadOrchestrator.startDownload(url, formatId, deviceId, options);
         });
 
-        // التعديل الأساسي: نمرر URL وليس processId
-        ipcMain.handle('download:stop', async (event, url) => {
-            if (!url) throw new Error('URL is required');
-            return this._downloadOrchestrator.stopDownload(url);
+        ipcMain.handle('download:stop', async (event, processId) => {
+            if (!processId) throw new Error('processId is required');
+            return this._downloadOrchestrator.stopDownload(processId);
         });
 
         ipcMain.handle('download:metadata', async (event, url) => {

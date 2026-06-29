@@ -44,7 +44,7 @@ class DeviceOrchestrator {
 
         // تحديد نوع الاتصال
         const connectionType = target.includes(':') ? 'TCPIP' : 'USB';
-        
+
         // إذا كان TCP/IP، ننفذ أمر الاتصال عبر ADB
         if (connectionType === 'TCPIP') {
             await this._connectionService.connect(target);
@@ -63,7 +63,7 @@ class DeviceOrchestrator {
 
         // تسجيل الجهاز في الـ Registry
         this._deviceRegistry.registerDevice(device);
-        
+
         // تحديث الحالة التشغيلية
         this._deviceRegistry.updateState(device.id, {
             status: 'connected',
@@ -78,7 +78,7 @@ class DeviceOrchestrator {
             if (deviceInfo) {
                 device.updateDetails(deviceInfo.model, deviceInfo.version, deviceInfo.arch);
                 this._logger?.info(`Device info updated for ${target}: ${deviceInfo.model} (${deviceInfo.version})`);
-                
+
                 // تحديث الـ runtime state بمعلومات إضافية اختيارية
                 this._deviceRegistry.updateState(device.id, {
                     model: deviceInfo.model,
@@ -106,6 +106,12 @@ class DeviceOrchestrator {
         }
 
         const runtimeState = this._deviceRegistry.getRuntimeState(deviceId);
+
+        // SECURITY: Verify device is connected before allowing streaming
+        if (runtimeState?.status !== 'connected') {
+            throw new Error(`Device ${deviceId} is not connected (status: ${runtimeState?.status || 'unknown'})`);
+        }
+
         const adbTarget = runtimeState?.adbTarget || device.id;
 
         return this._scrcpyAdapter.startMirroring(adbTarget, options);

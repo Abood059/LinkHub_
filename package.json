@@ -3,9 +3,13 @@
   "version": "1.0.0",
   "main": "src/main/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --expose-gc ./node_modules/.bin/jest",
+    "test:coverage": "node --expose-gc ./node_modules/.bin/jest --coverage",
+    "test:e2e": "NODE_ENV=test node --expose-gc ./node_modules/.bin/jest tests/e2e",
+    "test:e2e:headless": "NODE_ENV=test HEADLESS=true node --expose-gc ./node_modules/.bin/jest tests/e2e",
     "start": "electron . --disable-gpu --no-sandbox",
-    "build": "electron-builder"
+    "build": "electron-builder",
+    "cli": "node src/cli/index.js"
   },
   "keywords": [],
   "author": "",
@@ -15,13 +19,17 @@
     "axios": "^1.16.1",
     "better-sqlite3": "^12.10.0",
     "bonjour-service": "^1.4.0",
+    "chalk": "^4.1.2",
     "dotenv": "^17.4.2",
     "electron-log": "^5.4.4",
-    "electron-squirrel-startup": "^1.0.1"
+    "electron-squirrel-startup": "^1.0.1",
+    "neo-blessed": "^0.2.0"
   },
   "devDependencies": {
     "@electron/rebuild": "3.6.0",
     "electron": "30.0.0",
-    "electron-builder": "24.13.3"
+    "electron-builder": "24.13.3",
+    "jest": "^30.4.2",
+    "memfs": "^4.0.0"
   }
 }

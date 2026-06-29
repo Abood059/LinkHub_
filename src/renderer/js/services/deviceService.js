@@ -1,6 +1,22 @@
 // deviceService.js - التعامل مع أجهزة linkhub
+import store from '../store/appStore.js';
+
 export async function getAllDevices() {
     return await linkhub.devices.getAll();
+}
+
+export async function loadDevices() {
+    store.setLoading(true);
+    try {
+        const devices = await getAllDevices();
+        store.setDevices(devices);
+        store.setLoading(false);
+        return devices;
+    } catch (error) {
+        store.setError(error);
+        store.setLoading(false);
+        throw error;
+    }
 }
 
 export async function startStream(deviceId) {

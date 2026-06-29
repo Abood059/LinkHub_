@@ -1,22 +1,48 @@
-// eventService.js - تسجيل أحداث IPC
-export function setupEventListeners(handlers) {
-    if (!linkhub.on) return;
-    
-    linkhub.on('download:progress', (event, data) => {
-        if (data && data.downloadId && data.percent !== undefined) {
-            handlers.onProgress?.(data.downloadId, data.percent, data.speed, data.size);
+// eventService.js - تسجيل أحداث IPC باستخدام الحالة المجمعة
+'use strict';
+
+import stateSyncService from './stateSyncService.js';
+import store from '../store/appStore.js';
+
+let _unsubscribe = null;
+
+/**
+ * إعداد مستمعي الأحداث من الخلفية
+ * @param {Object} handlers - معالجات إضافية (اختياري، للتوافق)
+ * @param {Object} containers - حاويات DOM (اختياري، للتوافق)
+ * @returns {Function} دالة تنظيف
+ */
+export function setupEventListeners(handlers = {}, containers = {}) {
+    if (!stateSyncService) {
+        console.warn('[EventService] stateSyncService not available');
+        return null;
+    }
+
+    stateSyncService.start();
+
+    // الاشتراك في تحديثات الحالة من الخلفية
+    _unsubscribe = stateSyncService.onUpdate((state) => {
+        if (!state) return;
+
+        // تحديث المخزن المركزي
+        if (state.devices) {
+            store.setDevices(state.devices);
+        }
+        if (state.downloads) {
+            store.setDownloads(state.downloads);
         }
     });
-    linkhub.on('download:complete', (event, data) => {
-        if (data?.downloadId) handlers.onComplete?.(data.downloadId);
-    });
-    linkhub.on('download:error', (event, data) => {
-        if (data?.downloadId) handlers.onError?.(data.downloadId, data.error);
-    });
-    linkhub.on('download:stopped', (event, data) => {
-        if (data?.downloadId) handlers.onStopped?.(data.downloadId);
-    });
-    linkhub.on('device:stateChanged', () => handlers.onDeviceStateChanged?.());
-    linkhub.on('device:paired', () => handlers.onDevicePaired?.());
-    linkhub.on('device:removed', () => handlers.onDeviceRemoved?.());
+
+    // إرجاع دالة تنظيف
+    return () => {
+        cleanup();
+    };
+}
+
+export function cleanup() {
+    if (_unsubscribe) {
+        _unsubscribe();
+        _unsubscribe = null;
+    }
+    stateSyncService.stop();
 }

@@ -1,1 +1,11 @@
-[]
+[
+    {
+        "id": "persistent-device",
+        "deviceFriendlyName": "persistent-device",
+        "type": "MOBILE",
+        "model": "Unknown",
+        "version": "Unknown",
+        "arch": "Unknown",
+        "isNew": true
+    }
+]

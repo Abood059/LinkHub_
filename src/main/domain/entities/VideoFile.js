@@ -28,6 +28,36 @@ class VideoFile extends BaseFile {
         this.height = height;
         this.fileSizeApprox = fileSizeApprox;
     }
+
+    toJSON() {
+        return {
+            ...super.toJSON(),
+            formatId: this.formatId,
+            resolution: this.resolution,
+            fps: this.fps,
+            codec: this.codec,
+            width: this.width,
+            height: this.height,
+            fileSizeApprox: this.fileSizeApprox
+        };
+    }
+
+    static fromJSON(data) {
+        return new VideoFile({
+            id: data.id,
+            name: data.name,
+            extension: data.extension,
+            sourceUrl: data.sourceUrl,
+            storagePath: data.storagePath,
+            formatId: data.formatId,
+            resolution: data.resolution,
+            fps: data.fps,
+            codec: data.codec,
+            width: data.width,
+            height: data.height,
+            fileSizeApprox: data.fileSizeApprox
+        });
+    }
 }
 
 module.exports = VideoFile;

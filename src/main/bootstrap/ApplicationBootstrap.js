@@ -5,6 +5,7 @@ const path = require('path');
 const container = require('./container');
 const WindowManager = require('../infrastructure/windows/WindowManager');
 const WindowRegistry = require('../infrastructure/windows/WindowRegistry');
+const IpcBootstrap = require('./IpcBootstrap');
 
 class ApplicationBootstrap {
     constructor() {
@@ -73,7 +74,13 @@ class ApplicationBootstrap {
         const connectionService = container.resolve('connectionService');
         const deviceRegistry = container.resolve('deviceRegistry'); // for reference, not used directly
 
-        // 5. Start ADB monitoring and wireless discovery
+        // 5. Setup DeviceEventHandler and start monitoring
+        const deviceEventHandler = container.resolve('deviceEventHandler');
+        if (deviceEventHandler && connectionService) {
+            deviceEventHandler.setup(connectionService);
+            console.log('[Bootstrap] DeviceEventHandler setup completed.');
+        }
+
         if (connectionService) {
             if (typeof connectionService.startAdbMonitoring === 'function') {
                 connectionService.startAdbMonitoring(500);
@@ -83,6 +90,14 @@ class ApplicationBootstrap {
                 connectionService.startWirelessDiscovery();
                 console.log('[Bootstrap] Wireless discovery started.');
             }
+        }
+
+        // 5.5. Register IPC handlers
+        try {
+            IpcBootstrap.register(container);
+            console.log('[Bootstrap] IPC handlers registered.');
+        } catch (error) {
+            console.error('[Bootstrap] Failed to register IPC handlers:', error);
         }
 
         // 6. Initialize window management infrastructure

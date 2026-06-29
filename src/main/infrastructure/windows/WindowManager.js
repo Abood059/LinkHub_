@@ -29,7 +29,12 @@ class WindowManager {
             throw new Error(`WindowManager: Window with id "${id}" already exists. Close it first or use a different id.`);
         }
         
-        // Merge with default options
+        // Ensure options is an object
+        if (!options || typeof options !== 'object') {
+            options = {};
+        }
+        
+        // Merge with default options (deep merge for webPreferences to preserve security defaults)
         const defaultOptions = {
             show: false,
             webPreferences: {
@@ -38,7 +43,14 @@ class WindowManager {
                 sandbox: false
             }
         };
-        const finalOptions = { ...defaultOptions, ...options };
+        const finalOptions = {
+            ...defaultOptions,
+            ...options,
+            webPreferences: {
+                ...defaultOptions.webPreferences,
+                ...options.webPreferences
+            }
+        };
         
         const browserWindow = new BrowserWindow(finalOptions);
         
@@ -74,6 +86,7 @@ class WindowManager {
             minWidth: 900,
             minHeight: 600,
             title: 'LinkHub',
+            loadFile: require('path').join(__dirname, '../../../renderer/index.html'),
             webPreferences: {
                 preload: require('path').join(__dirname, '../../../preload/preload.js'),
                 contextIsolation: true,

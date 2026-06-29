@@ -13,16 +13,18 @@ const ProcessSupervisor = require('../runtime/processes/ProcessSupervisor');
 const DeviceRegistry = require('../runtime/devices/DeviceRegistry');
 const ScrcpyAdapter = require('../infrastructure/streaming/ScrcpyAdapter');
 const YtdlpAdapter = require('../infrastructure/media/YtdlpAdapter');
+const StateSyncService = require('../infrastructure/sync/StateSyncService');
 const DeviceOrchestrator = require('../application/orchestrators/DeviceOrchestrator');
 const DownloadOrchestrator = require('../application/orchestrators/DownloadOrchestrator');
 const ToolPathResolver = require('../infrastructure/tools/ToolPathResolver');
-const Device = require('../domain/entities/Device');
+const DeviceEventHandler = require('../application/handlers/DeviceEventHandler');
 
 class BootstrapContainer {
     constructor() {
         this._services = new Map();
         this._initialized = false;
         this._windowManager = null;
+        this._stateSyncService = null;
     }
 
     initialize() {
@@ -58,192 +60,11 @@ class BootstrapContainer {
             logger: errorCentralService
         });
 
-        // ==================== معالج ADB Devices المتقدم ====================
-        connectionService.on('adbDevices', devices => {
-            if (!Array.isArray(devices)) return;
-
-            // 1. جمع الـ serials الحالية من ADB
-            const currentSerials = new Set();
-            for (const device of devices) {
-                if (device?.serial) currentSerials.add(device.serial);
-            }
-
-            // 2. معالجة الأجهزة الموجودة حالياً
-            for (const device of devices) {
-                if (!device?.serial) continue;
-                const deviceId = device.serial;
-
-                // إنشاء كيان الجهاز إذا لم يكن موجوداً
-                if (!deviceRegistry.hasDevice(deviceId)) {
-                    const newDevice = new Device({
-                        id: deviceId,
-                        deviceFriendlyName: device.serial,
-                        model: 'Unknown',
-                        version: 'Unknown',
-                        arch: 'Unknown',
-                        isNew: true
-                    });
-                    deviceRegistry.registerDevice(newDevice);
-                }
-
-                // تحديث الحالة التشغيلية (متصل)
-                const newStatus = (device.state === 'device') ? 'connected' : (device.state || 'unknown');
-                deviceRegistry.updateState(deviceId, {
-                    status: newStatus,
-                    adbTarget: device.serial,
-                    connectionType: device.serial.includes(':') ? 'TCPIP' : 'USB',
-                    lastSeen: new Date()
-                });
-
-                if (this._windowManager) {
-                    this._windowManager.broadcast('device:stateChanged', {
-                        deviceId: deviceId,
-                        state: newStatus,
-                        adbTarget: device.serial
-                    });
-                }
-            }
-
-            // 3. معالجة الأجهزة المفقودة (غير موجودة في القائمة الحالية)
-            const allDevices = deviceRegistry.getAllDevices();
-            for (const registeredDevice of allDevices) {
-                const deviceId = registeredDevice.id;
-                const runtimeState = deviceRegistry.getRuntimeState(deviceId);
-                
-                // إذا كان الجهاز غير موجود في الـ serials الحالية
-                if (!currentSerials.has(deviceId)) {
-                    // الجهاز غير مسجل (isNew = true) => إزالته بالكامل من السجل
-                    if (registeredDevice.isNew === true) {
-                        deviceRegistry.removeDevice(deviceId);
-                        if (this._windowManager) {
-                            this._windowManager.broadcast('device:removed', { deviceId });
-                        }
-                    } 
-                    // الجهاز مسجل (isNew = false) => تحديث حالته إلى offline
-                    else if (runtimeState && runtimeState.status !== 'offline') {
-                        deviceRegistry.updateState(deviceId, { status: 'offline', lastSeen: new Date() });
-                        if (this._windowManager) {
-                            this._windowManager.broadcast('device:stateChanged', {
-                                deviceId: deviceId,
-                                state: 'offline',
-                                adbTarget: deviceId
-                            });
-                        }
-                    }
-                }
-            }
-        });
-
-        // ==================== معالج اكتشاف الأجهزة اللاسلكية ====================
-        connectionService.on('wirelessServiceFound', (service) => {
-            if (!service?.host || !service?.port) return;
-            const adbTarget = `${service.host}:${service.port}`;
-            let deviceId = deviceRegistry.findDeviceIdByAdbTarget(adbTarget);
-
-            if (!deviceId) {
-                deviceId = `wireless-${adbTarget.replace(/:/g, '-')}`;
-                if (!deviceRegistry.hasDevice(deviceId)) {
-                    const newDevice = new Device({
-                        id: deviceId,
-                        deviceFriendlyName: service.name || adbTarget,
-                        model: 'Unknown',
-                        version: 'Unknown',
-                        arch: 'Unknown',
-                        isNew: true
-                    });
-                    deviceRegistry.registerDevice(newDevice);
-                }
-            }
-
-            deviceRegistry.updateState(deviceId, {
-                status: 'discovered',
-                adbTarget: adbTarget,
-                ip: service.host,
-                port: service.port,
-                connectionType: 'WIRELESS_DISCOVERED',
-                lastSeen: new Date()
-            });
-
-            if (this._windowManager) {
-                this._windowManager.broadcast('device:stateChanged', {
-                    deviceId: deviceId,
-                    state: 'discovered',
-                    adbTarget: adbTarget
-                });
-            }
-        });
-
-        // ==================== باقي معالجات الأحداث ====================
-        connectionService.on('pairSuccess', ({ host, pairingCode }) => {
-            if (!host) return;
-            errorCentralService.info(`Pair success for ${host}`, { source: 'Container' });
-            if (this._windowManager) {
-                this._windowManager.broadcast('device:paired', { host, pairingCode });
-            }
-        });
-
-        connectionService.on('connectSuccess', ({ target }) => {
-            if (!target) return;
-            let deviceId = deviceRegistry.findDeviceIdByAdbTarget(target);
-            
-            if (!deviceId) {
-                deviceId = `device-${target.replace(/:/g, '-')}-${Date.now()}`;
-                if (!deviceRegistry.hasDevice(deviceId)) {
-                    const newDevice = new Device({
-                        id: deviceId,
-                        deviceFriendlyName: target,
-                        model: 'Unknown',
-                        version: 'Unknown',
-                        arch: 'Unknown',
-                        isNew: true
-                    });
-                    deviceRegistry.registerDevice(newDevice);
-                }
-            }
-            
-            deviceRegistry.updateState(deviceId, {
-                status: 'connected',
-                adbTarget: target,
-                connectionType: 'TCPIP',
-                lastSeen: new Date()
-            });
-            
-            if (this._windowManager) {
-                this._windowManager.broadcast('device:stateChanged', {
-                    deviceId: deviceId,
-                    state: 'connected',
-                    adbTarget: target
-                });
-            }
-        });
-
-        connectionService.on('disconnect', ({ target }) => {
-            if (!target || target === 'all') {
-                for (const deviceId of deviceRegistry.getAllDevices().map(d => d.id)) {
-                    const state = deviceRegistry.getRuntimeState(deviceId);
-                    if (state && state.status === 'connected') {
-                        deviceRegistry.updateState(deviceId, { status: 'offline', lastSeen: new Date() });
-                        if (this._windowManager) {
-                            this._windowManager.broadcast('device:stateChanged', {
-                                deviceId: deviceId,
-                                state: 'offline'
-                            });
-                        }
-                    }
-                }
-                return;
-            }
-            const deviceId = deviceRegistry.findDeviceIdByAdbTarget(target);
-            if (deviceId) {
-                deviceRegistry.updateState(deviceId, { status: 'offline', lastSeen: new Date() });
-                if (this._windowManager) {
-                    this._windowManager.broadcast('device:stateChanged', {
-                        deviceId: deviceId,
-                        state: 'offline',
-                        adbTarget: target
-                    });
-                }
-            }
+        // ==================== تهيئة DeviceEventHandler ====================
+        const deviceEventHandler = new DeviceEventHandler({
+            deviceRegistry,
+            stateSyncService: null, // سيتم تعيينه لاحقاً في setWindowManager
+            logger: errorCentralService
         });
 
         // ==================== تهيئة المحولات والمنسقين ====================
@@ -272,8 +93,9 @@ class BootstrapContainer {
             logger: errorCentralService
         });
 
-        const { registerIpcHandlers } = require('../infrastructure/ipc');
-        registerIpcHandlers(deviceOrchestrator, downloadOrchestrator);
+        // ==================== تهيئة StateSyncService ====================
+        // سيتم إنشاؤه لاحقاً بعد تعيين WindowManager
+        // stateSyncService سيتم تمريره لـ ytdlpAdapter في setWindowManager
 
         // ==================== تسجيل الخدمات ====================
         this._services.set('errorCentralService', errorCentralService);
@@ -289,6 +111,7 @@ class BootstrapContainer {
         this._services.set('deviceOrchestrator', deviceOrchestrator);
         this._services.set('downloadOrchestrator', downloadOrchestrator);
         this._services.set('toolPathResolver', toolPathResolver);
+        this._services.set('deviceEventHandler', deviceEventHandler);
 
         this._initialized = true;
         return this;
@@ -300,9 +123,25 @@ class BootstrapContainer {
 
     setWindowManager(windowManager) {
         this._windowManager = windowManager;
+        
+        // إنشاء StateSyncService
+        const deviceRegistry = this._services.get('deviceRegistry');
+        this._stateSyncService = new StateSyncService(windowManager, deviceRegistry, { interval: 100 });
+        this._stateSyncService.start();
+        
+        // تمرير StateSyncService لـ DeviceEventHandler
+        const deviceEventHandler = this._services.get('deviceEventHandler');
+        if (deviceEventHandler && typeof deviceEventHandler.setStateSyncService === 'function') {
+            deviceEventHandler.setStateSyncService(this._stateSyncService);
+        }
+        
+        // الاشتراك في أحداث YtdlpAdapter
         const ytdlpAdapter = this._services.get('ytdlpAdapter');
-        if (ytdlpAdapter && typeof ytdlpAdapter.setWindowManager === 'function') {
-            ytdlpAdapter.setWindowManager(windowManager);
+        if (ytdlpAdapter) {
+            ytdlpAdapter.on('downloadProgress', (data) => this._stateSyncService.onDownloadProgress(data));
+            ytdlpAdapter.on('downloadComplete', (data) => this._stateSyncService.onDownloadComplete(data));
+            ytdlpAdapter.on('downloadError', (data) => this._stateSyncService.onDownloadError(data));
+            ytdlpAdapter.on('downloadStopped', (data) => this._stateSyncService.onDownloadStopped(data));
         }
     }
 

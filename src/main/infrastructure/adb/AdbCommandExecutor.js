@@ -26,6 +26,28 @@ class AdbCommandExecutor {
         }
     }
 
+    /**
+     * Validate and sanitize serial/target input to prevent command injection
+     * @param {string} input - The serial or target to validate
+     * @returns {string} The validated input
+     * @throws {Error} If input contains dangerous characters
+     */
+    _sanitizeSerialOrTarget(input) {
+        if (!input || typeof input !== 'string') {
+            throw new Error('Serial or target must be a non-empty string');
+        }
+
+        // Allow alphanumeric, hyphens, underscores, dots, colons, and spaces
+        // Reject characters commonly used in command injection: ;, &, |, `, $, (, ), <, >
+        const dangerousPattern = /[;&|`$()<>]/;
+        if (dangerousPattern.test(input)) {
+            throw new Error(`Invalid serial or target: contains dangerous characters`);
+        }
+
+        // Trim whitespace
+        return input.trim();
+    }
+
     async getDevices() {
         try {
             // الاستدعاء الصحيح المتوافق مع الكود الخاص بك لتنفيذ الأوامر السريعة لـ ADB
@@ -68,11 +90,7 @@ class AdbCommandExecutor {
     async getDeviceInfo(
         serial
     ) {
-        if (!serial) {
-            throw new Error(
-                'serial is required'
-            );
-        }
+        const sanitizedSerial = this._sanitizeSerialOrTarget(serial);
 
         const [
             model,
@@ -80,21 +98,21 @@ class AdbCommandExecutor {
             arch
         ] = await Promise.all([
             this._executeShellCommand(
-                serial,
+                sanitizedSerial,
                 [
                     'getprop',
                     'ro.product.model'
                 ]
             ),
             this._executeShellCommand(
-                serial,
+                sanitizedSerial,
                 [
                     'getprop',
                     'ro.build.version.release'
                 ]
             ),
             this._executeShellCommand(
-                serial,
+                sanitizedSerial,
                 [
                     'getprop',
                     'ro.product.cpu.abi'
@@ -103,7 +121,7 @@ class AdbCommandExecutor {
         ]);
 
         return {
-            serial,
+            serial: sanitizedSerial,
             model:
                 model.trim(),
             version:
@@ -116,9 +134,10 @@ class AdbCommandExecutor {
     async connect(
         target
     ) {
+        const sanitizedTarget = this._sanitizeSerialOrTarget(target);
         return this._executeQuickAdbCommand([
             'connect',
-            target
+            sanitizedTarget
         ]);
     }
 
@@ -126,9 +145,14 @@ class AdbCommandExecutor {
         host,
         pairingCode
     ) {
+        const sanitizedHost = this._sanitizeSerialOrTarget(host);
+        // Pairing code should only contain digits
+        if (!pairingCode || !/^\d+$/.test(pairingCode)) {
+            throw new Error('Pairing code must contain only digits');
+        }
         return this._executeQuickAdbCommand([
             'pair',
-            host,
+            sanitizedHost,
             pairingCode
         ]);
     }
@@ -140,7 +164,7 @@ class AdbCommandExecutor {
             target
                 ? [
                       'disconnect',
-                      target
+                      this._sanitizeSerialOrTarget(target)
                   ]
                 : [
                       'disconnect'
@@ -155,11 +179,12 @@ class AdbCommandExecutor {
         serial,
         shellArgs
     ) {
+        const sanitizedSerial = this._sanitizeSerialOrTarget(serial);
         const result =
             await this._executeQuickAdbCommand(
                 [
                     '-s',
-                    serial,
+                    sanitizedSerial,
                     'shell',
                     ...shellArgs
                 ]
