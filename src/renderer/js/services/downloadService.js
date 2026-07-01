@@ -3,7 +3,7 @@ export async function inspectUrl(url) {
     return await linkhub.downloads.inspect(url);
 }
 
-export async function startDownload(url, formatId, deviceId) {
+export async function startDownload(url, formatId, deviceId = null) {
     return await linkhub.downloads.start(url, formatId, deviceId, {});
 }
 

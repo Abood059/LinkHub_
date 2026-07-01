@@ -9,7 +9,8 @@
     "test:e2e:headless": "NODE_ENV=test HEADLESS=true node --expose-gc ./node_modules/.bin/jest tests/e2e",
     "start": "electron . --disable-gpu --no-sandbox",
     "build": "electron-builder",
-    "cli": "node src/cli/index.js"
+    "cli": "node src/cli/index.js",
+    "download": "node src/cli/download.js"
   },
   "keywords": [],
   "author": "",

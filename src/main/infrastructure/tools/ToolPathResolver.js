@@ -80,7 +80,7 @@ class ToolPathResolver {
     }
 
     getYtDlpPath() {
-        return this._getPath('LINKHUB_YTDLP_PATH', 'yt-dlp_linux');
+        return this._getPath('LINKHUB_YTDLP_PATH', 'yt-dlp');
     }
 
     verifyAll() {

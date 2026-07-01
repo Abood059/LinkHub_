@@ -14,10 +14,6 @@ export async function handleStartRoute(url, urlInputElement) {
 
     const state = store.getState();
     const selectedIds = state.selectedDeviceIds || new Set();
-    if (selectedIds.size === 0) {
-        showToast('الرجاء تحديد جهاز واحد أو أكثر أولاً.', true);
-        return false;
-    }
 
     let inspection;
     try {
@@ -42,15 +38,27 @@ export async function handleStartRoute(url, urlInputElement) {
         } catch(e) { return 'media_' + Date.now(); }
     })();
 
-    const devices = store.getState().devices;
-    for (const deviceId of selectedIds) {
-        const deviceData = devices.find(d => d.device.id === deviceId);
-        if (!deviceData) continue;
-        const deviceName = deviceData.device.deviceFriendlyName || deviceData.device.model || deviceId;
+    // إذا لم يتم تحديد أي جهاز، قم بالتحميل محلياً
+    if (selectedIds.size === 0) {
         try {
-            await startDownload(trimmedUrl, formatId, deviceId);
+            await startDownload(trimmedUrl, formatId, null);
+            showToast('بدأ التحميل محلياً', false);
         } catch (err) {
-            showToast(`فشل التحميل على الجهاز ${deviceName}: ${err.message}`, true);
+            showToast(`فشل التحميل: ${err.message}`, true);
+            return false;
+        }
+    } else {
+        // إذا تم تحديد أجهزة، قم بالتحميل على كل جهاز
+        const devices = store.getState().devices;
+        for (const deviceId of selectedIds) {
+            const deviceData = devices.find(d => d.device.id === deviceId);
+            if (!deviceData) continue;
+            const deviceName = deviceData.device.deviceFriendlyName || deviceData.device.model || deviceId;
+            try {
+                await startDownload(trimmedUrl, formatId, deviceId);
+            } catch (err) {
+                showToast(`فشل التحميل على الجهاز ${deviceName}: ${err.message}`, true);
+            }
         }
     }
 

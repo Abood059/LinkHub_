@@ -371,3 +371,36 @@
 [2026-06-29 22:12:11.802] [info]  [2026-06-29T19:12:11.802Z] | [INFO] | [PROCESS] | [INFO] | [ProcessManager] | Process ytdlp-dl-1782760331181 exited with code 1 |  | 
 [2026-06-29 22:12:30.576] [info]  [2026-06-29T19:12:30.576Z] | [INFO] | [PROCESS] | [INFO] | [ProcessManager] | Process ytdlp-dl-1782760349939 exited with code 1 |  | 
 [2026-06-29 22:12:31.209] [info]  [2026-06-29T19:12:31.209Z] | [INFO] | [PROCESS] | [INFO] | [ProcessManager] | Process ytdlp-dl-1782760350585 exited with code 1 |  | 
+[2026-06-30 15:45:07.695] [warn]  [2026-06-30T12:45:07.693Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | ToolPathResolver: Optional binary "yt-dlp_linux" not found at /home/abood/Project/LinkHub_/resources/bin/linux/yt-dlp_linux. |  | 
+[2026-06-30 15:45:07.699] [warn]  [2026-06-30T12:45:07.699Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | ToolPathResolver: Optional binary "yt-dlp_linux" not found at /home/abood/Project/LinkHub_/resources/bin/linux/yt-dlp_linux. |  | 
+[2026-06-30 15:45:07.701] [warn]  [2026-06-30T12:45:07.701Z] | [WARN] | [GENERAL] | [MEDIUM] | [ApplicationBootstrap] | yt-dlp binary not found. Please ensure resources/bin/win/yt-dlp.exe or LINKHUB_YTDLP_PATH is set. |  | 
+[2026-06-30 15:45:34.626] [warn]  [2026-06-30T12:45:34.625Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | ToolPathResolver: Optional binary "yt-dlp_linux" not found at /home/abood/Project/LinkHub_/resources/bin/linux/yt-dlp_linux. |  | 
+[2026-06-30 15:49:04.011] [warn]  [2026-06-30T12:49:04.010Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | ToolPathResolver: Optional binary "yt-dlp_linux" not found at /home/abood/Project/LinkHub_/resources/bin/linux/yt-dlp_linux. |  | 
+[2026-06-30 15:57:54.255] [warn]  [2026-06-30T12:57:54.254Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | ToolPathResolver: Optional binary "yt-dlp_linux" not found at /home/abood/Project/LinkHub_/resources/bin/linux/yt-dlp_linux. |  | 
+[2026-06-30 16:07:07.532] [warn]  [2026-06-30T13:07:07.531Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | ToolPathResolver: Optional binary "yt-dlp_linux" not found at /home/abood/Project/LinkHub_/resources/bin/linux/yt-dlp_linux. |  | 
+[2026-06-30 16:16:32.352] [warn]  [2026-06-30T13:16:32.351Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | ToolPathResolver: Optional binary "yt-dlp_linux" not found at /home/abood/Project/LinkHub_/resources/bin/linux/yt-dlp_linux. |  | 
+[2026-06-30 16:17:04.422] [error] [2026-06-30T13:17:04.422Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Uncaught Exception |  | Error: setRawMode EIO
+    at ReadStream.setRawMode (node:tty:76:24)
+    at Program.destroy (/home/abood/Project/LinkHub_/node_modules/neo-blessed/lib/program.js:494:22)
+    at Screen.destroy (/home/abood/Project/LinkHub_/node_modules/neo-blessed/lib/widgets/screen.js:442:16)
+    at /home/abood/Project/LinkHub_/node_modules/neo-blessed/lib/widgets/screen.js:239:14
+    at Array.forEach (<anonymous>)
+    at process.on.Screen._exitHandler (/home/abood/Project/LinkHub_/node_modules/neo-blessed/lib/widgets/screen.js:238:30)
+    at process.emit (node:events:536:35)
+    at process.exit (node:internal/process/per_thread:184:15)
+    at Timeout._onTimeout (/home/abood/Project/LinkHub_/src/cli/index.js:132:21)
+    at listOnTimeout (node:internal/timers:581:17)
+[2026-06-30 16:17:04.433] [error] [2026-06-30T13:17:04.433Z] | [ERROR] | [SYSTEM] | [CRITICAL] | [process] | Uncaught Exception |  | Error: setRawMode EIO
+    at ReadStream.setRawMode (node:tty:76:24)
+    at Program.destroy (/home/abood/Project/LinkHub_/node_modules/neo-blessed/lib/program.js:494:22)
+    at Screen.destroy (/home/abood/Project/LinkHub_/node_modules/neo-blessed/lib/widgets/screen.js:442:16)
+    at /home/abood/Project/LinkHub_/node_modules/neo-blessed/lib/widgets/screen.js:239:14
+    at Array.forEach (<anonymous>)
+    at process.on.Screen._exitHandler (/home/abood/Project/LinkHub_/node_modules/neo-blessed/lib/widgets/screen.js:238:30)
+    at process.emit (node:events:536:35)
+    at process.exit (node:internal/process/per_thread:184:15)
+    at Timeout._onTimeout (/home/abood/Project/LinkHub_/src/cli/index.js:132:21)
+    at listOnTimeout (node:internal/timers:581:17)
+[2026-06-30 16:20:38.219] [warn]  [2026-06-30T13:20:38.219Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | ToolPathResolver: Optional binary "yt-dlp_linux" not found at /home/abood/Project/LinkHub_/resources/bin/linux/yt-dlp_linux. |  | 
+[2026-06-30 16:20:58.061] [warn]  [2026-06-30T13:20:58.060Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | ToolPathResolver: Optional binary "yt-dlp_linux" not found at /home/abood/Project/LinkHub_/resources/bin/linux/yt-dlp_linux. |  | 
+[2026-06-30 16:24:57.261] [warn]  [2026-06-30T13:24:57.261Z] | [WARN] | [GENERAL] | [MEDIUM] | [UNKNOWN] | ToolPathResolver: Optional binary "yt-dlp_linux" not found at /home/abood/Project/LinkHub_/resources/bin/linux/yt-dlp_linux. |  | 
