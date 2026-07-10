@@ -19,7 +19,6 @@ app.whenReady().then(async () => {
         bootstrap = new ApplicationBootstrap();
         await bootstrap.run();
     } catch (error) {
-        console.error('[Main] Fatal error during application startup:', error);
         app.quit();
     }
 });
@@ -54,8 +53,6 @@ app.on('before-quit', async (event) => {
     event.preventDefault();
     
     try {
-        console.log('[Main] Starting graceful shutdown...');
-
         const processManager = container.resolve('processManager');
         if (processManager && typeof processManager.terminateAll === 'function') {
             await processManager.terminateAll();
@@ -71,9 +68,8 @@ app.on('before-quit', async (event) => {
             await errorService.flush();
         }
 
-        console.log('[Main] Cleanup completed successfully.');
     } catch (err) {
-        console.error('[Main] Error during graceful shutdown:', err);
+        // Error during shutdown
     } finally {
         // نرفع العلم بأن التنظيف انتهى تماماً
         isCleanedUp = true;

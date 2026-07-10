@@ -83,6 +83,10 @@ class ToolPathResolver {
         return this._getPath('LINKHUB_YTDLP_PATH', 'yt-dlp');
     }
 
+    getDenoPath() {
+        return this._getPath('LINKHUB_DENO_PATH', 'deno');
+    }
+
     verifyAll() {
         const result = { adb: false, scrcpy: false, ytdlp: false };
         try { result.adb = !!this.getAdbPath(); } catch (e) { /* ignore */ }

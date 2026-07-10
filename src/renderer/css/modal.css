@@ -96,9 +96,94 @@
 }
 .modal-btn.primary { background-color: #1e6fd9; color: white; }
 .modal-btn.primary:hover { background-color: #155bb0; transform: translateY(-2px); }
-.modal-btn.danger { background-color: transparent; border: 1px solid #d32f2f; color: #d32f2f; }
-.modal-btn.danger:hover { background-color: #d32f2f; color: white; }
+.modal-btn.danger { background-color: #d32f2f; color: white; }
+.modal-btn.danger:hover { background-color: #b71c1c; transform: translateY(-2px); }
+.modal-btn:disabled {
+    opacity: 0.4 !important;
+    cursor: not-allowed !important;
+    background-color: #3a3a3a !important;
+    border-color: #555 !important;
+    color: #888 !important;
+}
+.modal-btn:disabled:hover {
+    background-color: #3a3a3a !important;
+    color: #888 !important;
+    transform: none !important;
+}
 @media (max-width: 500px) {
     .modal-content { width: 95%; padding: 20px 16px; }
     .modal-actions { flex-direction: column; }
+}
+
+/* Format Selection Modal Styles */
+.format-modal-content {
+    max-width: 800px;
+    max-height: 90vh;
+    overflow: visible;
+}
+.format-section {
+    margin-bottom: 24px;
+}
+.format-section-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #e0e0e0;
+    margin-bottom: 12px;
+}
+.formats-table-container,
+.devices-table-container {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #3a3a3a;
+    border-radius: 8px;
+    /* إخفاء شريط السكرول */
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+}
+.formats-table-container::-webkit-scrollbar,
+.devices-table-container::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+}
+.formats-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+.formats-table thead {
+    position: sticky;
+    top: 0;
+    background: #262626;
+    z-index: 1;
+}
+.formats-table th {
+    padding: 10px 8px;
+    text-align: right;
+    font-weight: 600;
+    color: #a6a6a6;
+    border-bottom: 1px solid #3a3a3a;
+}
+.formats-table td {
+    padding: 8px;
+    border-bottom: 1px solid #333;
+    color: #e0e0e0;
+}
+.formats-table tbody tr:hover {
+    background-color: #2a2a2a;
+    cursor: pointer;
+}
+.formats-table tbody tr.selected {
+    background-color: #1e6fd9;
+}
+.formats-table tbody tr.selected td {
+    color: white;
+}
+.device-radio {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+.format-radio {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
 }

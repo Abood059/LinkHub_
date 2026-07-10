@@ -71,6 +71,14 @@ class DeviceHandlers {
             }
             return this._deviceOrchestrator.stopStreaming(deviceId);
         });
+
+        // Disconnect a device
+        ipcMain.handle('device:disconnect', async (event, deviceId) => {
+            if (!deviceId) {
+                throw new Error('deviceId is required');
+            }
+            return this._deviceOrchestrator.disconnectDevice(deviceId);
+        });
     }
 }
 

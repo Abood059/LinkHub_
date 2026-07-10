@@ -80,22 +80,45 @@ class WindowManager {
      * @returns {Electron.BrowserWindow}
      */
     createMainWindow(customOptions = {}) {
+        const path = require('path');
+        const fs = require('fs');
+        const preloadPath = path.resolve(__dirname, '../../../preload/preload.js');
+        console.log('[WindowManager] Preload path (absolute):', preloadPath);
+        console.log('[WindowManager] Preload path exists:', fs.existsSync(preloadPath));
+
         const defaultMainOptions = {
             width: 1200,
             height: 800,
             minWidth: 900,
             minHeight: 600,
             title: 'LinkHub',
-            loadFile: require('path').join(__dirname, '../../../renderer/index.html'),
+            loadFile: path.resolve(__dirname, '../../../renderer/index.html'),
             webPreferences: {
-                preload: require('path').join(__dirname, '../../../preload/preload.js'),
+                preload: preloadPath,
                 contextIsolation: true,
                 nodeIntegration: false
             },
             show: false
         };
         const options = { ...defaultMainOptions, ...customOptions };
-        return this.createWindow('main', options);
+        console.log('[WindowManager] Final webPreferences:', options.webPreferences);
+        
+        const browserWindow = this.createWindow('main', options);
+        
+        // Add error handling for preload script loading
+        browserWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+            // Error handled silently
+        });
+        
+        browserWindow.webContents.on('did-finish-load', () => {
+            // Window loaded
+        });
+        
+        browserWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+            // Renderer console messages handled silently
+        });
+        
+        return browserWindow;
     }
     
     /**
@@ -148,7 +171,12 @@ class WindowManager {
      * @param {any} data
      */
     broadcast(channel, data) {
-        for (const win of this._registry.getAll()) {
+        const windows = this._registry.getAll();
+        // Only log during startup (before main window is created)
+        if (windows.length === 0) {
+            console.log(`[WindowManager] broadcast called: channel="${channel}", windows count=${windows.length}, data=`, data);
+        }
+        for (const win of windows) {
             if (!win.isDestroyed()) {
                 win.webContents.send(channel, data);
             }

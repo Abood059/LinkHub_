@@ -58,7 +58,7 @@ class DeviceOrchestrator {
             model: 'Unknown',
             version: 'Unknown',
             arch: 'Unknown',
-            isNew: true
+            isNew: false
         });
 
         // تسجيل الجهاز في الـ Registry
@@ -132,6 +132,31 @@ class DeviceOrchestrator {
     }
 
     /**
+     * قطع الاتصال بجهاز معين
+     * @param {string} deviceId - معرف الجهاز
+     */
+    async disconnectDevice(deviceId) {
+        const device = this._deviceRegistry.getDevice(deviceId);
+        if (!device) {
+            throw new Error(`Device ${deviceId} not found`);
+        }
+
+        const runtimeState = this._deviceRegistry.getRuntimeState(deviceId);
+        const adbTarget = runtimeState?.adbTarget || device.id;
+
+        // قطع الاتصال عبر ADB
+        await this._connectionService.disconnect(adbTarget);
+
+        // تحديث حالة الجهاز إلى غير متصل
+        this._deviceRegistry.updateState(deviceId, {
+            status: 'offline',
+            lastSeen: new Date()
+        });
+
+        return device;
+    }
+
+    /**
      * الحصول على جهاز مسجل
      */
     getDevice(deviceId) {
@@ -146,7 +171,7 @@ class DeviceOrchestrator {
             device: device.toJSON(),
             runtimeState: this._deviceRegistry.getRuntimeState(device.id)?.toJSON() || null
         }));
-    }
+   }
 }
 
 module.exports = DeviceOrchestrator;

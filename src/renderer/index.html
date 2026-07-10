@@ -72,29 +72,58 @@
                 <section class="routing-section">
                     <div class="routing-input-container">
                         <input type="text" class="input-url" id="media-url" placeholder="أدخل رابط الوسائط (فيديو، أغنية) لبدء التوجيه...">
-                        <button class="btn-route" id="btn-start-route">بدء التحميل</button>
+                        <button class="btn-route" id="btn-start-route">بدأ التحميل</button>
+                    </div>
+                </section>
+
+                <section class="recent-downloads-section">
+                    <div class="downloads-capsule-wrapper">
+                        <h2 class="section-subheading">أحدث التحميلات</h2>
+                        <div class="recent-downloads-table-container">
+                            <table class="downloads-table recent-downloads-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 25%;">اسم الملف</th>
+                                        <th style="width: 20%;">التقدم</th>
+                                        <th style="width: 15%;">الحجم</th>
+                                        <th style="width: 15%;">السرعة</th>
+                                        <th style="width: 25%;">الإجراءات</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recent-downloads-tbody">
+                                    <tr class="empty-row"><td colspan="5" style="text-align:center;">لا توجد تحميلات نشطة</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </section>
             </div>
 
             <!-- قسم التحميلات -->
             <div id="downloads-section" class="tab-section">
+                <section class="routing-section">
+                    <div class="routing-input-container">
+                        <input type="text" class="input-url" id="media-url-downloads" placeholder="أدخل رابط الوسائط (فيديو، أغنية) لبدء التوجيه...">
+                        <button class="btn-route" id="btn-start-route-downloads">بدأ التحميل</button>
+                    </div>
+                </section>
                 <div class="downloads-card">
                     <h2 class="section-subheading right-align">قائمة التحميلات النشطة</h2>
                     <div class="table-container">
                         <table class="downloads-table">
                             <thead>
                                 <tr>
-                                    <th style="width: 20%;">اسم الملف</th>
-                                    <th style="width: 15%;">التقدم</th>
-                                    <th style="width: 10%;">الحجم</th>
-                                    <th style="width: 15%;">السرعة</th>
-                                    <th style="width: 20%;">الجهة الوجهة</th>
-                                    <th style="width: 20%;">الإجراءات</th>
+                                    <th style="width: 18%;">اسم الملف</th>
+                                    <th style="width: 14%;">التقدم</th>
+                                    <th style="width: 9%;">الحجم</th>
+                                    <th style="width: 13%;">السرعة</th>
+                                    <th style="width: 18%;">الجهة الوجهة</th>
+                                    <th style="width: 12%;">حالة النقل</th>
+                                    <th style="width: 16%;">الإجراءات</th>
                                 </tr>
                             </thead>
                             <tbody id="downloads-tbody">
-                                <tr class="empty-row"><td colspan="6" style="text-align:center;">لا توجد تحميلات نشطة</td></tr>
+                                <tr class="empty-row"><td colspan="7" style="text-align:center;">لا توجد تحميلات نشطة</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -156,6 +185,74 @@
             <div class="modal-actions">
                 <button id="modal-stream-btn" class="modal-btn primary">📺 بث الشاشة</button>
                 <button id="modal-disconnect-btn" class="modal-btn danger">🔌 قطع الاتصال</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- نافذة اختيار الجودة والجهاز (Modal) -->
+    <div id="format-selection-modal" class="device-modal" style="display: none;">
+        <div class="modal-overlay"></div>
+        <div class="modal-content format-modal-content">
+            <button class="modal-close" id="format-modal-close">&times;</button>
+            <div class="modal-header">
+                <h3 class="modal-device-name">اختر جودة التحميل</h3>
+            </div>
+            <div class="modal-body">
+                <div class="format-section">
+                    <h4 class="format-section-title">جودة الصورة (فيديو)</h4>
+                    <div class="formats-table-container">
+                        <table class="formats-table">
+                            <thead>
+                                <tr>
+                                    <th>الجودة</th>
+                                    <th>الدقة</th>
+                                    <th>معدل البت</th>
+                                    <th>الحجم</th>
+                                    <th>اختيار</th>
+                                </tr>
+                            </thead>
+                            <tbody id="video-formats-tbody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="format-section">
+                    <h4 class="format-section-title">جودة الصوت</h4>
+                    <div class="formats-table-container">
+                        <table class="formats-table">
+                            <thead>
+                                <tr>
+                                    <th>الجودة</th>
+                                    <th>معدل البت</th>
+                                    <th>الحجم</th>
+                                    <th>الاختيار</th>
+                                </tr>
+                            </thead>
+                            <tbody id="audio-formats-tbody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="format-section">
+                    <h4 class="format-section-title">الجهاز الهدف (اختياري)</h4>
+                    <div class="devices-table-container">
+                        <table class="formats-table">
+                            <thead>
+                                <tr>
+                                    <th>الجهاز</th>
+                                    <th>الحالة</th>
+                                    <th>اختيار</th>
+                                </tr>
+                            </thead>
+                            <tbody id="devices-tbody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="format-cancel-btn" class="modal-btn danger">إلغاء</button>
+                <button id="format-start-btn" class="modal-btn primary">بدء التحميل</button>
             </div>
         </div>
     </div>

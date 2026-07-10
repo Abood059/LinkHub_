@@ -34,7 +34,6 @@ class ApplicationBootstrap {
             console.log('[Bootstrap] Tool verification results:', toolsStatus);
 
             if (!toolsStatus.adb) {
-                console.warn('[Bootstrap] Warning: ADB not found. Device discovery and pairing will not work.');
                 if (errorService) {
                     errorService.warn('ADB binary not found. Please ensure resources/bin/win/adb.exe or LINKHUB_ADB_PATH is set.', {
                         source: 'ApplicationBootstrap'
@@ -42,7 +41,6 @@ class ApplicationBootstrap {
                 }
             }
             if (!toolsStatus.scrcpy) {
-                console.warn('[Bootstrap] Warning: scrcpy not found. Screen mirroring will not work.');
                 if (errorService) {
                     errorService.warn('scrcpy binary not found. Please ensure resources/bin/win/scrcpy.exe or LINKHUB_SCRCPY_PATH is set.', {
                         source: 'ApplicationBootstrap'
@@ -50,15 +48,12 @@ class ApplicationBootstrap {
                 }
             }
             if (!toolsStatus.ytdlp) {
-                console.warn('[Bootstrap] Warning: yt-dlp not found. Downloading will not work.');
                 if (errorService) {
                     errorService.warn('yt-dlp binary not found. Please ensure resources/bin/win/yt-dlp.exe or LINKHUB_YTDLP_PATH is set.', {
                         source: 'ApplicationBootstrap'
                     });
                 }
             }
-        } else {
-            console.warn('[Bootstrap] ToolPathResolver not available, skipping tool verification.');
         }
 
         // 3. Initialize database (ensures directory and file exist)
@@ -66,21 +61,33 @@ class ApplicationBootstrap {
         if (dbManager && typeof dbManager.initDb === 'function') {
             await dbManager.initDb();
             console.log('[Bootstrap] Database initialized.');
-        } else {
-            console.warn('[Bootstrap] DatabaseManager not available or missing initDb method.');
         }
 
-        // 4. Retrieve core services for monitoring
-        const connectionService = container.resolve('connectionService');
-        const deviceRegistry = container.resolve('deviceRegistry'); // for reference, not used directly
+        // 4. Initialize window management infrastructure
+        this._windowRegistry = new WindowRegistry();
+        this._windowManager = new WindowManager(this._windowRegistry);
 
-        // 5. Setup DeviceEventHandler and start monitoring
+        // 5. Pass windowManager to container for event broadcasting and StateSyncService initialization
+        container.setWindowManager(this._windowManager);
+        console.log('[Bootstrap] WindowManager set and StateSyncServices initialized.');
+
+        // 6. Register IPC handlers
+        try {
+            IpcBootstrap.register(container);
+            console.log('[Bootstrap] IPC handlers registered.');
+        } catch (error) {
+            // Error handled silently
+        }
+
+        // 7. Setup DeviceEventHandler and start monitoring (after StateSyncService is ready)
+        const connectionService = container.resolve('connectionService');
         const deviceEventHandler = container.resolve('deviceEventHandler');
         if (deviceEventHandler && connectionService) {
             deviceEventHandler.setup(connectionService);
             console.log('[Bootstrap] DeviceEventHandler setup completed.');
         }
 
+        // 8. Start ADB monitoring and wireless discovery (after StateSyncService is ready)
         if (connectionService) {
             if (typeof connectionService.startAdbMonitoring === 'function') {
                 connectionService.startAdbMonitoring(500);
@@ -92,31 +99,14 @@ class ApplicationBootstrap {
             }
         }
 
-        // 5.5. Register IPC handlers
-        try {
-            IpcBootstrap.register(container);
-            console.log('[Bootstrap] IPC handlers registered.');
-        } catch (error) {
-            console.error('[Bootstrap] Failed to register IPC handlers:', error);
-        }
-
-        // 6. Initialize window management infrastructure
-        this._windowRegistry = new WindowRegistry();
-        this._windowManager = new WindowManager(this._windowRegistry);
-
-        // 6.5. Pass windowManager to container for event broadcasting
-        container.setWindowManager(this._windowManager);
-
-        // 7. Create main window
+        // 9. Create main window
         await this.createMainWindow();
 
         console.log('[Bootstrap] Application ready.');
     }
 
     async createMainWindow() {
-        const indexPath = path.join(__dirname, '../../renderer/index.html');
         const mainWindow = this._windowManager.createMainWindow({
-            loadFile: indexPath,
             show: false
         });
         mainWindow.once('ready-to-show', () => {

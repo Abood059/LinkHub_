@@ -1,9 +1,13 @@
 // src/main/infrastructure/media/YtdlpAdapter.js
 'use strict';
 
-const os = require('os');
-const path = require('path');
 const EventEmitter = require('events');
+const path = require('path');
+
+const YtdlpCommandBuilder = require('./YtdlpCommandBuilder');
+const YtdlpResponseParser = require('./YtdlpResponseParser');
+const DownloadManager = require('./DownloadManager');
+const { createTempDirectory, calculateTotalSize } = require('./YtdlpUtils');
 
 class YtdlpAdapter extends EventEmitter {
     constructor({
@@ -17,8 +21,18 @@ class YtdlpAdapter extends EventEmitter {
         this._logger = logger;
         this._toolPathResolver = toolPathResolver;
         this._ytdlpPath = this._resolveYtdlpPath(ytdlpPath);
-        this._activeDownloads = new Map(); // processId -> { resolve, reject, process, status }
         this._windowManager = null;
+        
+        // Initialize helper modules
+        this._commandBuilder = new YtdlpCommandBuilder();
+        this._responseParser = new YtdlpResponseParser();
+        this._downloadManager = new DownloadManager({ logger });
+        
+        // Forward events from download manager
+        this._downloadManager.on('downloadProgress', (data) => this.emit('downloadProgress', data));
+        this._downloadManager.on('downloadComplete', (data) => this.emit('downloadComplete', data));
+        this._downloadManager.on('downloadError', (data) => this.emit('downloadError', data));
+        this._downloadManager.on('downloadRetrying', (data) => this.emit('downloadRetrying', data));
     }
 
     setWindowManager(windowManager) {
@@ -35,41 +49,21 @@ class YtdlpAdapter extends EventEmitter {
         return fallbackPath;
     }
 
-    /**
-     * إصلاح دالة inspectFormats لاستخدام -j (JSON واحد) بدلاً من -F --print-json
-     */
     async inspectFormats(url) {
         if (!url) {
             throw new Error('URL is required');
         }
 
-        const args = ['-j', url];  // استخراج JSON كامل يحتوي على الميتاداتا والتنسيقات
+        const denoPath = this._toolPathResolver ? this._toolPathResolver.getDenoPath() : null;
+        const command = this._commandBuilder.buildInspectCommand(url, denoPath);
+        
         const output = await this._processSupervisor.executeQuickTaskArray(
             this._ytdlpPath,
-            args,
-            { timeout: 30000 }
+            command.args,
+            { timeout: command.timeout }
         );
 
-        const data = JSON.parse(output);
-        
-        // تحويل التنسيقات إلى صيغة مبسطة للواجهة
-        const formats = (data.formats || []).map(f => ({
-            formatId: f.format_id,
-            ext: f.ext,
-            resolution: f.resolution || null,
-            fps: f.fps || null,
-            acodec: f.acodec,
-            vcodec: f.vcodec,
-            filesize: f.filesize,
-            formatNote: f.format_note
-        }));
-
-        return {
-            title: data.title,
-            duration: data.duration,
-            thumbnail: data.thumbnail,
-            formats: formats
-        };
+        return this._responseParser.parseFormats(output);
     }
 
     async extractMetadata(url) {
@@ -77,22 +71,16 @@ class YtdlpAdapter extends EventEmitter {
             throw new Error('URL is required');
         }
 
-        const args = ['-j', '--flat-playlist', url];
+        const denoPath = this._toolPathResolver ? this._toolPathResolver.getDenoPath() : null;
+        const command = this._commandBuilder.buildMetadataCommand(url, denoPath);
+        
         const output = await this._processSupervisor.executeQuickTaskArray(
             this._ytdlpPath,
-            args,
-            { timeout: 15000 }
+            command.args,
+            { timeout: command.timeout }
         );
 
-        const data = JSON.parse(output);
-        return {
-            id: data.id,
-            title: data.title,
-            duration: data.duration,
-            thumbnail: data.thumbnail,
-            uploader: data.uploader,
-            webpageUrl: data.webpage_url
-        };
+        return this._responseParser.parseMetadata(output);
     }
 
     async startDownload(url, formatId, options = {}) {
@@ -100,98 +88,106 @@ class YtdlpAdapter extends EventEmitter {
             throw new Error('formatId is required and must be a non-empty string');
         }
         
+        // التحقق من صحة formatId لحماية النظام
+        if (!/^[a-zA-Z0-9+\-]+$/.test(formatId.trim())) {
+            throw new Error(`Invalid formatId: ${formatId}. Format ID must contain only letters, numbers, +, or -`);
+        }
+        
+        const { outputPath, onProgress, deviceId, title, formatsData } = options;
+        let finalOutputPath = outputPath;
+        
+        // إنشاء مجلد مؤقت داخل المشروع إذا لم يتم تمرير مسار مخصص
+        if (!finalOutputPath) {
+            const timestamp = Date.now();
+            const tempDir = await createTempDirectory();
+            finalOutputPath = path.join(tempDir, `linkhub_${timestamp}_${formatId}.%(ext)s`);
+        }
+
+        const processId = `ytdlp-dl-${Date.now()}`;
+        const denoPath = this._toolPathResolver ? this._toolPathResolver.getDenoPath() : null;
+        
+        // حساب الحجم الكلي للتحميل المركب
+        const { totalSize, hasSizeInfo } = calculateTotalSize(formatId, formatsData);
+        
+        // إنشاء إدخال التحميل في DownloadManager
+        this._downloadManager.createDownloadEntry(processId, {
+            resolve: null, // سيتم تعيينها لاحقاً
+            reject: null,  // سيتم تعيينها لاحقاً
+            url,
+            formatId,
+            outputPath: finalOutputPath,
+            deviceId,
+            title,
+            totalSize,
+            hasSizeInfo
+        });
+
+        // بناء أمر التحميل
+        const command = this._commandBuilder.buildDownloadCommand(url, formatId, finalOutputPath, denoPath);
+
+        let lineBuffer = '';
+        
         return new Promise((resolve, reject) => {
-            const { outputPath, onProgress, deviceId } = options;
-            let finalOutputPath = outputPath;
-            if (!finalOutputPath) {
-                const timestamp = Date.now();
-                const defaultDir = path.join(os.homedir(), 'Downloads');
-                finalOutputPath = path.join(defaultDir, `linkhub_${timestamp}_${formatId}.%(ext)s`);
+            // تحديث resolve/reject في إدخال التحميل
+            const entry = this._downloadManager.getDownloadEntry(processId);
+            if (entry) {
+                entry.resolve = resolve;
+                entry.reject = reject;
             }
 
-            const processId = `ytdlp-dl-${Date.now()}`;
-            const args = [
-                '-f', formatId,
-                '-o', finalOutputPath,
-                '--newline',
-                '--progress',
-                url
-            ];
-
-            const process = this._processSupervisor.startManagedProcess({
+            const downloadProcess = this._processSupervisor.startManagedProcess({
                 processId,
                 binPath: this._ytdlpPath,
-                args,
+                args: command.args,
                 type: 'ytdlp-download',
                 metadata: { url, formatId, outputPath: finalOutputPath, deviceId },
                 onData: (chunk, streamType) => {
-                    if (streamType !== 'stderr') return;
-                    const text = chunk.toString();
-                    const match = text.match(/\[download\]\s+(\d+(?:\.\d+)?)%/);
-                    if (match) {
-                        const percent = parseFloat(match[1]);
-                        if (onProgress) onProgress({ percent, raw: text });
-                        this.emit('downloadProgress', {
-                            downloadId: processId,
-                            percent: percent,
-                            deviceId: deviceId,
-                            url: url
-                        });
+                    const text = typeof chunk === 'string' ? chunk : chunk.toString();
+                    
+                    // دمج النص الجديد مع المتبقي من المرة السابقة لمعالجته بشكل آمن
+                    lineBuffer += text;
+                    
+                    // تقسيم البث الحي إلى أسطر بناءً على رمز السطر الجديد
+                    const lines = lineBuffer.split('\n');
+                    
+                    // إخراج السطر الأخير والاحتفاظ به مؤقتاً لأنه قد يكون غير مكتمل
+                    lineBuffer = lines.pop();
+                    
+                    // معالجة الأسطر المكتملة فقط
+                    for (const line of lines) {
+                        this._downloadManager.handleProgressData(line, streamType, processId, onProgress, formatId);
                     }
                 }
             });
 
-            // تخزين حالة التحميل
-            this._activeDownloads.set(processId, {
-                resolve,
-                reject,
-                process,
-                status: 'downloading',
-                url,
-                formatId,
-                outputPath: finalOutputPath,
-                deviceId
-            });
+            // تحديث مرجع العملية وحالتها
+            this._downloadManager.updateDownloadProcess(processId, downloadProcess);
+            this._downloadManager.updateDownloadStatus(processId, 'downloading');
 
-            if (process && process.once) {
-                process.once('exit', (code) => {
-                    const entry = this._activeDownloads.get(processId);
+            // تسجيل معالجات انتهاء العملية
+            if (downloadProcess && downloadProcess.once) {
+                downloadProcess.once('exit', async (code) => {
+                    const entry = this._downloadManager.getDownloadEntry(processId);
                     if (!entry) return;
                     
                     if (code === 0) {
-                        entry.status = 'completed';
-                        this.emit('downloadComplete', {
-                            downloadId: processId,
-                            outputPath: finalOutputPath,
-                            deviceId: deviceId,
-                            url: url
-                        });
-                        entry.resolve({ success: true, outputPath: finalOutputPath, processId });
+                        await this._downloadManager.handleDownloadSuccess(processId, finalOutputPath, deviceId, url, title);
                     } else {
-                        entry.status = 'failed';
-                        this.emit('downloadError', {
-                            downloadId: processId,
-                            error: `Exit code ${code}`,
-                            deviceId: deviceId,
-                            url: url
-                        });
-                        entry.reject(new Error(`Download failed with exit code ${code}`));
+                        if (this._downloadManager.shouldRetry(entry, code)) {
+                            this._downloadManager.handleRetry(entry, processId, url, formatId, options, this.startDownload.bind(this), code);
+                            return;
+                        } else {
+                            this._downloadManager.handleDownloadFailure(processId, code, deviceId, url, title);
+                        }
                     }
-                    this._activeDownloads.delete(processId);
+                    this._downloadManager.removeDownloadEntry(processId);
                 });
                 
-                process.once('error', (err) => {
-                    const entry = this._activeDownloads.get(processId);
+                downloadProcess.once('error', (err) => {
+                    const entry = this._downloadManager.getDownloadEntry(processId);
                     if (entry) {
-                        entry.status = 'failed';
-                        this.emit('downloadError', {
-                            downloadId: processId,
-                            error: err.message,
-                            deviceId: deviceId,
-                            url: url
-                        });
-                        entry.reject(err);
-                        this._activeDownloads.delete(processId);
+                        this._downloadManager.handleProcessError(processId, err, deviceId, url);
+                        this._downloadManager.removeDownloadEntry(processId);
                     }
                 });
             } else {
@@ -202,27 +198,31 @@ class YtdlpAdapter extends EventEmitter {
 
     stopDownload(processId) {
         if (!processId) return false;
-        const entry = this._activeDownloads.get(processId);
+        const entry = this._downloadManager.getDownloadEntry(processId);
         if (!entry) return false;
         
-        entry.status = 'stopped';
+        this._downloadManager.updateDownloadStatus(processId, 'stopped');
         const stopped = this._processSupervisor.stopManagedProcess(processId);
         if (stopped) {
-            this._activeDownloads.delete(processId);
+            // الاحتفاظ بالإدخال لفترة قصيرة للسماح بالاستئناف
+            // سيتم إزالته عند بدء تحميل جديد أو بعد فترة زمنية
+            setTimeout(() => {
+                this._downloadManager.removeDownloadEntry(processId);
+            }, 5000); // 5 ثواني
+            
             this.emit('downloadStopped', {
                 downloadId: processId,
-                url: entry.url
+                url: entry.url,
+                formatId: entry.formatId,
+                deviceId: entry.deviceId,
+                title: entry.title
             });
         }
         return stopped;
     }
-    
-    /**
-     * الحصول على حالة التحميل (للاستخدام الداخلي)
-     */
+
     getDownloadStatus(processId) {
-        const entry = this._activeDownloads.get(processId);
-        return entry ? entry.status : null;
+        return this._downloadManager.getDownloadStatus(processId);
     }
 }
 

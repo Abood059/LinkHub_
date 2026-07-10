@@ -67,7 +67,7 @@ class DeviceEventHandler {
                     model: 'Unknown',
                     version: 'Unknown',
                     arch: 'Unknown',
-                    isNew: true
+                    isNew: false
                 });
                 this._deviceRegistry.registerDevice(newDevice);
             }
@@ -131,7 +131,7 @@ class DeviceEventHandler {
                     model: 'Unknown',
                     version: 'Unknown',
                     arch: 'Unknown',
-                    isNew: true
+                    isNew: false
                 });
                 this._deviceRegistry.registerDevice(newDevice);
             }
@@ -180,7 +180,7 @@ class DeviceEventHandler {
                     model: 'Unknown',
                     version: 'Unknown',
                     arch: 'Unknown',
-                    isNew: true
+                    isNew: false
                 });
                 this._deviceRegistry.registerDevice(newDevice);
             }

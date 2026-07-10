@@ -13,9 +13,11 @@ const ProcessSupervisor = require('../runtime/processes/ProcessSupervisor');
 const DeviceRegistry = require('../runtime/devices/DeviceRegistry');
 const ScrcpyAdapter = require('../infrastructure/streaming/ScrcpyAdapter');
 const YtdlpAdapter = require('../infrastructure/media/YtdlpAdapter');
-const StateSyncService = require('../infrastructure/sync/StateSyncService');
+const DeviceStateSyncService = require('../infrastructure/sync/DeviceStateSyncService');
+const DownloadStateSyncService = require('../infrastructure/sync/DownloadStateSyncService');
 const DeviceOrchestrator = require('../application/orchestrators/DeviceOrchestrator');
 const DownloadOrchestrator = require('../application/orchestrators/DownloadOrchestrator');
+const FileTransferService = require('../application/services/FileTransferService');
 const ToolPathResolver = require('../infrastructure/tools/ToolPathResolver');
 const DeviceEventHandler = require('../application/handlers/DeviceEventHandler');
 
@@ -87,15 +89,18 @@ class BootstrapContainer {
             logger: errorCentralService
         });
 
-        const downloadOrchestrator = new DownloadOrchestrator({
-            ytdlpAdapter,
-            deviceRegistry,
+        const fileTransferService = new FileTransferService({
+            adbExecutor: adbCommandExecutor,
             logger: errorCentralService
         });
 
-        // ==================== تهيئة StateSyncService ====================
-        // سيتم إنشاؤه لاحقاً بعد تعيين WindowManager
-        // stateSyncService سيتم تمريره لـ ytdlpAdapter في setWindowManager
+        const downloadOrchestrator = new DownloadOrchestrator({
+            ytdlpAdapter,
+            deviceRegistry,
+            fileTransferService,
+            logger: errorCentralService
+        });
+
 
         // ==================== تسجيل الخدمات ====================
         this._services.set('errorCentralService', errorCentralService);
@@ -110,6 +115,7 @@ class BootstrapContainer {
         this._services.set('ytdlpAdapter', ytdlpAdapter);
         this._services.set('deviceOrchestrator', deviceOrchestrator);
         this._services.set('downloadOrchestrator', downloadOrchestrator);
+        this._services.set('fileTransferService', fileTransferService);
         this._services.set('toolPathResolver', toolPathResolver);
         this._services.set('deviceEventHandler', deviceEventHandler);
 
@@ -124,25 +130,43 @@ class BootstrapContainer {
     setWindowManager(windowManager) {
         this._windowManager = windowManager;
         
-        // إنشاء StateSyncService
+        // إنشاء الخدمات المنفصلة
         const deviceRegistry = this._services.get('deviceRegistry');
-        this._stateSyncService = new StateSyncService(windowManager, deviceRegistry, { interval: 100 });
-        this._stateSyncService.start();
         
-        // تمرير StateSyncService لـ DeviceEventHandler
+        // DeviceStateSyncService - تحديث عند التغييرات فقط
+        this._deviceStateSyncService = new DeviceStateSyncService(windowManager, deviceRegistry, { interval: 1000 });
+        this._deviceStateSyncService.start();
+        
+        // DownloadStateSyncService - تحديث كل 0.3 ثانية
+        this._downloadStateSyncService = new DownloadStateSyncService(windowManager, { interval: 300 });
+        this._downloadStateSyncService.start();
+        
+        // تمرير DeviceStateSyncService لـ DeviceEventHandler
         const deviceEventHandler = this._services.get('deviceEventHandler');
         if (deviceEventHandler && typeof deviceEventHandler.setStateSyncService === 'function') {
-            deviceEventHandler.setStateSyncService(this._stateSyncService);
+            deviceEventHandler.setStateSyncService(this._deviceStateSyncService);
         }
         
-        // الاشتراك في أحداث YtdlpAdapter
+        // الاشتراك في أحداث YtdlpAdapter مع DownloadStateSyncService
         const ytdlpAdapter = this._services.get('ytdlpAdapter');
         if (ytdlpAdapter) {
-            ytdlpAdapter.on('downloadProgress', (data) => this._stateSyncService.onDownloadProgress(data));
-            ytdlpAdapter.on('downloadComplete', (data) => this._stateSyncService.onDownloadComplete(data));
-            ytdlpAdapter.on('downloadError', (data) => this._stateSyncService.onDownloadError(data));
-            ytdlpAdapter.on('downloadStopped', (data) => this._stateSyncService.onDownloadStopped(data));
+            ytdlpAdapter.on('downloadProgress', (data) => {
+                this._downloadStateSyncService.onDownloadProgress(data);
+            });
+            ytdlpAdapter.on('downloadComplete', (data) => {
+                this._downloadStateSyncService.onDownloadComplete(data);
+            });
+            ytdlpAdapter.on('downloadError', (data) => {
+                this._downloadStateSyncService.onDownloadError(data);
+            });
+            ytdlpAdapter.on('downloadStopped', (data) => {
+                this._downloadStateSyncService.onDownloadStopped(data);
+            });
         }
+        
+        // تسجيل الخدمات المنفصلة
+        this._services.set('deviceStateSyncService', this._deviceStateSyncService);
+        this._services.set('downloadStateSyncService', this._downloadStateSyncService);
     }
 
     getWindowManager() {

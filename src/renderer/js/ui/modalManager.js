@@ -55,6 +55,11 @@ export function showDeviceModal(deviceData) {
     modalStreamBtn.style.opacity = isConnected ? '1' : '0.5';
     modalStreamBtn.style.cursor = isConnected ? 'pointer' : 'not-allowed';
 
+    // تعطيل زر قطع الاتصال إذا كان الجهاز غير متصل
+    modalDisconnectBtn.disabled = !isConnected;
+    modalDisconnectBtn.style.opacity = isConnected ? '1' : '0.5';
+    modalDisconnectBtn.style.cursor = isConnected ? 'pointer' : 'not-allowed';
+
     modalElement.style.display = 'flex';
 }
 
@@ -86,6 +91,13 @@ async function onDisconnectClick() {
     try {
         await disconnectDevice(adbTarget);
         showToast(`تم قطع الاتصال عن الجهاز`);
+        
+        // تحديث حالة الزرين فوراً قبل إخفاء المودال
+        modalStreamBtn.disabled = true;
+        modalDisconnectBtn.disabled = true;
+        modalDeviceStatus.textContent = 'غير متصل';
+        modalDeviceStatus.className = 'detail-value status-badge-modal offline';
+        
         hideModal();
         setTimeout(() => {
             if (typeof loadDevices === 'function') loadDevices();

@@ -7,11 +7,12 @@
  * Thin IPC layer for download-related operations.
  */
 class DownloadHandlers {
-    constructor(downloadOrchestrator) {
+    constructor(downloadOrchestrator, fileTransferService = null) {
         if (!downloadOrchestrator) {
             throw new Error('DownloadOrchestrator is required for DownloadHandlers');
         }
         this._downloadOrchestrator = downloadOrchestrator;
+        this._fileTransferService = fileTransferService;
     }
 
     register(ipcMain) {
@@ -21,7 +22,8 @@ class DownloadHandlers {
 
         ipcMain.handle('download:inspect', async (event, url) => {
             if (!url) throw new Error('URL is required');
-            return this._downloadOrchestrator.inspectLink(url);
+            const result = this._downloadOrchestrator.inspectLink(url);
+            return result;
         });
 
         ipcMain.handle('download:start', async (event, url, formatId, deviceId = null, options = {}) => {
@@ -34,6 +36,11 @@ class DownloadHandlers {
             return this._downloadOrchestrator.stopDownload(processId);
         });
 
+        ipcMain.handle('download:resume', async (event, processId, url, formatId, deviceId = null, options = {}) => {
+            if (!processId || !url || !formatId) throw new Error('processId, url, and formatId are required');
+            return this._downloadOrchestrator.resumeDownload(processId, url, formatId, deviceId, options);
+        });
+
         ipcMain.handle('download:metadata', async (event, url) => {
             if (!url) throw new Error('URL is required');
             return this._downloadOrchestrator.getMetadata(url);
@@ -42,6 +49,16 @@ class DownloadHandlers {
         // إضافة جديدة: الحصول على قائمة التحميلات النشطة (اختياري)
         ipcMain.handle('download:active', async () => {
             return this._downloadOrchestrator.getActiveDownloads();
+        });
+
+        // إضافة جديدة: نقل ملف للجهاز يدوياً
+        ipcMain.handle('download:transferToDevice', async (event, localPath, deviceId) => {
+            if (!localPath) throw new Error('Local path is required');
+            if (!deviceId) throw new Error('Device ID is required');
+            if (!this._fileTransferService) {
+                throw new Error('FileTransferService not available');
+            }
+            return this._fileTransferService.transferFromDownloads(localPath, deviceId);
         });
     }
 }

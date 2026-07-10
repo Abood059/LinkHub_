@@ -37,7 +37,6 @@ class DatabaseManager {
             this._initialized = true;
             console.log('[DatabaseManager] Initialized successfully at', this._databasePath);
         } catch (error) {
-            console.error('[DatabaseManager] Failed to initialize:', error);
             throw error;
         }
     }
@@ -60,7 +59,6 @@ class DatabaseManager {
             if (err.code === 'ENOENT') {
                 // File does not exist, create with empty array
                 await fs.writeFile(this._databasePath, JSON.stringify([], null, 4), 'utf8');
-                console.log('[DatabaseManager] Created new database file');
             } else {
                 throw err;
             }
@@ -81,7 +79,6 @@ class DatabaseManager {
             if (error.code === 'ENOENT') {
                 return [];
             }
-            console.error('[DatabaseManager] Failed to load devices:', error);
             throw error;
         }
     }
@@ -145,7 +142,6 @@ class DatabaseManager {
      */
     async close() {
         // Future implementation: close DB connection if using SQLite
-        console.log('[DatabaseManager] Closed (no-op)');
     }
 
     /**

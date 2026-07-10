@@ -44,6 +44,13 @@ const devicesAPI = {
     connect: (target, friendlyName = null) => ipcRenderer.invoke('device:connect', target, friendlyName),
     
     /**
+     * Disconnect from a device.
+     * @param {string} deviceId - Device ID to disconnect
+     * @returns {Promise<Object>}
+     */
+    disconnect: (deviceId) => ipcRenderer.invoke('device:disconnect', deviceId),
+    
+    /**
      * Start screen mirroring for a connected device.
      * @param {string} deviceId
      * @param {Object} options - e.g., { fullscreen: boolean, bitrate: number }
@@ -65,7 +72,9 @@ const downloadsAPI = {
      * @param {string} url
      * @returns {Promise<Object>}
      */
-    inspect: (url) => ipcRenderer.invoke('download:inspect', url),
+    inspect: (url) => {
+        return ipcRenderer.invoke('download:inspect', url);
+    },
     
     /**
      * Start downloading a specific format.
@@ -75,8 +84,9 @@ const downloadsAPI = {
      * @param {Object} options - Additional options
      * @returns {Promise<Object>}
      */
-    start: (url, formatId, deviceId = null, options = {}) => 
-        ipcRenderer.invoke('download:start', url, formatId, deviceId, options),
+    start: (url, formatId, deviceId = null, options = {}) => {
+        return ipcRenderer.invoke('download:start', url, formatId, deviceId, options);
+    },
     
     /**
      * Stop an ongoing download by URL.
@@ -90,7 +100,16 @@ const downloadsAPI = {
      * @param {string} url
      * @returns {Promise<Object>}
      */
-    metadata: (url) => ipcRenderer.invoke('download:metadata', url)
+    metadata: (url) => ipcRenderer.invoke('download:metadata', url),
+
+    /**
+     * Transfer a downloaded file to a device.
+     * @param {string} localPath - Path to the local file
+     * @param {string} deviceId - Target device ID
+     * @returns {Promise<Object>}
+     */
+    transferToDevice: (localPath, deviceId) => 
+        ipcRenderer.invoke('download:transferToDevice', localPath, deviceId)
 };
 
 // ============================================================================
@@ -116,7 +135,9 @@ const eventAPI = {
         if (typeof callback !== 'function') {
             throw new Error('Callback must be a function');
         }
-        const wrappedCallback = (event, ...args) => callback(event, ...args);
+        const wrappedCallback = (event, ...args) => {
+            callback(event, ...args);
+        };
         ipcRenderer.on(channel, wrappedCallback);
         // Return unsubscribe function
         return () => {
@@ -146,15 +167,14 @@ const eventAPI = {
 // 4. Expose the unified API to renderer
 // ============================================================================
 
-contextBridge.exposeInMainWorld('linkhub', {
-    devices: devicesAPI,
-    downloads: downloadsAPI,
-    on: eventAPI.on,
-    off: eventAPI.off,
-    removeAllListeners: eventAPI.removeAllListeners
-});
-
-// Optional: Log that preload has loaded (only in development)
-if (process.env.NODE_ENV === 'development') {
-    console.log('[Preload] linkhub API exposed successfully');
+try {
+    contextBridge.exposeInMainWorld('linkhub', {
+        devices: devicesAPI,
+        downloads: downloadsAPI,
+        on: eventAPI.on,
+        off: eventAPI.off,
+        removeAllListeners: eventAPI.removeAllListeners
+    });
+} catch (err) {
+    // Failed to expose linkhub
 }

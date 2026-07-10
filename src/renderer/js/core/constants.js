@@ -7,8 +7,11 @@ export const DOM_IDS = {
     registeredContainer: 'registered-devices',
     discoveredContainer: 'discovered-devices',
     downloadsTbody: 'downloads-tbody',
+    recentDownloadsTbody: 'recent-downloads-tbody',
     btnStart: 'btn-start-route',
     mediaUrl: 'media-url',
+    btnStartDownloads: 'btn-start-route-downloads',
+    mediaUrlDownloads: 'media-url-downloads',
     refreshDevices: 'refresh-devices',
     pairDevice: 'pair-device-btn',
     // modal

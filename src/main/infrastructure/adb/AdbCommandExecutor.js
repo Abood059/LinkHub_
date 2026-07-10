@@ -175,6 +175,69 @@ class AdbCommandExecutor {
         );
     }
 
+    /**
+     * نقل ملف للجهاز باستخدام adb push
+     * @param {string} serial - معرف الجهاز
+     * @param {string} localPath - المسار المحلي للملف
+     * @param {string} remotePath - المسار الهدف على الجهاز
+     * @returns {Promise<{success: boolean, message: string}>}
+     */
+    async pushFile(serial, localPath, remotePath) {
+        const sanitizedSerial = this._sanitizeSerialOrTarget(serial);
+        
+        // التحقق من صحة المسارات
+        if (!localPath || typeof localPath !== 'string') {
+            throw new Error('Local path is required and must be a string');
+        }
+        if (!remotePath || typeof remotePath !== 'string') {
+            throw new Error('Remote path is required and must be a string');
+        }
+
+        try {
+            const args = [
+                '-s',
+                sanitizedSerial,
+                'push',
+                localPath,
+                remotePath
+            ];
+            
+            await this._executeQuickAdbCommand(args);
+            
+            return {
+                success: true,
+                message: `File transferred successfully to ${remotePath}`
+            };
+        } catch (error) {
+            if (this._logger) {
+                this._logger.error(`Failed to push file to device: ${error.message}`);
+            }
+            return {
+                success: false,
+                message: `Failed to transfer file: ${error.message}`
+            };
+        }
+    }
+
+    /**
+     * التحقق من اتصال الجهاز
+     * @param {string} serial - معرف الجهاز
+     * @returns {Promise<boolean>}
+     */
+    async isDeviceConnected(serial) {
+        const sanitizedSerial = this._sanitizeSerialOrTarget(serial);
+        
+        try {
+            const devices = await this.getDevices();
+            return devices.some(device => device.serial === sanitizedSerial && device.state === 'device');
+        } catch (error) {
+            if (this._logger) {
+                this._logger.error(`Failed to check device connection: ${error.message}`);
+            }
+            return false;
+        }
+    }
+
     async _executeShellCommand(
         serial,
         shellArgs

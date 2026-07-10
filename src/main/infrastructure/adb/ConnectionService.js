@@ -25,7 +25,7 @@ class ConnectionService extends EventEmitter {
         }
     }
 
-    startAdbMonitoring(intervalMs = 5000) {
+    startAdbMonitoring(intervalMs = 1000) {
         if (this._adbMonitor) return;
         this._adbMonitor = setInterval(async () => {
             try {
