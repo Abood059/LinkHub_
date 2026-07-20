@@ -121,8 +121,9 @@ class DeviceStateSyncService {
         const newDevices = devices.map(device => {
             const runtimeState = this._deviceRegistry.getRuntimeState(device.id);
             return {
-                device: device,
-                runtimeState: runtimeState || {}
+                device: device.toJSON(),
+                runtimeState: runtimeState ? runtimeState.toJSON() : {},
+                isPersistent: device.isFavorite // isPersistent indicates if device is saved in database
             };
         });
 
@@ -149,6 +150,11 @@ class DeviceStateSyncService {
 
             // التحقق من معرف الجهاز
             if (newDevice.device.id !== oldDevice.device.id) {
+                return true;
+            }
+
+            // التحقق من حالة المفضلة (isFavorite)
+            if (newDevice.device.isFavorite !== oldDevice.device.isFavorite) {
                 return true;
             }
 
@@ -196,21 +202,21 @@ class DeviceStateSyncService {
     _diffAndEmitDevices(currentDevices) {
         const currentMap = new Map();
         currentDevices.forEach(d => currentMap.set(d.device.id, d));
-        
+
         // أجهزة جديدة
         for (const [id, deviceData] of currentMap) {
             if (!this._previousState.devices.has(id)) {
                 this._windowManager.broadcast('device:added', deviceData);
             }
         }
-        
+
         // أجهزة محذوفة
         for (const id of this._previousState.devices.keys()) {
             if (!currentMap.has(id)) {
                 this._windowManager.broadcast('device:removed', { deviceId: id });
             }
         }
-        
+
         // أجهزة تغيرت حالتها
         for (const [id, deviceData] of currentMap) {
             const prev = this._previousState.devices.get(id);
@@ -228,7 +234,8 @@ class DeviceStateSyncService {
         const currRuntime = current.runtimeState || {};
         
         return prevRuntime.status !== currRuntime.status ||
-               prevRuntime.adbTarget !== currRuntime.adbTarget;
+               prevRuntime.adbTarget !== currRuntime.adbTarget ||
+               prev.device.isFavorite !== current.device.isFavorite;
     }
 
     /**

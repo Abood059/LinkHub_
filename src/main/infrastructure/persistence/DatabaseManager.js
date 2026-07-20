@@ -1,42 +1,53 @@
 // src/main/infrastructure/persistence/DatabaseManager.js
 'use strict';
 
-const fs = require('fs/promises');
+const Database = require('better-sqlite3');
+const fs = require('fs');
 const path = require('path');
 const { sanitizePath } = require('../../utils/pathSanitizer');
+const DeviceRepository = require('./repositories/DeviceRepository');
+const DownloadRepository = require('./repositories/DownloadRepository');
+const SettingsRepository = require('./repositories/SettingsRepository');
 
 /**
  * DatabaseManager
  *
- * Responsible only for persistence of devices (and possibly other data).
+ * Responsible for database connection management and providing repository access.
+ * Uses SQLite with better-sqlite3 for synchronous operations.
  * 
  * Features:
- * - Initialize database directory and file
- * - Load all devices
- * - Save all devices
- * - Insert/update/delete individual devices
- * - Close (placeholder for future DB upgrades)
+ * - Initialize SQLite database
+ * - Run migrations
+ * - Provide repository instances
+ * - Close database connection
  * 
  * No ADB logic. No runtime logic. No business logic.
  */
 class DatabaseManager {
     constructor({ databasePath } = {}) {
         this._appRoot = process.cwd();
-        this._databasePath = sanitizePath(this._appRoot, databasePath) || path.join(this._appRoot, 'data', 'devices.json');
+        this._databasePath = sanitizePath(this._appRoot, databasePath) || path.join(this._appRoot, 'data', 'linkhub.db');
+        this._db = null;
         this._initialized = false;
+        this._deviceRepository = null;
+        this._downloadRepository = null;
+        this._settingsRepository = null;
     }
 
     /**
-     * Initialize the database: ensure directory exists and create empty JSON file if missing.
+     * Initialize the database: create connection, run migrations, create repositories.
      * Should be called once during application startup.
      */
     async initDb() {
         try {
             await this._ensureDirectory();
-            await this._ensureFile();
+            await this._createConnection();
+            await this._runMigrations();
+            this._createRepositories();
             this._initialized = true;
             console.log('[DatabaseManager] Initialized successfully at', this._databasePath);
         } catch (error) {
+            console.error('[DatabaseManager] Initialization failed:', error);
             throw error;
         }
     }
@@ -46,112 +57,132 @@ class DatabaseManager {
      */
     async _ensureDirectory() {
         const directory = path.dirname(this._databasePath);
-        await fs.mkdir(directory, { recursive: true });
+        if (!fs.existsSync(directory)) {
+            fs.mkdirSync(directory, { recursive: true });
+        }
     }
 
     /**
-     * Ensure the database file exists; if not, create it with an empty array.
+     * Create database connection.
      */
-    async _ensureFile() {
-        try {
-            await fs.access(this._databasePath);
-        } catch (err) {
-            if (err.code === 'ENOENT') {
-                // File does not exist, create with empty array
-                await fs.writeFile(this._databasePath, JSON.stringify([], null, 4), 'utf8');
+    async _createConnection() {
+        this._db = new Database(this._databasePath);
+        this._db.pragma('journal_mode = WAL');
+        this._db.pragma('synchronous = NORMAL');
+        this._db.pragma('foreign_keys = ON');
+    }
+
+    /**
+     * Run database migrations.
+     */
+    async _runMigrations() {
+        const migrationsDir = path.join(__dirname, 'migrations');
+        const migrationFiles = ['001_init.sql', '003_add_custom_name.sql', '004_add_updated_at.sql'];
+
+        for (const migrationFile of migrationFiles) {
+            const migrationPath = path.join(migrationsDir, migrationFile);
+            if (fs.existsSync(migrationPath)) {
+                try {
+                    const migrationSql = fs.readFileSync(migrationPath, 'utf8');
+
+                    // Special handling for 003_add_custom_name to check if column already exists
+                    if (migrationFile === '003_add_custom_name.sql') {
+                        const tableInfo = this._db.pragma(`table_info(devices)`);
+                        const hasCustomName = tableInfo.some(col => col.name === 'custom_name');
+                        if (hasCustomName) {
+                            console.log(`[DatabaseManager] Migration ${migrationFile} skipped - column already exists`);
+                            continue;
+                        }
+                    }
+
+                    // Special handling for 004_add_updated_at to check if column already exists
+                    if (migrationFile === '004_add_updated_at.sql') {
+                        const tableInfo = this._db.pragma(`table_info(downloads)`);
+                        const hasUpdatedAt = tableInfo.some(col => col.name === 'updated_at');
+                        if (hasUpdatedAt) {
+                            console.log(`[DatabaseManager] Migration ${migrationFile} skipped - column already exists`);
+                            continue;
+                        }
+                    }
+
+                    this._db.exec(migrationSql);
+                    console.log(`[DatabaseManager] Migration ${migrationFile} executed successfully`);
+                } catch (error) {
+                    // If it's a duplicate column error, skip it gracefully
+                    if (error.code === 'SQLITE_ERROR' && error.message.includes('duplicate column name')) {
+                        console.log(`[DatabaseManager] Migration ${migrationFile} skipped - column already exists`);
+                    } else {
+                        console.error(`[DatabaseManager] Migration ${migrationFile} failed:`, error);
+                        throw error;
+                    }
+                }
             } else {
-                throw err;
+                console.warn('[DatabaseManager] Migration file not found:', migrationPath);
             }
         }
+        console.log('[DatabaseManager] All migrations executed successfully');
     }
 
     /**
-     * Load all devices from the JSON file.
-     * @returns {Promise<Array>} Array of device objects
+     * Create repository instances.
      */
-    async loadDevices() {
-        await this._ensureInitialized();
-        try {
-            const content = await fs.readFile(this._databasePath, 'utf8');
-            const parsed = JSON.parse(content);
-            return Array.isArray(parsed) ? parsed : [];
-        } catch (error) {
-            if (error.code === 'ENOENT') {
-                return [];
-            }
-            throw error;
+    _createRepositories() {
+        this._deviceRepository = new DeviceRepository(this._db);
+        this._downloadRepository = new DownloadRepository(this._db);
+        this._settingsRepository = new SettingsRepository(this._db);
+    }
+
+    /**
+     * Get the device repository.
+     * @returns {DeviceRepository} Device repository instance
+     */
+    get devices() {
+        if (!this._initialized) {
+            throw new Error('DatabaseManager not initialized. Call initDb() first.');
         }
+        return this._deviceRepository;
     }
 
     /**
-     * Save all devices to the JSON file.
-     * @param {Array} devices - Array of device objects
+     * Get the download repository.
+     * @returns {DownloadRepository} Download repository instance
      */
-    async saveDevices(devices = []) {
-        await this._ensureInitialized();
-        await this._ensureDirectory();
-        await fs.writeFile(this._databasePath, JSON.stringify(devices, null, 4), 'utf8');
+    get downloads() {
+        if (!this._initialized) {
+            throw new Error('DatabaseManager not initialized. Call initDb() first.');
+        }
+        return this._downloadRepository;
     }
 
     /**
-     * Insert a new device into the database.
-     * @param {Object} device - Device object to insert
-     * @returns {Promise<Object>} The inserted device
+     * Get the settings repository.
+     * @returns {SettingsRepository} Settings repository instance
      */
-    async insertDevice(device) {
-        const devices = await this.loadDevices();
-        devices.push(device);
-        await this.saveDevices(devices);
-        return device;
+    get settings() {
+        if (!this._initialized) {
+            throw new Error('DatabaseManager not initialized. Call initDb() first.');
+        }
+        return this._settingsRepository;
     }
 
     /**
-     * Update an existing device by ID.
-     * @param {string} deviceId - ID of the device to update
-     * @param {Object|Function} updater - Either a partial object or a function that receives current and returns updated
-     * @returns {Promise<Object|null>} Updated device or null if not found
-     */
-    async updateDevice(deviceId, updater) {
-        const devices = await this.loadDevices();
-        const index = devices.findIndex(device => device.id === deviceId);
-        if (index === -1) return null;
-
-        const current = devices[index];
-        const updated = typeof updater === 'function' ? updater(current) : { ...current, ...updater };
-        devices[index] = updated;
-        await this.saveDevices(devices);
-        return updated;
-    }
-
-    /**
-     * Delete a device by ID.
-     * @param {string} deviceId - ID of the device to delete
-     * @returns {Promise<boolean>} True if deleted, false if not found
-     */
-    async deleteDevice(deviceId) {
-        const devices = await this.loadDevices();
-        const filtered = devices.filter(device => device.id !== deviceId);
-        if (filtered.length === devices.length) return false;
-        await this.saveDevices(filtered);
-        return true;
-    }
-
-    /**
-     * Close the database connection (placeholder for future enhancements like using better-sqlite3).
-     * Currently no-op but kept for API compatibility.
+     * Close the database connection.
      */
     async close() {
-        // Future implementation: close DB connection if using SQLite
+        if (this._db) {
+            this._db.close();
+            this._db = null;
+            this._initialized = false;
+            console.log('[DatabaseManager] Database connection closed');
+        }
     }
 
     /**
-     * Ensure that initDb has been called before any operation.
-     * @private
+     * Check if database is initialized.
+     * @returns {boolean} True if initialized
      */
-    async _ensureInitialized() {
-        if (!this._initialized) {
-            await this.initDb();
-        }
+    isInitialized() {
+        return this._initialized;
     }
 }
 

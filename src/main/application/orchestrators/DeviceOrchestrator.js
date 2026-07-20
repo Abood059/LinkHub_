@@ -9,14 +9,16 @@ const Device = require('../../domain/entities/Device');
  * - الاقتران والاتصال
  * - إدارة الحالة في DeviceRegistry
  * - تشغيل وإيقاف انعكاس الشاشة
- * 
+ * - إدارة المفضلة والموثوقية
+ *
  * لا يحتوي على أي منطق تنفيذ تقني (لا spawn، لا child_process، لا ADB مباشر)
  */
 class DeviceOrchestrator {
-    constructor({ deviceRegistry, connectionService, scrcpyAdapter, logger = null }) {
+    constructor({ deviceRegistry, connectionService, scrcpyAdapter, deviceRepository = null, logger = null }) {
         this._deviceRegistry = deviceRegistry;
         this._connectionService = connectionService;
         this._scrcpyAdapter = scrcpyAdapter;
+        this._deviceRepository = deviceRepository;
         this._logger = logger;
     }
 
@@ -58,7 +60,7 @@ class DeviceOrchestrator {
             model: 'Unknown',
             version: 'Unknown',
             arch: 'Unknown',
-            isNew: false
+            isFavorite: false
         });
 
         // تسجيل الجهاز في الـ Registry
@@ -172,6 +174,102 @@ class DeviceOrchestrator {
             runtimeState: this._deviceRegistry.getRuntimeState(device.id)?.toJSON() || null
         }));
    }
+
+    /**
+     * تعيين الجهاز كمفضل
+     * @param {string} deviceId - معرف الجهاز
+     * @param {boolean} isFavorite - حالة المفضلة
+     * @returns {Promise<Object>} الجهاز المحدث
+     */
+    async setDeviceFavorite(deviceId, isFavorite) {
+        const device = this._deviceRegistry.getDevice(deviceId);
+        if (!device) {
+            throw new Error(`Device ${deviceId} not found`);
+        }
+
+        // Sync immediately with registry (handles both memory and repository)
+        this._deviceRegistry.syncDeviceFavorite(deviceId, isFavorite);
+
+        // Emit event to notify UI about the device state change
+        // This will trigger loadDevices() in the renderer
+        const { BrowserWindow } = require('electron');
+        const windows = BrowserWindow.getAllWindows();
+        if (windows.length > 0) {
+            windows[0].webContents.send('device:stateChanged', { deviceId, isFavorite });
+        }
+
+        return device.toJSON();
+    }
+
+    /**
+     * تعيين الجهاز كموثوق
+     * @param {string} deviceId - معرف الجهاز
+     * @param {boolean} isTrusted - حالة الموثوقية
+     * @returns {Promise<Object>} الجهاز المحدث
+     */
+    async setDeviceTrusted(deviceId, isTrusted) {
+        const device = this._deviceRegistry.getDevice(deviceId);
+        if (!device) {
+            throw new Error(`Device ${deviceId} not found`);
+        }
+
+        // Update in memory
+        device.setTrusted(isTrusted);
+
+        // Sync with repository
+        if (this._deviceRepository) {
+            try {
+                this._deviceRepository.updateTrusted(deviceId, isTrusted);
+            } catch (error) {
+                console.error('[DeviceOrchestrator] Failed to sync trusted status to repository:', error);
+            }
+        }
+
+        return device.toJSON();
+    }
+
+    /**
+     * الحصول على الأجهزة المفضلة
+     * @returns {Array} قائمة الأجهزة المفضلة
+     */
+    getFavoriteDevices() {
+        return this._deviceRegistry.getFavoriteDevices().map(device => device.toJSON());
+    }
+
+    /**
+     * الحصول على الأجهزة الموثوقة
+     * @returns {Array} قائمة الأجهزة الموثوقة
+     */
+    getTrustedDevices() {
+        return this._deviceRegistry.getTrustedDevices().map(device => device.toJSON());
+    }
+
+    /**
+     * تعيين اسم مخصص للجهاز
+     * @param {string} deviceId - معرف الجهاز
+     * @param {string} customName - الاسم المخصص
+     * @returns {Promise<Object>} الجهاز المحدث
+     */
+    async setDeviceCustomName(deviceId, customName) {
+        const device = this._deviceRegistry.getDevice(deviceId);
+        if (!device) {
+            throw new Error(`Device ${deviceId} not found`);
+        }
+
+        // Update in memory
+        device.setCustomName(customName);
+
+        // Sync with repository
+        if (this._deviceRepository) {
+            try {
+                this._deviceRepository.updateCustomName(deviceId, customName);
+            } catch (error) {
+                console.error('[DeviceOrchestrator] Failed to sync custom name to repository:', error);
+            }
+        }
+
+        return device.toJSON();
+    }
 }
 
 module.exports = DeviceOrchestrator;

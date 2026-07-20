@@ -1,6 +1,6 @@
 // startRouteHandler.js - معالج زر بدء التوجيه والتحميل
 import { showToast } from '../core/utils.js';
-import { inspectUrl, startDownload } from '../services/downloadService.js';
+import { inspectUrl, startDownload, resumeDownload } from '../services/downloadService.js';
 import { addDownloadRow } from '../ui/downloadManager.js';
 
 let registeredDevices = []; // سيتم ربطها من main
@@ -95,12 +95,8 @@ export async function handleUrlInspection(url, urlInputElement, buttonElement) {
  * بدء التحميل بعد اختيار الجودة والجهاز
  */
 export async function handleDownloadStart(url, videoFormatId, audioFormatId, deviceId, urlInputElement, buttonElement, inspectionData) {
-    const title = inspectionData?.title || (() => {
-        try {
-            const lastSegment = new URL(url).pathname.split('/').pop();
-            return (lastSegment && lastSegment.includes('.')) ? lastSegment : 'media_' + Date.now();
-        } catch(e) { return 'media_' + Date.now(); }
-    })();
+    // استخدام title فقط للعرض في الواجهة
+    const title = inspectionData?.title || 'Unknown Video';
 
     let deviceName = 'الجهاز المحلي';
     if (deviceId) {
@@ -125,13 +121,6 @@ export async function handleDownloadStart(url, videoFormatId, audioFormatId, dev
             throw new Error('يجب اختيار جودة واحدة على الأقل');
         }
 
-        const title = inspectionData?.title || (() => {
-            try {
-                const lastSegment = new URL(url).pathname.split('/').pop();
-                return (lastSegment && lastSegment.includes('.')) ? lastSegment : 'media_' + Date.now();
-            } catch(e) { return 'media_' + Date.now(); }
-        })();
-
         // تغيير حالة الزر إلى "جاري بدأ التحميل" وتعطيله
         if (buttonElement) {
             buttonElement.textContent = 'جاري بدأ التحميل';
@@ -141,11 +130,36 @@ export async function handleDownloadStart(url, videoFormatId, audioFormatId, dev
         }
 
         const result = await startDownload(url, formatId, deviceId, { title, formatsData: inspectionData });
-        const downloadId = result.processId;
         
+        // التحقق مما إذا كان الباك إند قد وجد تحميلاً موجوداً
+        if (result.existing) {
+            // تحميل موجود بنفس الرابط والجودة - فحص كل الحالات
+            if (result.status === 'cancelled' || result.status === 'pending' || result.status === 'in_progress' || result.status === 'stopped') {
+                // استئناف التحميل الموجود تلقائياً
+                showToast('التحميل موجود مسبقاً، جاري استئنافه...', false);
+                await resumeDownload(result.downloadId, url, formatId, deviceId, { title, formatsData: inspectionData });
+                if (urlInputElement) urlInputElement.value = '';
+                return;
+            } else if (result.status === 'completed') {
+                showToast('هذا الفيديو تم تحميله مسبقاً بنفس الجودة', true);
+                if (buttonElement) {
+                    buttonElement.textContent = 'بدأ التحميل';
+                    buttonElement.disabled = false;
+                    buttonElement.style.opacity = '1';
+                    buttonElement.style.cursor = 'pointer';
+                }
+                return;
+            } else if (result.status === 'failed') {
+                // السماح بإعادة المحاولة للتحميلات الفاشلة
+                showToast('التحميل السابق فشل، جاري إعادة المحاولة...', false);
+            }
+        }
+        
+        const downloadId = result.processId;
+
         // الـ row سيتم إنشاؤه تلقائياً عند استقبال حدث download:started من الباك إند
         // الزر سيتم استعادته عند استلام حدث download:started
-        
+
         if (urlInputElement) urlInputElement.value = '';
     } catch (err) {
         showToast(`فشل التحميل: ${err.message}`, true);

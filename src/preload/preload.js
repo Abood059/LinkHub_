@@ -49,7 +49,35 @@ const devicesAPI = {
      * @returns {Promise<Object>}
      */
     disconnect: (deviceId) => ipcRenderer.invoke('device:disconnect', deviceId),
-    
+
+    /**
+     * Set device favorite status.
+     * @param {string} deviceId - Device ID
+     * @param {boolean} isFavorite - Favorite status
+     * @returns {Promise<Object>}
+     */
+    setFavorite: (deviceId, isFavorite) => ipcRenderer.invoke('device:setFavorite', deviceId, isFavorite),
+
+    /**
+     * Set device trusted status.
+     * @param {string} deviceId - Device ID
+     * @param {boolean} isTrusted - Trusted status
+     * @returns {Promise<Object>}
+     */
+    setTrusted: (deviceId, isTrusted) => ipcRenderer.invoke('device:setTrusted', deviceId, isTrusted),
+
+    /**
+     * Get favorite devices.
+     * @returns {Promise<Array>}
+     */
+    getFavorites: () => ipcRenderer.invoke('device:getFavorites'),
+
+    /**
+     * Get trusted devices.
+     * @returns {Promise<Array>}
+     */
+    getTrusted: () => ipcRenderer.invoke('device:getTrusted'),
+
     /**
      * Start screen mirroring for a connected device.
      * @param {string} deviceId
@@ -89,12 +117,25 @@ const downloadsAPI = {
     },
     
     /**
-     * Stop an ongoing download by URL.
-     * @param {string} url
+     * Stop an ongoing download by process ID.
+     * @param {string} processId
      * @returns {Promise<boolean>}
      */
-    stop: (url) => ipcRenderer.invoke('download:stop', url),
-    
+    stop: (processId) => ipcRenderer.invoke('download:stop', processId),
+
+    /**
+     * Resume a stopped download.
+     * @param {string} processId
+     * @param {string} url
+     * @param {string} formatId
+     * @param {string|null} deviceId
+     * @param {Object} options
+     * @returns {Promise<Object>}
+     */
+    resume: (processId, url, formatId, deviceId = null, options = {}) => {
+        return ipcRenderer.invoke('download:resume', processId, url, formatId, deviceId, options);
+    },
+
     /**
      * Get lightweight metadata (title, duration, thumbnail).
      * @param {string} url
@@ -108,8 +149,48 @@ const downloadsAPI = {
      * @param {string} deviceId - Target device ID
      * @returns {Promise<Object>}
      */
-    transferToDevice: (localPath, deviceId) => 
-        ipcRenderer.invoke('download:transferToDevice', localPath, deviceId)
+    transferToDevice: (localPath, deviceId) =>
+        ipcRenderer.invoke('download:transferToDevice', localPath, deviceId),
+
+    /**
+     * Delete a download from history.
+     * @param {string} downloadId - Download ID
+     * @returns {Promise<boolean>}
+     */
+    delete: (downloadId) => ipcRenderer.invoke('download:delete', downloadId),
+
+    /**
+     * Delete all downloads from history.
+     * @returns {Promise<number>}
+     */
+    deleteAll: () => ipcRenderer.invoke('download:deleteAll'),
+
+    /**
+     * Delete downloads before a specific date.
+     * @param {string} date - Date string (ISO format)
+     * @returns {Promise<number>}
+     */
+    deleteBeforeDate: (date) => ipcRenderer.invoke('download:deleteBeforeDate', date),
+
+    /**
+     * Get download history.
+     * @returns {Promise<Array>}
+     */
+    getHistory: () => ipcRenderer.invoke('download:getHistory'),
+
+    /**
+     * Find existing download by URL and formatId.
+     * @param {string} url
+     * @param {string} formatId
+     * @returns {Promise<Object|null>}
+     */
+    findExisting: (url, formatId) => ipcRenderer.invoke('download:findExisting', url, formatId),
+
+    /**
+     * Get all active downloads.
+     * @returns {Promise<Map|Array>}
+     */
+    getActive: () => ipcRenderer.invoke('download:active')
 };
 
 // ============================================================================

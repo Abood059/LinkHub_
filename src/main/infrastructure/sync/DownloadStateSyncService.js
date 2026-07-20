@@ -3,20 +3,28 @@
 
 /**
  * DownloadStateSyncService
- * 
+ *
  * خدمة تجميع حالة التحميلات وإرسالها للواجهة بشكل منفصل
- * يقلل الضغط على IPC عن طريق تجميع التغييرات وإرسالها بشكل دوري
+ * يقلل الضغط على IPC عن طريق قراءة الحالة من الذاكرة وإرسالها بشكل دوري
+ * هذا هو المصدر الوحيد للحقيقة لمزامنة حالة التحميلات مع الواجهة الأمامية
  */
 class DownloadStateSyncService {
-    constructor(windowManager, options = {}) {
+    constructor(windowManager, downloadManager, options = {}) {
         if (!windowManager) {
             throw new Error('WindowManager is required for DownloadStateSyncService');
         }
 
         this._windowManager = windowManager;
+        this._downloadManager = downloadManager;
         this._interval = options.interval || 300; // 300ms default
         this._timer = null;
         this._isRunning = false;
+
+        // خريطة مؤقتة لتخزين رسائل الخطأ
+        this._pendingErrors = new Map(); // downloadId -> errorMessage
+
+        // عداد للمحاولات الفاشلة المتتالية
+        this._failedAttempts = 0;
 
         // الحالة المجمعة
         this._state = {
@@ -28,9 +36,6 @@ class DownloadStateSyncService {
         this._previousState = {
             downloads: new Map() // downloadId -> downloadData
         };
-
-        // Dirty flag للإشارة إلى وجود تغييرات
-        this._hasChanges = false;
     }
 
     /**
@@ -80,147 +85,75 @@ class DownloadStateSyncService {
     }
 
     // ============================================================================
-    // تحديثات التحميل
-    // ============================================================================
-
-    onDownloadProgress(data) {
-        if (!data || !data.downloadId) return;
-
-        const download = this._state.downloads.get(data.downloadId) || {
-            downloadId: data.downloadId,
-            url: data.url || null,
-            title: data.title || null,
-            status: 'downloading',
-            error: null,
-            deviceId: data.deviceId || null,
-            outputPath: null,
-            totalSize: null,
-            downloadedBytes: null
-        };
-
-        download.percent = data.percent;
-        download.speed = data.speed || null;
-        download.size = data.size || null;
-        download.eta = data.eta || null;
-        download.elapsed = data.elapsed || null;
-        download.status = 'downloading';
-        download.deviceId = data.deviceId || download.deviceId;
-        download.url = data.url || download.url;
-        download.title = data.title || download.title;
-        download.totalSize = data.totalSize || download.totalSize;
-        download.downloadedBytes = data.downloadedBytes || download.downloadedBytes;
-
-        this._state.downloads.set(data.downloadId, download);
-        this._hasChanges = true;
-    }
-
-    onDownloadComplete(data) {
-        if (!data || !data.downloadId) return;
-
-        const download = this._state.downloads.get(data.downloadId) || {
-            downloadId: data.downloadId,
-            url: data.url || null,
-            title: data.title || null,
-            status: 'completed',
-            error: null,
-            deviceId: data.deviceId || null,
-            outputPath: null
-        };
-
-        download.status = 'completed';
-        download.outputPath = data.outputPath || null;
-        download.deviceId = data.deviceId || download.deviceId;
-        download.url = data.url || download.url;
-        download.title = data.title || download.title;
-        download.percent = 100;
-
-        this._state.downloads.set(data.downloadId, download);
-        this._hasChanges = true;
-    }
-
-    onDownloadError(data) {
-        if (!data || !data.downloadId) return;
-
-        const download = this._state.downloads.get(data.downloadId) || {
-            downloadId: data.downloadId,
-            url: data.url || null,
-            title: data.title || null,
-            status: 'failed',
-            error: null,
-            deviceId: data.deviceId || null,
-            outputPath: null
-        };
-
-        download.status = 'failed';
-        download.error = data.error || null;
-        download.deviceId = data.deviceId || download.deviceId;
-        download.url = data.url || download.url;
-        download.title = data.title || download.title;
-
-        this._state.downloads.set(data.downloadId, download);
-        this._hasChanges = true;
-    }
-
-    onDownloadStopped(data) {
-        if (!data || !data.downloadId) return;
-
-        const download = this._state.downloads.get(data.downloadId);
-        if (download) {
-            download.status = 'stopped';
-            this._state.downloads.set(data.downloadId, download);
-            this._hasChanges = true;
-        }
-    }
-
-    onDownloadRetrying(data) {
-        if (!data || !data.downloadId) return;
-
-        const download = this._state.downloads.get(data.downloadId) || {
-            downloadId: data.downloadId,
-            url: data.url || null,
-            title: data.title || null,
-            status: 'retrying',
-            error: null,
-            deviceId: data.deviceId || null,
-            outputPath: null
-        };
-
-        download.status = 'retrying';
-        download.retryCount = data.retryCount;
-        download.maxRetries = data.maxRetries;
-        download.deviceId = data.deviceId || download.deviceId;
-        download.url = data.url || download.url;
-        download.title = data.title || download.title;
-
-        this._state.downloads.set(data.downloadId, download);
-        this._hasChanges = true;
-    }
-
-    // ============================================================================
     // Internal methods
     // ============================================================================
 
     /**
      * إرسال الحالة للواجهة
+     * يقرأ الحالة من الذاكرة (DownloadManager._activeDownloads) دورياً
      */
     _broadcastState() {
-        if (!this._hasChanges) {
+        if (!this._downloadManager) {
             return;
         }
 
-        const currentState = this.getState();
-        
-        // إرسال الحالة الموحدة
-        this._windowManager.broadcast('download:state:update', currentState);
-        
-        // مقارنة وإطلاق أحداث منفصلة
-        this._diffAndEmitDownloads(currentState.downloads);
-        
-        this._hasChanges = false;
-        this._state.timestamp = Date.now();
-        
-        // تحديث الحالة السابقة
-        this._updatePreviousState(currentState);
+        try {
+            // إعادة تعيين عداد المحاولات الفاشلة عند النجاح
+            this._failedAttempts = 0;
+
+            // قراءة التحميلات النشطة من الذاكرة
+            const activeDownloads = this._downloadManager.getActiveDownloads();
+
+            // كشف الانتقال إلى حالة failed وحفظ رسالة الخطأ
+            activeDownloads.forEach((entry, downloadId) => {
+                const prev = this._previousState.downloads.get(downloadId);
+                if (prev && prev.status !== 'failed' && entry.status === 'failed') {
+                    // الانتقال إلى failed: حفظ رسالة الخطأ مؤقتاً
+                    const errorMessage = entry.error || entry.errorMessage || null;
+                    this._pendingErrors.set(downloadId, errorMessage);
+                }
+            });
+
+            // تحديث الحالة الحالية
+            this._state.downloads.clear();
+            activeDownloads.forEach((entry, downloadId) => {
+                const downloadData = {
+                    downloadId: downloadId,
+                    url: entry.url || null,
+                    title: entry.title || null,
+                    status: entry.status || 'unknown',
+                    deviceId: entry.deviceId || null,
+                    formatId: entry.formatId || null,
+                    outputPath: entry.outputPath || null,
+                    percent: entry.percent || 0,
+                    speed: entry.speed || null,
+                    size: entry.size || null,
+                    totalSize: entry.totalSize || null,
+                    downloadedBytes: entry.downloadedBytes || 0,
+                    retryCount: entry.retryCount || 0,
+                    maxRetries: entry.maxRetries || 3,
+                    eta: entry.eta || null,
+                    elapsed: entry.elapsed || null
+                };
+                this._state.downloads.set(downloadId, downloadData);
+            });
+
+            const currentState = this.getState();
+
+            // إرسال الحالة الموحدة
+            this._windowManager.broadcast('download:state:update', currentState);
+
+            // مقارنة وإطلاق أحداث منفصلة
+            this._diffAndEmitDownloads(currentState.downloads);
+
+            this._state.timestamp = Date.now();
+
+            // تحديث الحالة السابقة
+            this._updatePreviousState(currentState);
+        } catch (error) {
+            this._failedAttempts++;
+            console.error(`[DownloadStateSyncService] Failed to broadcast state (attempt ${this._failedAttempts}):`, error);
+        }
     }
 
     // ============================================================================
@@ -229,6 +162,7 @@ class DownloadStateSyncService {
 
     /**
      * مقارنة حالة التحميلات وإطلاق أحداث منفصلة
+     * @param {Array} currentDownloads - التحميلات الحالية
      */
     _diffAndEmitDownloads(currentDownloads) {
         const currentMap = new Map();
@@ -238,8 +172,14 @@ class DownloadStateSyncService {
             const prev = this._previousState.downloads.get(downloadId);
             
             if (!prev) {
-                // تحميل جديد - أرسل حدث للإشارة إلى بداية التحميل
-                this._windowManager.broadcast('download:started', { downloadId, url: download.url, title: download.title });
+                // تحميل جديد
+                this._windowManager.broadcast('download:started', { 
+                    downloadId, 
+                    url: download.url, 
+                    title: download.title,
+                    formatId: download.formatId,
+                    deviceId: download.deviceId
+                });
                 continue;
             }
             
@@ -247,22 +187,51 @@ class DownloadStateSyncService {
                 if (download.status === 'completed') {
                     this._windowManager.broadcast('download:complete', { downloadId });
                 } else if (download.status === 'failed') {
-                    const errorData = { 
-                        downloadId, 
-                        error: download.error 
+                    const errorMessage = this._pendingErrors.get(downloadId) || null;
+                    const errorData = {
+                        downloadId,
+                        error: errorMessage
                     };
                     this._windowManager.broadcast('download:error', errorData);
+                    // حذف رسالة الخطأ بعد الإرسال لمنع التكرار
+                    this._pendingErrors.delete(downloadId);
                 } else if (download.status === 'stopped') {
-                    this._windowManager.broadcast('download:stopped', { downloadId });
+                    this._windowManager.broadcast('download:stopped', {
+                        downloadId,
+                        url: download.url,
+                        formatId: download.formatId,
+                        deviceId: download.deviceId,
+                        title: download.title
+                    });
+                } else if ((download.status === 'downloading' || download.status === 'starting') && prev.status === 'stopped') {
+                    // تم استئناف التحميل من حالة التوقف
+                    this._windowManager.broadcast('download:resumed', {
+                        downloadId,
+                        url: download.url,
+                        formatId: download.formatId,
+                        deviceId: download.deviceId,
+                        title: download.title
+                    });
+                } else if (download.status === 'retrying' && prev.status !== 'retrying') {
+                    // إعادة محاولة التحميل
+                    this._windowManager.broadcast('download:retrying', {
+                        downloadId,
+                        retryCount: download.retryCount,
+                        maxRetries: download.maxRetries
+                    });
                 }
             }
-            
+
+            // إرسال progress للتحميلات النشطة فقط عند تغيير النسبة المئوية
+            // لتقليل الضغط على IPC
             if (download.status === 'downloading' && download.percent !== prev.percent) {
                 const progressData = {
                     downloadId,
                     percent: download.percent,
                     speed: download.speed || null,
-                    size: download.size || null
+                    size: download.size || null,
+                    totalSize: download.totalSize || null,
+                    downloadedBytes: download.downloadedBytes || null
                 };
                 this._windowManager.broadcast('download:progress', progressData);
             }
@@ -275,9 +244,47 @@ class DownloadStateSyncService {
     _updatePreviousState(currentState) {
         this._previousState.downloads.clear();
         currentState.downloads.forEach(d => {
-            this._previousState.downloads.set(d.downloadId, JSON.parse(JSON.stringify(d)));
+            this._previousState.downloads.set(d.downloadId, structuredClone(d));
         });
     }
+
+    /**
+     * Initialize the previous state with restored downloads
+     * This prevents sending download:started events for restored downloads on first sync cycle
+     * @param {Map} downloadsMap - Map of downloadId -> download data
+     */
+    initializeState(downloadsMap) {
+        if (!downloadsMap || !(downloadsMap instanceof Map)) {
+            console.warn('[DownloadStateSyncService] Invalid downloadsMap provided for initialization');
+            return;
+        }
+
+        this._previousState.downloads.clear();
+        downloadsMap.forEach((entry, downloadId) => {
+            const downloadData = {
+                downloadId: downloadId,
+                url: entry.url || null,
+                title: entry.title || null,
+                status: entry.status || 'unknown',
+                deviceId: entry.deviceId || null,
+                formatId: entry.formatId || null,
+                outputPath: entry.outputPath || null,
+                percent: entry.percent || 0,
+                speed: entry.speed || null,
+                size: entry.size || null,
+                totalSize: entry.totalSize || null,
+                downloadedBytes: entry.downloadedBytes || 0,
+                retryCount: entry.retryCount || 0,
+                maxRetries: entry.maxRetries || 3,
+                eta: entry.eta || null,
+                elapsed: entry.elapsed || null
+            };
+            this._previousState.downloads.set(downloadId, structuredClone(downloadData));
+        });
+
+        console.log(`[DownloadStateSyncService] Initialized previous state with ${this._previousState.downloads.size} downloads`);
+    }
+
 }
 
 module.exports = DownloadStateSyncService;

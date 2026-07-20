@@ -82,6 +82,22 @@ class ProcessSupervisor {
         }
     }
 
+    /**
+     * التحقق من وجود عملية حية في السجل
+     * @param {string} processId - معرف العملية
+     * @returns {boolean} true إذا كانت العملية موجودة في السجل، false إذا لم تكن
+     */
+    hasProcess(
+        processId
+    ) {
+        const process =
+            this._processRegistry.get(
+                processId
+            );
+
+        return !!process;
+    }
+
     stopManagedProcess(
         processId
     ) {

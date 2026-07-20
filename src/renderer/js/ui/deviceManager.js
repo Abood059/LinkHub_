@@ -1,13 +1,22 @@
 // deviceManager.js - إنشاء وعرض عناصر الأجهزة
 import { escapeHtml } from '../core/utils.js';
 import { showToast } from '../core/utils.js';
-import { startStream } from '../services/deviceService.js';
+import { startStream, setDeviceFavorite } from '../services/deviceService.js';
 import { getSelectedDeviceIds, toggleSelectedDevice, updateElementSelection } from './selectionManager.js';
 
 let currentShowModalCallback = null; // سيتم ربطه من main.js
+let currentFilter = 'all'; // 'all', 'favorites', 'trusted'
 
 export function setShowModalCallback(callback) {
     currentShowModalCallback = callback;
+}
+
+export function setFilter(filter) {
+    currentFilter = filter;
+}
+
+export function getFilter() {
+    return currentFilter;
 }
 
 export function createDeviceElement(deviceData, isRegistered) {
@@ -15,10 +24,12 @@ export function createDeviceElement(deviceData, isRegistered) {
     const runtime = deviceData.runtimeState || {};
     const status = runtime.status || 'offline';
     const deviceId = device.id;
-    const displayName = device.deviceFriendlyName || device.model || device.id;
+    const displayName = device.customName || device.deviceFriendlyName || device.model || device.id;
     const model = (device.model && device.model !== 'Unknown') ? device.model : '';
     const version = (device.version && device.version !== 'Unknown') ? device.version : '';
     const detailsText = model && version ? `${model} (${version})` : (model || version || '');
+    const isFavorite = device.isFavorite || false;
+    const isTrusted = device.isTrusted || false;
 
     const div = document.createElement('div');
     div.className = `device-item ${status === 'connected' ? 'status-connected' : 'status-offline'}`;
@@ -43,15 +54,34 @@ export function createDeviceElement(deviceData, isRegistered) {
             ${detailsText ? `<div class="device-detail">${escapeHtml(detailsText)}</div>` : ''}
         </div>
         <span class="status-badge">${status === 'connected' ? 'متصل' : (status === 'offline' ? 'غير متصل' : status)}</span>
+        <button class="favorite-btn ${isFavorite ? 'active' : ''}" data-device-id="${deviceId}" style="background: none; border: none; cursor: pointer; margin-right: 8px;" title="${isFavorite ? 'إزالة من المفضلة' : 'إضافة للمفضلة'}">⭐</button>
         <button class="stream-btn" data-device-id="${deviceId}" style="background: none; border: none; cursor: pointer; margin-right: 8px;" title="بدء البث">📺</button>
     `;
 
-    // فتح النافذة عند النقر على الجهاز (ليس على زر البث)
+    // فتح النافذة عند النقر على الجهاز (ليس على زر البث أو المفضلة)
     div.addEventListener('click', (e) => {
         if (e.target.classList?.contains('stream-btn') || e.target.closest('.stream-btn')) return;
+        if (e.target.classList?.contains('favorite-btn') || e.target.closest('.favorite-btn')) return;
         e.stopPropagation();
         if (currentShowModalCallback) currentShowModalCallback(deviceData);
     });
+
+    // زر المفضلة
+    const favoriteBtn = div.querySelector('.favorite-btn');
+    if (favoriteBtn) {
+        favoriteBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            try {
+                const newFavoriteState = !isFavorite;
+                await setDeviceFavorite(deviceId, newFavoriteState);
+                favoriteBtn.classList.toggle('active', newFavoriteState);
+                favoriteBtn.title = newFavoriteState ? 'إزالة من المفضلة' : 'إضافة للمفضلة';
+                showToast(newFavoriteState ? 'تمت إضافة الجهاز للمفضلة' : 'تمت إزالة الجهاز من المفضلة');
+            } catch (err) {
+                showToast(`فشل تحديث المفضلة: ${err.message}`, true);
+            }
+        });
+    }
 
     // زر البث المباشر
     const streamBtn = div.querySelector('.stream-btn');
@@ -90,6 +120,7 @@ export function createDeviceElement(deviceData, isRegistered) {
     if (isRegistered && status === 'connected') {
         div.addEventListener('click', (e) => {
             if (e.target.classList?.contains('stream-btn') || e.target.closest('.stream-btn')) return;
+            if (e.target.classList?.contains('favorite-btn') || e.target.closest('.favorite-btn')) return;
             e.stopPropagation();
             const nowSelected = toggleSelectedDevice(deviceId);
             updateElementSelection(div, deviceId, nowSelected);
@@ -99,27 +130,39 @@ export function createDeviceElement(deviceData, isRegistered) {
     return div;
 }
 
-export function renderDevices(registeredDevices, registeredContainer, discoveredContainer) {
-    if (registeredContainer) {
-        if (!registeredDevices || registeredDevices.length === 0) {
-            registeredContainer.innerHTML = '<div class="placeholder-text">لا توجد أجهزة مسجلة</div>';
+export function renderDevices(registeredDevices, favoriteContainer, nonFavoriteContainer) {
+    const allDevices = registeredDevices || [];
+    const favoriteDevices = allDevices.filter(d => d.device.isFavorite === true);
+    const nonFavoriteDevices = allDevices.filter(d => d.device.isFavorite === false);
+
+    // Apply filter to favorite container
+    let filteredFavorites = favoriteDevices;
+    if (currentFilter === 'trusted') {
+        filteredFavorites = favoriteDevices.filter(d => d.device.isTrusted === true);
+    }
+
+    // Render favorite devices
+    if (favoriteContainer) {
+        if (!filteredFavorites || filteredFavorites.length === 0) {
+            favoriteContainer.innerHTML = '<div class="placeholder-text">لا توجد أجهزة مفضلة</div>';
         } else {
-            registeredContainer.innerHTML = '';
-            registeredDevices.forEach(deviceData => {
+            favoriteContainer.innerHTML = '';
+            filteredFavorites.forEach(deviceData => {
                 const el = createDeviceElement(deviceData, true);
-                registeredContainer.appendChild(el);
+                favoriteContainer.appendChild(el);
             });
         }
     }
-    if (discoveredContainer) {
-        const newDevices = registeredDevices.filter(d => d.device.isNew === true);
-        if (newDevices.length === 0) {
-            discoveredContainer.innerHTML = '<div class="placeholder-text">لا توجد أجهزة جديدة مكتشفة</div>';
+
+    // Render non-favorite devices
+    if (nonFavoriteContainer) {
+        if (nonFavoriteDevices.length === 0) {
+            nonFavoriteContainer.innerHTML = '<div class="placeholder-text">لا توجد أجهزة</div>';
         } else {
-            discoveredContainer.innerHTML = '';
-            newDevices.forEach(deviceData => {
+            nonFavoriteContainer.innerHTML = '';
+            nonFavoriteDevices.forEach(deviceData => {
                 const el = createDeviceElement(deviceData, false);
-                discoveredContainer.appendChild(el);
+                nonFavoriteContainer.appendChild(el);
             });
         }
     }

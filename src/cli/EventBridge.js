@@ -110,7 +110,7 @@ class EventBridge {
                         model: 'Unknown',
                         version: 'Unknown',
                         arch: 'Unknown',
-                        isNew: true
+                        isFavorite: false
                     });
                     this.deviceRegistry.registerDevice(newDevice);
                     this.deviceRegistry.updateState(deviceId, {

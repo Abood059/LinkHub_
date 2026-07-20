@@ -269,13 +269,15 @@ class CommandHandler {
         }
 
         this.cliRenderer.log(MESSAGES.DOWNLOAD_STOP, 'info');
-        const stopped = this.downloadOrchestrator.stopDownload(downloadId);
+        const stopResult = this.downloadOrchestrator.stopDownload(downloadId);
         
-        if (stopped) {
-            this.cliRenderer.log(`Download stopped: ${downloadId}`, 'success');
+        if (stopResult.success) {
+            const statusMsg = stopResult.wasRunning ? 'stopped' : 'was not running';
+            this.cliRenderer.log(`Download ${statusMsg}: ${downloadId}`, 'success');
             this.cliRenderer.removeDownload(downloadId);
         } else {
-            this.cliRenderer.log(`Failed to stop download: ${downloadId}`, 'error');
+            const reason = stopResult.reason || 'unknown';
+            this.cliRenderer.log(`Failed to stop download: ${downloadId} (reason: ${reason})`, 'error');
         }
     }
 

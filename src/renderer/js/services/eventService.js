@@ -17,10 +17,13 @@ export function setupEventListeners(handlers) {
         if (data?.downloadId) handlers.onError?.(data.downloadId, data.error);
     });
     linkhub.on('download:stopped', (event, data) => {
-        if (data?.downloadId) handlers.onStopped?.(data.downloadId);
+        if (data?.downloadId) handlers.onStopped?.(data.downloadId, data);
+    });
+    linkhub.on('download:resumed', (event, data) => {
+        if (data?.downloadId) handlers.onResumed?.(data.downloadId);
     });
     linkhub.on('download:started', (event, data) => {
-        if (data?.downloadId) handlers.onDownloadStarted?.(data.downloadId, data.url, data.title);
+        if (data?.downloadId) handlers.onDownloadStarted?.(data.downloadId, data.url, data.title, data.formatId, data.deviceId);
     });
     linkhub.on('download:state:update', (event, data) => {
         if (data?.downloads && Array.isArray(data.downloads)) {

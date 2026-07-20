@@ -67,7 +67,7 @@ class DeviceEventHandler {
                     model: 'Unknown',
                     version: 'Unknown',
                     arch: 'Unknown',
-                    isNew: false
+                    isFavorite: false
                 });
                 this._deviceRegistry.registerDevice(newDevice);
             }
@@ -96,12 +96,12 @@ class DeviceEventHandler {
             
             // إذا كان الجهاز غير موجود في الـ serials الحالية
             if (!currentSerials.has(deviceId)) {
-                // الجهاز غير مسجل (isNew = true) => إزالته بالكامل من السجل
-                if (registeredDevice.isNew === true) {
+                // الجهاز غير مفضل => إزالته بالكامل من السجل
+                if (!registeredDevice.isFavorite) {
                     this._deviceRegistry.removeDevice(deviceId);
                     this._notifyStateSync('deviceRemoved', { deviceId });
                 } 
-                // الجهاز مسجل (isNew = false) => تحديث حالته إلى offline
+                // الجهاز مفضل => تحديث حالته إلى offline
                 else if (runtimeState && runtimeState.status !== 'offline') {
                     this._deviceRegistry.updateState(deviceId, { status: 'offline', lastSeen: new Date() });
                     this._notifyStateSync('deviceStateChanged', {
@@ -131,7 +131,7 @@ class DeviceEventHandler {
                     model: 'Unknown',
                     version: 'Unknown',
                     arch: 'Unknown',
-                    isNew: false
+                    isFavorite: false
                 });
                 this._deviceRegistry.registerDevice(newDevice);
             }
@@ -180,7 +180,7 @@ class DeviceEventHandler {
                     model: 'Unknown',
                     version: 'Unknown',
                     arch: 'Unknown',
-                    isNew: false
+                    isFavorite: false
                 });
                 this._deviceRegistry.registerDevice(newDevice);
             }

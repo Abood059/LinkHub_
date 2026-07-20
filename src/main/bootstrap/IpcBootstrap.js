@@ -15,14 +15,13 @@ class IpcBootstrap {
     static register(container) {
         const deviceOrchestrator = container.resolve('deviceOrchestrator');
         const downloadOrchestrator = container.resolve('downloadOrchestrator');
-        const fileTransferService = container.resolve('fileTransferService');
 
         if (!deviceOrchestrator || !downloadOrchestrator) {
             throw new Error('deviceOrchestrator and downloadOrchestrator are required for IPC registration');
         }
 
         const { registerIpcHandlers } = require('../infrastructure/ipc');
-        registerIpcHandlers(deviceOrchestrator, downloadOrchestrator, fileTransferService);
+        registerIpcHandlers(deviceOrchestrator, downloadOrchestrator);
     }
 }
 

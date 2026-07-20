@@ -2,27 +2,38 @@
 
 /**
  * DownloadOrchestrator
- * مسؤول عن تنسيق عمليات التحميل فقط
- * بدون إدارة عمليات أو تنفيذ تقني
+ * مسؤول عن تنسيق عمليات التحميل واتخاذ قرارات منطق الأعمال
+ * المبادئ:
+ * - الذاكرة هي المصدر الوحيد للحقيقة أثناء التشغيل
+ * - لا يصل إلى قاعدة البيانات نهائياً
+ * - يتحقق من وجود تحميل في الذاكرة ويقرر: بدء جديد، استئناف موجود، أم منع التكرار
  */
 class DownloadOrchestrator {
     constructor({
         ytdlpAdapter,
         deviceRegistry = null,
         fileTransferService = null,
+        downloadRepository = null,
         logger = null
     }) {
         this._ytdlpAdapter = ytdlpAdapter;
         this._deviceRegistry = deviceRegistry;
         this._fileTransferService = fileTransferService;
+        this._downloadRepository = downloadRepository;
         this._logger = logger;
     }
 
     async inspectLink(url) {
+        if (!url) {
+            throw new Error('URL is required');
+        }
         return this._ytdlpAdapter.inspectFormats(url);
     }
 
     async getMetadata(url) {
+        if (!url) {
+            throw new Error('URL is required');
+        }
         return this._ytdlpAdapter.extractMetadata(url);
     }
 
@@ -31,22 +42,91 @@ class DownloadOrchestrator {
             throw new Error('url and formatId are required');
         }
 
-        // Merge deviceId and formatsData into options for adapter
+        // البحث في الذاكرة عن تحميل نشط لنفس الرابط والجودة
+        const activeProcessId = this._ytdlpAdapter.findActiveDownload(url, formatId);
+        if (activeProcessId) {
+            // تحميل موجود في الذاكرة - منع التكرار
+            const entry = this._ytdlpAdapter.getDownloadEntry(activeProcessId);
+            return {
+                existing: true,
+                downloadId: activeProcessId,
+                status: entry ? entry.status : 'unknown',
+                title: entry ? entry.title : options.title || 'Unknown'
+            };
+        }
+
+        // لا يوجد تحميل في الذاكرة - بدء تحميل جديد
         const adapterOptions = { ...options, deviceId, formatsData: options.formatsData };
         return this._ytdlpAdapter.startDownload(url, formatId, adapterOptions);
     }
 
+    /**
+     * إيقاف عملية التحميل
+     * @param {string} fileId - معرف الملف/العملية
+     * @returns {Object} كائن نتيجة يوضح حالة الإيقاف من YtdlpAdapter
+     */
     stopDownload(fileId) {
+        if (!fileId) {
+            throw new Error('fileId is required');
+        }
         return this._ytdlpAdapter.stopDownload(fileId);
     }
 
     async resumeDownload(processId, url, formatId, deviceId = null, options = {}) {
-        if (!processId || !url || !formatId) {
-            throw new Error('processId, url, and formatId are required');
+        if (!url || !formatId) {
+            throw new Error('url and formatId are required');
         }
-        // استئناف التحميل هو نفسه بدء تحميل جديد بنفس المعاملات
-        // yt-dlp يدعم الاستئناف التلقائي
-        return this._ytdlpAdapter.startDownload(url, formatId, { ...options, deviceId });
+
+        // إذا لم يتم تمرير processId، ابحث عن تحميل متطابق في الذاكرة
+        if (!processId) {
+            processId = this._ytdlpAdapter.findActiveDownload(url, formatId);
+            if (!processId) {
+                throw new Error('لم يتم العثور على تحميل نشط لهذا الرابط والجودة');
+            }
+        }
+
+        // التحقق من وجود الإدخال في الذاكرة
+        const entry = this._ytdlpAdapter.getDownloadEntry(processId);
+        if (!entry) {
+            throw new Error('لم يتم العثور على تحميل نشط لهذا الرابط والجودة');
+        }
+
+        // التحقق من حالة العملية قبل الاستئناف
+        const isRunning = this._ytdlpAdapter.isProcessRunning(processId);
+
+        if (isRunning) {
+            // العملية قيد التشغيل - إنهاء العملية الحالية فقط دون تغيير الحالة في الذاكرة
+            const stopResult = this._ytdlpAdapter.stopProcessOnly(processId);
+            if (this._logger) {
+                this._logger.info(`resumeDownload: Stopped running process ${processId}`, stopResult);
+            }
+        }
+
+        // تحديث الحالة إلى downloading مباشرة
+        // الانتقال من stopped إلى downloading سيُفسر كاستئناف بواسطة DownloadStateSyncService
+        this._ytdlpAdapter.updateDownloadStatus(processId, 'downloading');
+
+        // بدء التحميل الجديد
+        return this.startDownload(url, formatId, deviceId, { ...options, processId });
+    }
+
+    /**
+     * الحصول على حالة التحميل النشط
+     * @param {string} processId - معرف العملية
+     * @returns {string|null} حالة التحميل أو null إذا لم يكن موجوداً
+     */
+    getDownloadStatus(processId) {
+        return this._ytdlpAdapter.getDownloadStatus(processId);
+    }
+
+    /**
+     * البحث عن تحميل نشط في الذاكرة بناءً على الرابط ومعرف التنسيق
+     * @param {string} url - رابط التحميل
+     * @param {string} formatId - معرف التنسيق
+     * @returns {string|null} processId إذا وجد، null إذا لم يوجد
+     */
+    findActiveDownload(url, formatId) {
+        return this._ytdlpAdapter.findActiveDownload(url, formatId);
     }
 
     /**
@@ -103,6 +183,107 @@ class DownloadOrchestrator {
                 error: err.message
             });
         }
+    }
+
+    /**
+     * الحصول على خريطة التحميلات النشطة من الذاكرة
+     * @returns {Object} خريطة التحميلات النشطة
+     */
+    getActiveDownloads() {
+        return this._ytdlpAdapter.getActiveDownloads();
+    }
+
+    /**
+     * نقل ملف موجود إلى جهاز
+     * @param {string} localPath - المسار المحلي للملف
+     * @param {string} deviceId - معرف الجهاز
+     * @returns {Promise<Object>} نتيجة النقل
+     */
+    async transferFileToDevice(localPath, deviceId) {
+        if (!localPath) {
+            throw new Error('Local path is required');
+        }
+        if (!deviceId) {
+            throw new Error('Device ID is required');
+        }
+        if (!this._fileTransferService) {
+            throw new Error('FileTransferService not available');
+        }
+        return this._fileTransferService.transferFromDownloads(localPath, deviceId);
+    }
+
+    /**
+     * حذف تحميل من السجل التاريخي
+     * @param {string} downloadId - معرف التحميل
+     * @returns {boolean} تم الحذف بنجاح
+     */
+    deleteDownload(downloadId) {
+        if (!downloadId) {
+            throw new Error('downloadId is required');
+        }
+        if (!this._downloadRepository) {
+            throw new Error('DownloadRepository not available for history operations');
+        }
+        return this._downloadRepository.deleteDownload(downloadId);
+    }
+
+    /**
+     * حذف جميع التحميلات من السجل التاريخي
+     * @returns {number} عدد التحميلات المحذوفة
+     */
+    deleteAllDownloads() {
+        if (!this._downloadRepository) {
+            throw new Error('DownloadRepository not available for history operations');
+        }
+        return this._downloadRepository.deleteAllDownloads();
+    }
+
+    /**
+     * حذف التحميلات الأقدم من تاريخ معين
+     * @param {string} date - التاريخ (ISO format)
+     * @returns {number} عدد التحميلات المحذوفة
+     */
+    deleteDownloadsBeforeDate(date) {
+        if (!date) {
+            throw new Error('date is required');
+        }
+        if (!this._downloadRepository) {
+            throw new Error('DownloadRepository not available for history operations');
+        }
+        return this._downloadRepository.deleteDownloadsBeforeDate(date);
+    }
+
+    /**
+     * الحصول على السجل التاريخي للتحميلات
+     * @returns {Array} قائمة جميع التحميلات
+     */
+    getDownloadHistory() {
+        if (!this._downloadRepository) {
+            throw new Error('DownloadRepository not available for history operations');
+        }
+        return this._downloadRepository.findAllDownloads();
+    }
+
+    /**
+     * البحث عن تحميل تاريخي قابل للاستئناف
+     * @param {string} url - رابط التحميل
+     * @param {string} formatId - معرف التنسيق
+     * @returns {Object|null} التحميل الموجود أو null
+     */
+    findHistoricalDownload(url, formatId) {
+        if (!url || !formatId) {
+            throw new Error('url and formatId are required');
+        }
+        if (!this._downloadRepository) {
+            throw new Error('DownloadRepository not available for history operations');
+        }
+        const downloads = this._downloadRepository.findAllDownloads();
+        return downloads.find(d => 
+            d.url === url && 
+            d.format_id === formatId && 
+            d.status !== 'completed' && 
+            d.status !== 'failed'
+        ) || null;
     }
 }
 

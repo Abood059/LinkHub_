@@ -2,6 +2,7 @@
 'use strict';
 
 const path = require('path');
+const { app } = require('electron');
 const container = require('./container');
 const WindowManager = require('../infrastructure/windows/WindowManager');
 const WindowRegistry = require('../infrastructure/windows/WindowRegistry');
@@ -63,6 +64,10 @@ class ApplicationBootstrap {
             console.log('[Bootstrap] Database initialized.');
         }
 
+        // 3.5. Set repositories in container after DB initialization
+        container.setRepositories();
+        console.log('[Bootstrap] Repositories set in container.');
+
         // 4. Initialize window management infrastructure
         this._windowRegistry = new WindowRegistry();
         this._windowManager = new WindowManager(this._windowRegistry);
@@ -71,7 +76,26 @@ class ApplicationBootstrap {
         container.setWindowManager(this._windowManager);
         console.log('[Bootstrap] WindowManager set and StateSyncServices initialized.');
 
-        // 6. Register IPC handlers
+        // 6. Load data from database into memory (after sync services are initialized)
+        const deviceRegistry = container.resolve('deviceRegistry');
+        const ytdlpAdapter = container.resolve('ytdlpAdapter');
+
+        if (deviceRegistry && dbManager) {
+            await deviceRegistry.loadFromRepository(dbManager.devices);
+        }
+
+        if (ytdlpAdapter && dbManager) {
+            await ytdlpAdapter._downloadManager.restoreMemoryFromDatabase(dbManager.downloads);
+
+            // Initialize DownloadStateSyncService with restored downloads
+            const downloadStateSyncService = container.resolve('downloadStateSyncService');
+            if (downloadStateSyncService) {
+                const activeDownloads = ytdlpAdapter._downloadManager.getActiveDownloads();
+                downloadStateSyncService.initializeState(activeDownloads);
+            }
+        }
+
+        // 7. Register IPC handlers
         try {
             IpcBootstrap.register(container);
             console.log('[Bootstrap] IPC handlers registered.');
@@ -79,7 +103,7 @@ class ApplicationBootstrap {
             // Error handled silently
         }
 
-        // 7. Setup DeviceEventHandler and start monitoring (after StateSyncService is ready)
+        // 8. Setup DeviceEventHandler and start monitoring (after StateSyncService is ready)
         const connectionService = container.resolve('connectionService');
         const deviceEventHandler = container.resolve('deviceEventHandler');
         if (deviceEventHandler && connectionService) {
@@ -87,7 +111,7 @@ class ApplicationBootstrap {
             console.log('[Bootstrap] DeviceEventHandler setup completed.');
         }
 
-        // 8. Start ADB monitoring and wireless discovery (after StateSyncService is ready)
+        // 9. Start ADB monitoring and wireless discovery (after StateSyncService is ready)
         if (connectionService) {
             if (typeof connectionService.startAdbMonitoring === 'function') {
                 connectionService.startAdbMonitoring(500);
@@ -99,8 +123,11 @@ class ApplicationBootstrap {
             }
         }
 
-        // 9. Create main window
+        // 10. Create main window
         await this.createMainWindow();
+
+        // 11. Setup shutdown handler for graceful shutdown
+        this._setupShutdownHandler();
 
         console.log('[Bootstrap] Application ready.');
     }
@@ -124,6 +151,64 @@ class ApplicationBootstrap {
 
     getWindowRegistry() {
         return this._windowRegistry;
+    }
+
+    /**
+     * Setup shutdown handler for graceful shutdown
+     * Ensures all data is flushed to database before closing
+     */
+    _setupShutdownHandler() {
+        app.on('before-quit', async (event) => {
+            console.log('[Bootstrap] Application is shutting down...');
+
+            // Prevent default quit behavior to handle cleanup
+            event.preventDefault();
+
+            try {
+                // 1. Stop all active downloads
+                const ytdlpAdapter = container.resolve('ytdlpAdapter');
+                if (ytdlpAdapter) {
+                    const downloadManager = ytdlpAdapter._downloadManager;
+                    const activeDownloads = downloadManager.getActiveDownloads();
+                    
+                    console.log(`[Bootstrap] Stopping ${activeDownloads.size} active downloads...`);
+                    for (const [processId] of activeDownloads.entries()) {
+                        try {
+                            ytdlpAdapter.stopDownload(processId);
+                        } catch (error) {
+                            console.error(`[Bootstrap] Failed to stop download ${processId}:`, error);
+                        }
+                    }
+                }
+
+                // 2. Flush download sync service to ensure all data is written
+                const downloadSyncService = container.resolve('downloadSyncService');
+                if (downloadSyncService) {
+                    console.log('[Bootstrap] Flushing download sync service...');
+                    const flushSuccess = await downloadSyncService.flush();
+                    if (flushSuccess) {
+                        console.log('[Bootstrap] Download sync service flushed successfully');
+                    } else {
+                        console.error('[Bootstrap] Download sync service flush failed');
+                    }
+                }
+
+                // 3. Close database
+                const dbManager = container.resolve('databaseManager');
+                if (dbManager && typeof dbManager.close === 'function') {
+                    console.log('[Bootstrap] Closing database...');
+                    await dbManager.close();
+                    console.log('[Bootstrap] Database closed');
+                }
+
+                console.log('[Bootstrap] Shutdown complete, allowing app to quit');
+            } catch (error) {
+                console.error('[Bootstrap] Error during shutdown:', error);
+            } finally {
+                // Allow app to quit regardless of errors
+                app.exit(0);
+            }
+        });
     }
 }
 

@@ -15,6 +15,7 @@ const ScrcpyAdapter = require('../infrastructure/streaming/ScrcpyAdapter');
 const YtdlpAdapter = require('../infrastructure/media/YtdlpAdapter');
 const DeviceStateSyncService = require('../infrastructure/sync/DeviceStateSyncService');
 const DownloadStateSyncService = require('../infrastructure/sync/DownloadStateSyncService');
+const DownloadSyncService = require('../infrastructure/sync/DownloadSyncService');
 const DeviceOrchestrator = require('../application/orchestrators/DeviceOrchestrator');
 const DownloadOrchestrator = require('../application/orchestrators/DownloadOrchestrator');
 const FileTransferService = require('../application/services/FileTransferService');
@@ -44,8 +45,8 @@ class BootstrapContainer {
             logger: errorCentralService
         });
 
-        const deviceRegistry = new DeviceRegistry();
         const databaseManager = new DatabaseManager();
+        const deviceRegistry = new DeviceRegistry({ deviceRepository: null }); // Will be set after DB init
 
         const toolPathResolver = new ToolPathResolver({
             logger: errorCentralService
@@ -86,6 +87,7 @@ class BootstrapContainer {
             deviceRegistry,
             connectionService,
             scrcpyAdapter,
+            deviceRepository: null, // Will be set after DB init
             logger: errorCentralService
         });
 
@@ -129,44 +131,80 @@ class BootstrapContainer {
 
     setWindowManager(windowManager) {
         this._windowManager = windowManager;
-        
+
         // إنشاء الخدمات المنفصلة
         const deviceRegistry = this._services.get('deviceRegistry');
-        
+
         // DeviceStateSyncService - تحديث عند التغييرات فقط
         this._deviceStateSyncService = new DeviceStateSyncService(windowManager, deviceRegistry, { interval: 1000 });
         this._deviceStateSyncService.start();
-        
-        // DownloadStateSyncService - تحديث كل 0.3 ثانية
-        this._downloadStateSyncService = new DownloadStateSyncService(windowManager, { interval: 300 });
+
+        // DownloadStateSyncService - تحديث كل 0.3 ثانية من الذاكرة
+        const ytdlpAdapter = this._services.get('ytdlpAdapter');
+        const downloadManager = ytdlpAdapter ? ytdlpAdapter._downloadManager : null;
+        this._downloadStateSyncService = new DownloadStateSyncService(windowManager, downloadManager, { interval: 300 });
         this._downloadStateSyncService.start();
-        
+
         // تمرير DeviceStateSyncService لـ DeviceEventHandler
         const deviceEventHandler = this._services.get('deviceEventHandler');
         if (deviceEventHandler && typeof deviceEventHandler.setStateSyncService === 'function') {
             deviceEventHandler.setStateSyncService(this._deviceStateSyncService);
         }
-        
-        // الاشتراك في أحداث YtdlpAdapter مع DownloadStateSyncService
-        const ytdlpAdapter = this._services.get('ytdlpAdapter');
-        if (ytdlpAdapter) {
-            ytdlpAdapter.on('downloadProgress', (data) => {
-                this._downloadStateSyncService.onDownloadProgress(data);
-            });
-            ytdlpAdapter.on('downloadComplete', (data) => {
-                this._downloadStateSyncService.onDownloadComplete(data);
-            });
-            ytdlpAdapter.on('downloadError', (data) => {
-                this._downloadStateSyncService.onDownloadError(data);
-            });
-            ytdlpAdapter.on('downloadStopped', (data) => {
-                this._downloadStateSyncService.onDownloadStopped(data);
-            });
-        }
-        
+
+        // ملاحظة: تم إزالة الاشتراك في أحداث YtdlpAdapter
+        // DownloadStateSyncService هو المصدر الوحيد للحقيقة لمزامنة الحالة
+        // DownloadStateSyncService يقرأ الحالة من الذاكرة (DownloadManager._activeDownloads) دورياً كل 300ms
+
         // تسجيل الخدمات المنفصلة
         this._services.set('deviceStateSyncService', this._deviceStateSyncService);
         this._services.set('downloadStateSyncService', this._downloadStateSyncService);
+    }
+
+    /**
+     * Set repositories after database initialization
+     * This is called after databaseManager.initDb() completes
+     */
+    setRepositories() {
+        const databaseManager = this._services.get('databaseManager');
+        if (!databaseManager || !databaseManager.isInitialized()) {
+            console.warn('[Container] Database not initialized, cannot set repositories');
+            return;
+        }
+
+        const deviceRepository = databaseManager.devices;
+        const downloadRepository = databaseManager.downloads;
+
+        // Update DeviceRegistry with repository
+        const deviceRegistry = this._services.get('deviceRegistry');
+        if (deviceRegistry) {
+            deviceRegistry._deviceRepository = deviceRepository;
+        }
+
+        // Update DeviceOrchestrator with repository
+        const deviceOrchestrator = this._services.get('deviceOrchestrator');
+        if (deviceOrchestrator) {
+            deviceOrchestrator._deviceRepository = deviceRepository;
+        }
+
+        // Update DownloadOrchestrator with repository
+        const downloadOrchestrator = this._services.get('downloadOrchestrator');
+        if (downloadOrchestrator) {
+            downloadOrchestrator._downloadRepository = downloadRepository;
+        }
+
+        // ==================== تهيئة DownloadSyncService ====================
+        // خدمة مزامنة دورية مستقلة للتحميلات بين الذاكرة وقاعدة البيانات
+        // تقرأ الذاكرة كل 300ms وتكتب التغييرات فقط إلى قاعدة البيانات
+        const ytdlpAdapter = this._services.get('ytdlpAdapter');
+        const downloadSyncService = new DownloadSyncService(
+            ytdlpAdapter._downloadManager,
+            downloadRepository,
+            errorCentralService
+        );
+        downloadSyncService.start();
+        this._services.set('downloadSyncService', downloadSyncService);
+
+        console.log('[Container] Repositories set successfully');
     }
 
     getWindowManager() {

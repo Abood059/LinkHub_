@@ -3,7 +3,7 @@ import { DOM_IDS } from './core/constants.js';
 import { showToast } from './core/utils.js';
 import { getAllDevices } from './services/deviceService.js';
 import { setupEventListeners } from './services/eventService.js';
-import { initDownloadTable, initRecentDownloadsTable, addDownloadRow, updateDownloadProgress, markDownloadComplete, markDownloadError, markDownloadRetrying, updateTransferStatus, markTransferComplete, markTransferError, showTransferButton } from './ui/downloadManager.js';
+import { initDownloadTable, initRecentDownloadsTable, addDownloadRow, updateDownloadProgress, markDownloadComplete, markDownloadError, markDownloadRetrying, markDownloadStopped, updateTransferStatus, markTransferComplete, markTransferError, showTransferButton, syncStopButtonState, renderDownloadHistory, stopAllDownloads, resumeAllDownloads } from './ui/downloadManager.js';
 import { renderDevices, setShowModalCallback } from './ui/deviceManager.js';
 import { initModal, showDeviceModal } from './ui/modalManager.js';
 import { initTabs, switchTab } from './ui/tabManager.js';
@@ -11,6 +11,7 @@ import { getSelectedDeviceIds, clearSelected } from './ui/selectionManager.js';
 import { handleStartRoute } from './handlers/startRouteHandler.js';
 import { handlePairDevice } from './handlers/pairHandler.js';
 import { initFormatSelectionModal, resetStartButtonState } from './ui/formatSelectionModal.js';
+import { loadDownloadHistory } from './services/downloadService.js';
 
 // التحقق من وصول linkhub
 let registeredDevices = [];
@@ -22,8 +23,8 @@ const sections = {
     downloads: document.getElementById(DOM_IDS.downloadsSection),
     settings: document.getElementById(DOM_IDS.settingsSection)
 };
-const registeredContainer = document.getElementById(DOM_IDS.registeredContainer);
-const discoveredContainer = document.getElementById(DOM_IDS.discoveredContainer);
+const favoriteContainer = document.getElementById(DOM_IDS.favoriteContainer);
+const nonFavoriteContainer = document.getElementById(DOM_IDS.nonFavoriteContainer);
 const downloadsTbody = document.getElementById(DOM_IDS.downloadsTbody);
 const recentDownloadsTbody = document.getElementById(DOM_IDS.recentDownloadsTbody);
 const btnStart = document.getElementById(DOM_IDS.btnStart);
@@ -45,9 +46,11 @@ const modalDeviceStatus = document.getElementById(DOM_IDS.modalDeviceStatus);
 const modalDeviceAdb = document.getElementById(DOM_IDS.modalDeviceAdb);
 const modalStreamBtn = document.getElementById(DOM_IDS.modalStreamBtn);
 const modalDisconnectBtn = document.getElementById(DOM_IDS.modalDisconnectBtn);
+const modalCustomNameInput = document.getElementById('modal-device-custom-name');
+const modalSaveNameBtn = document.getElementById('modal-save-name-btn');
 
 // تهيئة المودال وربط callback
-initModal(modal, modalClose, modalOverlay, modalDeviceName, modalDeviceModel, modalDeviceVersion, modalDeviceArch, modalDeviceStatus, modalDeviceAdb, modalStreamBtn, modalDisconnectBtn);
+initModal(modal, modalClose, modalOverlay, modalDeviceName, modalDeviceModel, modalDeviceVersion, modalDeviceArch, modalDeviceStatus, modalDeviceAdb, modalStreamBtn, modalDisconnectBtn, modalCustomNameInput, modalSaveNameBtn);
 setShowModalCallback(showDeviceModal);
 
 // تهيئة جدول التحميلات
@@ -66,9 +69,22 @@ export async function loadDevices() {
     try {
         const devices = await getAllDevices();
         registeredDevices = devices;
-        renderDevices(registeredDevices, registeredContainer, discoveredContainer);
+        renderDevices(registeredDevices, favoriteContainer, nonFavoriteContainer);
     } catch (err) {
-        if (registeredContainer) registeredContainer.innerHTML = '<div class="placeholder-text">خطأ في تحميل الأجهزة</div>';
+        if (favoriteContainer) favoriteContainer.innerHTML = '<div class="placeholder-text">خطأ في تحميل الأجهزة</div>';
+    }
+}
+
+// دالة تحميل سجل التحميلات
+export async function loadDownloads() {
+    try {
+        const history = await loadDownloadHistory();
+        await renderDownloadHistory(history);
+    } catch (err) {
+        console.error('[main] Failed to load download history:', err);
+        if (downloadsTbody) {
+            downloadsTbody.innerHTML = '<tr class="empty-row"><td colspan="7" style="text-align:center;">خطأ في تحميل سجل التحميلات</td></tr>';
+        }
     }
 }
 
@@ -78,8 +94,37 @@ setupEventListeners({
     onRetrying: (downloadId, retryCount, maxRetries) => markDownloadRetrying(downloadId, retryCount, maxRetries),
     onComplete: (downloadId) => markDownloadComplete(downloadId),
     onError: (downloadId, error) => markDownloadError(downloadId, error),
-    onStopped: (downloadId) => showToast('تم إيقاف التحميل'),
-    onDownloadStarted: (downloadId, url, title) => {
+    onStopped: (downloadId, data) => {
+        markDownloadStopped(downloadId, data);
+        // تحديث بيانات الصف إذا توفرت
+        if (data && downloadsTbody) {
+            const row = downloadsTbody.querySelector(`tr[data-download-id="${downloadId}"]`);
+            if (row && data.formatId) {
+                row.setAttribute('data-format-id', data.formatId);
+            }
+            if (row && data.deviceId) {
+                row.setAttribute('data-device-id', data.deviceId);
+            }
+            if (row && data.title) {
+                row.setAttribute('data-title', data.title);
+            }
+        }
+        showToast('تم إيقاف التحميل');
+    },
+    onResumed: (downloadId) => {
+        // تحديث حالة الزر إلى active عند استئناف التحميل
+        syncStopButtonState(downloadId, 'إيقاف', 'active', '#D32F2F', false);
+    },
+    onDownloadStarted: async (downloadId, url, title, formatId, deviceId) => {
+        // التحقق من وجود التحميل بالفعل في الواجهة (لمنع التكرار عند الاستئناف)
+        if (downloadsTbody) {
+            const existingRow = downloadsTbody.querySelector(`tr[data-download-id="${downloadId}"]`);
+            if (existingRow) {
+                // التحميل موجود بالفعل، لا تضف صف جديد
+                return;
+            }
+        }
+
         // إنشاء row للتحميل الجديد باستخدام عنوان الفيديو من yt-dlp
         const fileName = title || (() => {
             try {
@@ -89,10 +134,26 @@ setupEventListeners({
                 return 'media_' + downloadId;
             }
         })();
-        // ملاحظة: حالياً لا نملك formatId و deviceId عند استلام الحدث
-        // سيتم تحديث هذا لاحقاً إذا كانت هناك حاجة
-        addDownloadRow(downloadId, fileName, 'الجهاز المحلي', url, null, null, title);
-        
+
+        // تحديد اسم الجهاز
+        let deviceName = 'الجهاز المحلي';
+        if (deviceId) {
+            try {
+                const devices = await getAllDevices();
+                const device = devices.find(d => d.device.id === deviceId);
+                if (device) {
+                    deviceName = device.device.deviceFriendlyName || device.device.model || deviceId;
+                }
+            } catch (e) {
+                console.error('[main] Failed to get device name:', e);
+            }
+        }
+
+        addDownloadRow(downloadId, fileName, deviceName, url, formatId, deviceId, title);
+
+        // تحديث حالة الزر إلى active عند بدء التحميل
+        syncStopButtonState(downloadId, 'إيقاف', 'active', '#D32F2F', false);
+
         // استعادة حالة أزرار بدأ التحميل
         if (btnStart) {
             btnStart.textContent = 'بدأ التحميل';
@@ -142,5 +203,26 @@ if (refreshBtn) refreshBtn.addEventListener('click', () => loadDevices());
 // إقران جهاز
 if (pairBtn) pairBtn.addEventListener('click', () => handlePairDevice(loadDevices));
 
+// أزرار التحكم الجماعي للتحميلات
+const btnStopAll = document.getElementById('btn-stop-all-downloads');
+const btnResumeAll = document.getElementById('btn-resume-all-downloads');
+
+if (btnStopAll) {
+    btnStopAll.addEventListener('click', async () => {
+        if (confirm('هل تريد إيقاف جميع التحميلات النشطة؟')) {
+            await stopAllDownloads();
+        }
+    });
+}
+
+if (btnResumeAll) {
+    btnResumeAll.addEventListener('click', async () => {
+        if (confirm('هل تريد استئناف جميع التحميلات المتوقفة/الفاشلة؟')) {
+            await resumeAllDownloads();
+        }
+    });
+}
+
 // تحميل أولي
 loadDevices();
+loadDownloads();

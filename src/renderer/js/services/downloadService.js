@@ -14,3 +14,29 @@ export async function stopDownload(processId) {
 export async function resumeDownload(processId, url, formatId, deviceId, options = {}) {
     return await linkhub.downloads.resume(processId, url, formatId, deviceId, options);
 }
+
+export async function deleteDownload(downloadId) {
+    return await linkhub.downloads.delete(downloadId);
+}
+
+export async function deleteAllDownloads() {
+    return await linkhub.downloads.deleteAll();
+}
+
+export async function deleteDownloadsBeforeDate(date) {
+    return await linkhub.downloads.deleteBeforeDate(date);
+}
+
+export async function getDownloadHistory() {
+    return await linkhub.downloads.getHistory();
+}
+
+export async function loadDownloadHistory() {
+    try {
+        const history = await getDownloadHistory();
+        return history;
+    } catch (error) {
+        console.error('[downloadService] Failed to load download history:', error);
+        throw error;
+    }
+}

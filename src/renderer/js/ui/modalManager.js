@@ -1,5 +1,5 @@
 // modalManager.js - التحكم بنافذة معلومات الجهاز
-import { startStream, disconnectDevice } from '../services/deviceService.js';
+import { startStream, disconnectDevice, setDeviceCustomName } from '../services/deviceService.js';
 import { showToast } from '../core/utils.js';
 import { loadDevices } from '../main.js'; // سنقوم بتصدير loadDevices من main
 
@@ -7,9 +7,9 @@ let modalElement = null;
 let currentDevice = null;
 
 // عناصر DOM
-let modalClose, modalOverlay, modalDeviceName, modalDeviceModel, modalDeviceVersion, modalDeviceArch, modalDeviceStatus, modalDeviceAdb, modalStreamBtn, modalDisconnectBtn;
+let modalClose, modalOverlay, modalDeviceName, modalDeviceModel, modalDeviceVersion, modalDeviceArch, modalDeviceStatus, modalDeviceAdb, modalStreamBtn, modalDisconnectBtn, modalCustomNameInput, modalSaveNameBtn;
 
-export function initModal(modalDom, closeBtn, overlay, nameEl, modelEl, versionEl, archEl, statusEl, adbEl, streamBtn, disconnectBtn) {
+export function initModal(modalDom, closeBtn, overlay, nameEl, modelEl, versionEl, archEl, statusEl, adbEl, streamBtn, disconnectBtn, customNameInput = null, saveNameBtn = null) {
     modalElement = modalDom;
     modalClose = closeBtn;
     modalOverlay = overlay;
@@ -21,11 +21,17 @@ export function initModal(modalDom, closeBtn, overlay, nameEl, modelEl, versionE
     modalDeviceAdb = adbEl;
     modalStreamBtn = streamBtn;
     modalDisconnectBtn = disconnectBtn;
+    modalCustomNameInput = customNameInput;
+    modalSaveNameBtn = saveNameBtn;
 
     modalClose.addEventListener('click', hideModal);
     modalOverlay.addEventListener('click', hideModal);
     modalStreamBtn.addEventListener('click', onStreamClick);
     modalDisconnectBtn.addEventListener('click', onDisconnectClick);
+    
+    if (modalSaveNameBtn && modalCustomNameInput) {
+        modalSaveNameBtn.addEventListener('click', onSaveNameClick);
+    }
 }
 
 export function showDeviceModal(deviceData) {
@@ -41,6 +47,11 @@ export function showDeviceModal(deviceData) {
     modalDeviceVersion.textContent = (device.version && device.version !== 'Unknown') ? device.version : 'غير معروف';
     modalDeviceArch.textContent = (device.arch && device.arch !== 'Unknown') ? device.arch : 'غير معروف';
     modalDeviceAdb.textContent = adbTarget;
+
+    // تعبئة حقل الاسم المخصص
+    if (modalCustomNameInput) {
+        modalCustomNameInput.value = device.customName || '';
+    }
 
     let statusText = '', statusClass = '';
     if (status === 'connected') { statusText = 'متصل'; statusClass = 'connected'; }
@@ -104,5 +115,30 @@ async function onDisconnectClick() {
         }, 1000);
     } catch (err) {
         showToast(`فشل قطع الاتصال: ${err.message}`, true);
+    }
+}
+
+async function onSaveNameClick() {
+    if (!currentDevice || !modalCustomNameInput) return;
+    const deviceId = currentDevice.device.id;
+    const customName = modalCustomNameInput.value.trim();
+    
+    try {
+        await setDeviceCustomName(deviceId, customName);
+        showToast(customName ? 'تم حفظ الاسم المخصص' : 'تم إزالة الاسم المخصص');
+        
+        // تحديث الاسم المعروض في المودال
+        if (customName) {
+            modalDeviceName.textContent = customName;
+        } else {
+            modalDeviceName.textContent = currentDevice.device.deviceFriendlyName || currentDevice.device.model || currentDevice.device.id;
+        }
+        
+        // تحديث قائمة الأجهزة
+        setTimeout(() => {
+            if (typeof loadDevices === 'function') loadDevices();
+        }, 500);
+    } catch (err) {
+        showToast(`فشل حفظ الاسم المخصص: ${err.message}`, true);
     }
 }

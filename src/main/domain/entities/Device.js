@@ -13,7 +13,9 @@ class Device extends BaseNode {
         model,
         version,
         arch,
-        isNew
+        isFavorite,
+        isTrusted,
+        customName
     }) {
         super({
             id,
@@ -24,7 +26,9 @@ class Device extends BaseNode {
         this._model = model || 'Unknown';
         this._version = version || 'Unknown';
         this._arch = arch || 'Unknown';
-        this._isNew = isNew ?? true;
+        this._isFavorite = isFavorite ?? false;
+        this._isTrusted = isTrusted ?? true;
+        this._customName = customName || null;
 
         // No freeze - allows updateDetails
     }
@@ -42,8 +46,17 @@ class Device extends BaseNode {
         return this._arch;
     }
 
-    get isNew() {
-        return this._isNew;
+
+    get isFavorite() {
+        return this._isFavorite;
+    }
+
+    get isTrusted() {
+        return this._isTrusted;
+    }
+
+    get customName() {
+        return this._customName;
     }
 
     /**
@@ -56,8 +69,30 @@ class Device extends BaseNode {
         if (model && typeof model === 'string') this._model = model;
         if (version && typeof version === 'string') this._version = version;
         if (arch && typeof arch === 'string') this._arch = arch;
-        // Mark as not new after first update
-        if (this._isNew) this._isNew = false;
+    }
+
+    /**
+     * Set device favorite status.
+     * @param {boolean} isFavorite - Favorite status
+     */
+    setFavorite(isFavorite) {
+        this._isFavorite = isFavorite;
+    }
+
+    /**
+     * Set device trusted status.
+     * @param {boolean} isTrusted - Trusted status
+     */
+    setTrusted(isTrusted) {
+        this._isTrusted = isTrusted;
+    }
+
+    /**
+     * Set device custom name.
+     * @param {string} customName - Custom name
+     */
+    setCustomName(customName) {
+        this._customName = customName;
     }
 
     toJSON() {
@@ -66,7 +101,9 @@ class Device extends BaseNode {
             model: this._model,
             version: this._version,
             arch: this._arch,
-            isNew: this._isNew
+            isFavorite: this._isFavorite,
+            isTrusted: this._isTrusted,
+            customName: this._customName
         };
     }
 
@@ -77,7 +114,9 @@ class Device extends BaseNode {
             model: data.model,
             version: data.version,
             arch: data.arch,
-            isNew: data.isNew
+            isFavorite: data.isFavorite,
+            isTrusted: data.isTrusted,
+            customName: data.customName || data.custom_name
         });
     }
 }

@@ -3,16 +3,18 @@
 
 /**
  * DownloadHandlers
- * 
- * Thin IPC layer for download-related operations.
+ * طبقة IPC للنقل الخالص (Transport Layer)
+ * المبادئ:
+ * - لا تحتوي على منطق أعمال أو بحث أو اتخاذ قرارات
+ * - دورها الحصري: استقبال الطلبات من الواجهة → تحويلها إلى استدعاءات للخدمات → إعادة النتائج
+ * - لا تبحث في قاعدة البيانات لمنطق بدء/استئناف التحميل
  */
 class DownloadHandlers {
-    constructor(downloadOrchestrator, fileTransferService = null) {
+    constructor(downloadOrchestrator) {
         if (!downloadOrchestrator) {
             throw new Error('DownloadOrchestrator is required for DownloadHandlers');
         }
         this._downloadOrchestrator = downloadOrchestrator;
-        this._fileTransferService = fileTransferService;
     }
 
     register(ipcMain) {
@@ -21,44 +23,51 @@ class DownloadHandlers {
         }
 
         ipcMain.handle('download:inspect', async (event, url) => {
-            if (!url) throw new Error('URL is required');
-            const result = this._downloadOrchestrator.inspectLink(url);
-            return result;
+            return this._downloadOrchestrator.inspectLink(url);
         });
 
         ipcMain.handle('download:start', async (event, url, formatId, deviceId = null, options = {}) => {
-            if (!url || !formatId) throw new Error('url and formatId are required');
             return this._downloadOrchestrator.startDownload(url, formatId, deviceId, options);
         });
 
         ipcMain.handle('download:stop', async (event, processId) => {
-            if (!processId) throw new Error('processId is required');
             return this._downloadOrchestrator.stopDownload(processId);
         });
 
         ipcMain.handle('download:resume', async (event, processId, url, formatId, deviceId = null, options = {}) => {
-            if (!processId || !url || !formatId) throw new Error('processId, url, and formatId are required');
             return this._downloadOrchestrator.resumeDownload(processId, url, formatId, deviceId, options);
         });
 
         ipcMain.handle('download:metadata', async (event, url) => {
-            if (!url) throw new Error('URL is required');
             return this._downloadOrchestrator.getMetadata(url);
         });
         
-        // إضافة جديدة: الحصول على قائمة التحميلات النشطة (اختياري)
         ipcMain.handle('download:active', async () => {
             return this._downloadOrchestrator.getActiveDownloads();
         });
 
-        // إضافة جديدة: نقل ملف للجهاز يدوياً
         ipcMain.handle('download:transferToDevice', async (event, localPath, deviceId) => {
-            if (!localPath) throw new Error('Local path is required');
-            if (!deviceId) throw new Error('Device ID is required');
-            if (!this._fileTransferService) {
-                throw new Error('FileTransferService not available');
-            }
-            return this._fileTransferService.transferFromDownloads(localPath, deviceId);
+            return this._downloadOrchestrator.transferFileToDevice(localPath, deviceId);
+        });
+
+        ipcMain.handle('download:delete', async (event, downloadId) => {
+            return this._downloadOrchestrator.deleteDownload(downloadId);
+        });
+
+        ipcMain.handle('download:deleteAll', async () => {
+            return this._downloadOrchestrator.deleteAllDownloads();
+        });
+
+        ipcMain.handle('download:deleteBeforeDate', async (event, date) => {
+            return this._downloadOrchestrator.deleteDownloadsBeforeDate(date);
+        });
+
+        ipcMain.handle('download:getHistory', async () => {
+            return this._downloadOrchestrator.getDownloadHistory();
+        });
+
+        ipcMain.handle('download:findExisting', async (event, url, formatId) => {
+            return this._downloadOrchestrator.findHistoricalDownload(url, formatId);
         });
     }
 }

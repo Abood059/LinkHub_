@@ -9,16 +9,16 @@ const DeviceRuntimeState =
  * - Device registration
  * - Device lookup
  * - Runtime state management
+ * - Sync with repository for persistence
  *
  * This class does NOT:
  * - Connect devices
  * - Pair devices
  * - Execute ADB commands
- * - Persist data
  * - Implement business logic
  */
 class DeviceRegistry {
-    constructor() {
+    constructor({ deviceRepository } = {}) {
         /**
          * Map<deviceId, Device>
          */
@@ -30,6 +30,11 @@ class DeviceRegistry {
          */
         this._runtimeStates =
             new Map();
+
+        /**
+         * Device repository for persistence
+         */
+        this._deviceRepository = deviceRepository;
     }
 
     registerDevice(device) {
@@ -55,10 +60,22 @@ class DeviceRegistry {
             );
         }
 
+        // Sync with repository only if device is favorite
+        if (this._deviceRepository && device.isFavorite) {
+            try {
+                this._deviceRepository.insertDevice(device.toJSON());
+            } catch (error) {
+                console.error('[DeviceRegistry] Failed to sync device to repository:', error);
+            }
+        }
+
         return device;
     }
 
     removeDevice(deviceId) {
+        const device = this._devices.get(deviceId);
+        const wasFavorite = device ? device.isFavorite : false;
+
         this._devices.delete(
             deviceId
         );
@@ -66,6 +83,15 @@ class DeviceRegistry {
         this._runtimeStates.delete(
             deviceId
         );
+
+        // Sync with repository only if device was favorite
+        if (this._deviceRepository && wasFavorite) {
+            try {
+                this._deviceRepository.deleteDevice(deviceId);
+            } catch (error) {
+                console.error('[DeviceRegistry] Failed to delete device from repository:', error);
+            }
+        }
     }
 
     updateState(
@@ -152,6 +178,46 @@ class DeviceRegistry {
     }
 
     /**
+     * Sync device favorite status to repository immediately
+     * @param {string} deviceId - Device ID
+     * @param {boolean} isFavorite - New favorite status
+     */
+    syncDeviceFavorite(deviceId, isFavorite) {
+        const device = this._devices.get(deviceId);
+        if (!device) {
+            console.warn(`[DeviceRegistry] Device ${deviceId} not found for favorite sync`);
+            return;
+        }
+
+        // Update the device's favorite status
+        device.setFavorite(isFavorite);
+
+        if (this._deviceRepository) {
+            try {
+                const existingDevice = this._deviceRepository.findDeviceById(deviceId);
+
+                if (isFavorite) {
+                    if (existingDevice) {
+                        // Device exists in database, update only the favorite field
+                        this._deviceRepository.updateDevice(deviceId, { isFavorite: true });
+                    } else {
+                        // Device does not exist in database, insert it
+                        this._deviceRepository.insertDevice(device.toJSON());
+                    }
+                } else {
+                    if (existingDevice) {
+                        // Device exists in database, delete it
+                        this._deviceRepository.deleteDevice(deviceId);
+                    }
+                    // If device does not exist in database, do nothing
+                }
+            } catch (error) {
+                console.error('[DeviceRegistry] Failed to sync favorite status to repository:', error);
+            }
+        }
+    }
+
+    /**
      * Find device ID by ADB target (serial or host:port)
      * @param {string} adbTarget - e.g., "emulator-5554" or "192.168.1.10:5555"
      * @returns {string|null} deviceId if found, else null
@@ -165,6 +231,73 @@ class DeviceRegistry {
         }
         // Also check devices without runtime state? Not needed as each device has runtime.
         return null;
+    }
+
+    /**
+     * Load devices from repository into memory
+     * @param {DeviceRepository} repository - Device repository instance
+     * @returns {Promise<void>}
+     */
+    async loadFromRepository(repository) {
+        if (!repository) {
+            console.warn('[DeviceRegistry] No repository provided, skipping load');
+            return;
+        }
+
+        try {
+            const devicesData = repository.findAllDevices();
+            const Device = require('../../domain/entities/Device');
+
+            for (const deviceData of devicesData) {
+                // Data is already in CamelCase format from _mapFromDbFormat
+                // No need to convert is_favorite/is_trusted again
+                
+                const device = Device.fromJSON(deviceData);
+                this._devices.set(device.id, device);
+
+                // Initialize runtime state for loaded devices
+                if (!this._runtimeStates.has(device.id)) {
+                    this._runtimeStates.set(device.id, new DeviceRuntimeState());
+                }
+            }
+
+            console.log(`[DeviceRegistry] Loaded ${devicesData.length} devices from repository`);
+        } catch (error) {
+            console.error('[DeviceRegistry] Failed to load devices from repository:', error);
+        }
+    }
+
+    /**
+     * Get trusted devices
+     * @returns {Array} Array of trusted devices
+     */
+    getTrustedDevices() {
+        return this.getAllDevices().filter(device => device.isTrusted);
+    }
+
+    /**
+     * Get favorite devices
+     * @returns {Array} Array of favorite devices
+     */
+    getFavoriteDevices() {
+        return this.getAllDevices().filter(device => device.isFavorite);
+    }
+
+    /**
+     * Get connected devices (devices with runtime state)
+     * @returns {Array} Array of connected devices
+     */
+    getConnectedDevices() {
+        const connectedIds = Array.from(this._runtimeStates.keys());
+        return connectedIds.map(id => this._devices.get(id)).filter(Boolean);
+    }
+
+    /**
+     * Get untrusted devices
+     * @returns {Array} Array of untrusted devices
+     */
+    getUntrustedDevices() {
+        return this.getAllDevices().filter(device => !device.isTrusted);
     }
 }
 

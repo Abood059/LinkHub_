@@ -69,6 +69,25 @@
 .detail-label { font-size: 0.85rem; color: #a6a6a6; font-weight: 500; }
 .detail-value { font-size: 0.9rem; color: #e0e0e0; font-weight: 500; text-align: left; direction: ltr; }
 .detail-value.code { font-family: monospace; font-size: 0.8rem; background: #1a1a1a; padding: 4px 8px; border-radius: 8px; }
+.detail-input {
+    background: #1a1a1a;
+    border: 1px solid #3a3a3a;
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: #e0e0e0;
+    font-size: 0.9rem;
+    width: 60%;
+    text-align: left;
+    direction: ltr;
+}
+.detail-input:focus {
+    outline: none;
+    border-color: #1e6fd9;
+    background: #262626;
+}
+.detail-input::placeholder {
+    color: #666;
+}
 .status-badge-modal {
     display: inline-block;
     background-color: #2a2a2a;

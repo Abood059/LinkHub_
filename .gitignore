@@ -8,3 +8,6 @@ logs/
 *.part
 *.aria2
 *.zip
+*.db
+*.db-shm
+*.db-wal

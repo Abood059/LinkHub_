@@ -169,3 +169,32 @@
     background-color: #155bb0;
     transform: scale(0.98);
 }
+
+/* زر المفضلة */
+.favorite-btn {
+    font-size: 1.2rem;
+    opacity: 0.3;
+    transition: all 0.2s ease;
+}
+
+.favorite-btn:hover {
+    opacity: 1;
+    transform: scale(1.2);
+}
+
+.favorite-btn.active {
+    opacity: 1;
+    color: #FFD700;
+}
+
+/* زر البث */
+.stream-btn {
+    font-size: 1.2rem;
+    opacity: 0.5;
+    transition: all 0.2s ease;
+}
+
+.stream-btn:hover {
+    opacity: 1;
+    transform: scale(1.1);
+}

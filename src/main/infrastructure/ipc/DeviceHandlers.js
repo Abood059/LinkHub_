@@ -79,6 +79,40 @@ class DeviceHandlers {
             }
             return this._deviceOrchestrator.disconnectDevice(deviceId);
         });
+
+        // Set device favorite status
+        ipcMain.handle('device:setFavorite', async (event, deviceId, isFavorite) => {
+            if (!deviceId) {
+                throw new Error('deviceId is required');
+            }
+            return this._deviceOrchestrator.setDeviceFavorite(deviceId, isFavorite);
+        });
+
+        // Set device trusted status
+        ipcMain.handle('device:setTrusted', async (event, deviceId, isTrusted) => {
+            if (!deviceId) {
+                throw new Error('deviceId is required');
+            }
+            return this._deviceOrchestrator.setDeviceTrusted(deviceId, isTrusted);
+        });
+
+        // Get favorite devices
+        ipcMain.handle('device:getFavorites', async () => {
+            return this._deviceOrchestrator.getFavoriteDevices();
+        });
+
+        // Get trusted devices
+        ipcMain.handle('device:getTrusted', async () => {
+            return this._deviceOrchestrator.getTrustedDevices();
+        });
+
+        // Set device custom name
+        ipcMain.handle('device:setCustomName', async (event, deviceId, customName) => {
+            if (!deviceId) {
+                throw new Error('deviceId is required');
+            }
+            return this._deviceOrchestrator.setDeviceCustomName(deviceId, customName);
+        });
     }
 }
 

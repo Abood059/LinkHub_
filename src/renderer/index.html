@@ -56,14 +56,14 @@
             <div id="home-section" class="tab-section active-section">
                 <section class="devices-section">
                     <div class="devices-capsule-wrapper">
-                        <h2 class="section-subheading">الأجهزة المتصلة</h2>
-                        <div class="devices-capsule-pill" id="registered-devices">
+                        <h2 class="section-subheading">الأجهزة المفضلة</h2>
+                        <div class="devices-capsule-pill" id="favorite-devices">
                             <div class="placeholder-text">جاري تحميل الأجهزة...</div>
                         </div>
                     </div>
                     <div class="devices-capsule-wrapper offset-top">
-                        <h2 class="section-subheading offline-sub">الأجهزة غير المتصلة (المكتشفة)</h2>
-                        <div class="devices-capsule-pill offline-capsule" id="discovered-devices">
+                        <h2 class="section-subheading offline-sub">الأجهزة الأخرى</h2>
+                        <div class="devices-capsule-pill offline-capsule" id="non-favorite-devices">
                             <div class="placeholder-text">جاري البحث عن أجهزة...</div>
                         </div>
                     </div>
@@ -109,6 +109,10 @@
                 </section>
                 <div class="downloads-card">
                     <h2 class="section-subheading right-align">قائمة التحميلات النشطة</h2>
+                    <div class="bulk-actions" style="margin-bottom: 12px; display: flex; gap: 8px;">
+                        <button id="btn-stop-all-downloads" class="btn-outline" style="background-color: #D32F2F; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer;">إيقاف الكل</button>
+                        <button id="btn-resume-all-downloads" class="btn-outline" style="background-color: #388E3C; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer;">استئناف الكل</button>
+                    </div>
                     <div class="table-container">
                         <table class="downloads-table">
                             <thead>
@@ -162,6 +166,10 @@
             </div>
             <div class="modal-body">
                 <div class="device-detail-row">
+                    <span class="detail-label">الاسم المخصص:</span>
+                    <input type="text" id="modal-device-custom-name" class="detail-input" placeholder="أدخل اسماً مخصصاً...">
+                </div>
+                <div class="device-detail-row">
                     <span class="detail-label">الموديل:</span>
                     <span id="modal-device-model" class="detail-value"></span>
                 </div>
@@ -183,6 +191,7 @@
                 </div>
             </div>
             <div class="modal-actions">
+                <button id="modal-save-name-btn" class="modal-btn primary" style="background-color: #2E7D32;">💾 حفظ الاسم</button>
                 <button id="modal-stream-btn" class="modal-btn primary">📺 بث الشاشة</button>
                 <button id="modal-disconnect-btn" class="modal-btn danger">🔌 قطع الاتصال</button>
             </div>

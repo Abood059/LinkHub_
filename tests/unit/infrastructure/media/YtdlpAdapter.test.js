@@ -24,7 +24,8 @@ describe('YtdlpAdapter', () => {
         mockProcessSupervisor = {
             executeQuickTaskArray: jest.fn(),
             startManagedProcess: jest.fn(),
-            stopManagedProcess: jest.fn()
+            stopManagedProcess: jest.fn(),
+            hasProcess: jest.fn()
         };
         
         mockToolPathResolver = {
@@ -785,109 +786,137 @@ describe('YtdlpAdapter', () => {
             expect(mockProcessSupervisor.stopManagedProcess).toHaveBeenCalledWith(processId);
         });
 
-        test('should return true when stop succeeds', () => {
+        test('should return success object when stop succeeds with alive process', () => {
             const mockProcess = createMockChildProcess();
             mockProcessSupervisor.startManagedProcess.mockReturnValue(mockProcess);
             mockProcessSupervisor.stopManagedProcess.mockReturnValue(true);
+            mockProcessSupervisor.hasProcess.mockReturnValue(true);
             
             adapter.startDownload('https://youtube.com/watch?v=test', '137');
             const processId = mockProcessSupervisor.startManagedProcess.mock.calls[0][0].processId;
             
             const result = adapter.stopDownload(processId);
             
-            expect(result).toBe(true);
+            expect(result).toEqual({ success: true, wasRunning: true });
+            expect(mockProcessSupervisor.stopManagedProcess).toHaveBeenCalledWith(processId);
         });
 
-        test('should return false when processId does not exist', () => {
+        test('should return success object with wasRunning false when process is not alive', () => {
+            const mockProcess = createMockChildProcess();
+            mockProcessSupervisor.startManagedProcess.mockReturnValue(mockProcess);
+            mockProcessSupervisor.hasProcess.mockReturnValue(false);
+            
+            adapter.startDownload('https://youtube.com/watch?v=test', '137');
+            const processId = mockProcessSupervisor.startManagedProcess.mock.calls[0][0].processId;
+            
+            const result = adapter.stopDownload(processId);
+            
+            expect(result).toEqual({ success: true, wasRunning: false });
+            expect(mockProcessSupervisor.stopManagedProcess).not.toHaveBeenCalled();
+            expect(mockLogger.info).toHaveBeenCalledWith(
+                expect.stringContaining('was not alive, skipping stopManagedProcess')
+            );
+        });
+
+        test('should return failure object when processId does not exist', () => {
+            mockProcessSupervisor.hasProcess.mockReturnValue(false);
+            
             const result = adapter.stopDownload('non-existent-id');
             
-            expect(result).toBe(false);
+            expect(result).toEqual({ 
+                success: false, 
+                reason: 'entry_not_found', 
+                processId: 'non-existent-id' 
+            });
             expect(mockProcessSupervisor.stopManagedProcess).not.toHaveBeenCalled();
+            expect(mockLogger.warn).toHaveBeenCalledWith(
+                expect.stringContaining('Entry not found')
+            );
         });
 
-        test('should return false when stopManagedProcess returns false', () => {
+        test('should return failure object when stopManagedProcess returns false', () => {
             const mockProcess = createMockChildProcess();
             mockProcessSupervisor.startManagedProcess.mockReturnValue(mockProcess);
             mockProcessSupervisor.stopManagedProcess.mockReturnValue(false);
+            mockProcessSupervisor.hasProcess.mockReturnValue(true);
             
             adapter.startDownload('https://youtube.com/watch?v=test', '137');
             const processId = mockProcessSupervisor.startManagedProcess.mock.calls[0][0].processId;
             
             const result = adapter.stopDownload(processId);
             
-            expect(result).toBe(false);
+            expect(result).toEqual({ success: false, wasRunning: true });
         });
 
-        test('should delete entry from _activeDownloads on successful stop', () => {
+        test('should keep entry in _activeDownloads for resume (not delete)', () => {
             const mockProcess = createMockChildProcess();
             mockProcessSupervisor.startManagedProcess.mockReturnValue(mockProcess);
             mockProcessSupervisor.stopManagedProcess.mockReturnValue(true);
+            mockProcessSupervisor.hasProcess.mockReturnValue(true);
             
             adapter.startDownload('https://youtube.com/watch?v=test', '137');
             const processId = mockProcessSupervisor.startManagedProcess.mock.calls[0][0].processId;
             
             adapter.stopDownload(processId);
             
-            expect(adapter._activeDownloads.has(processId)).toBe(false);
+            // Entry should be kept in memory for resume capability
+            expect(adapter._downloadManager.getDownloadEntry(processId)).toBeDefined();
         });
 
         test('should update status to stopped before calling stopManagedProcess', () => {
             const mockProcess = createMockChildProcess();
             mockProcessSupervisor.startManagedProcess.mockReturnValue(mockProcess);
             mockProcessSupervisor.stopManagedProcess.mockReturnValue(true);
+            mockProcessSupervisor.hasProcess.mockReturnValue(true);
             
             adapter.startDownload('https://youtube.com/watch?v=test', '137');
             const processId = mockProcessSupervisor.startManagedProcess.mock.calls[0][0].processId;
             
             adapter.stopDownload(processId);
             
-            expect(adapter._activeDownloads.get(processId)).toBeUndefined(); // Deleted after stop
+            const entry = adapter._downloadManager.getDownloadEntry(processId);
+            expect(entry.status).toBe('stopped');
+            expect(entry.manuallyStopped).toBe(true);
         });
 
-        test('should broadcast download:stopped event', () => {
-            const mockProcess = createMockChildProcess();
-            mockProcessSupervisor.startManagedProcess.mockReturnValue(mockProcess);
-            mockProcessSupervisor.stopManagedProcess.mockReturnValue(true);
-            
-            adapter.startDownload('https://youtube.com/watch?v=test', '137');
-            const processId = mockProcessSupervisor.startManagedProcess.mock.calls[0][0].processId;
-            
-            adapter.stopDownload(processId);
-            
-            // The adapter emits 'downloadStopped' event via this.emit()
-            // The windowManager.broadcast is called by event listeners, not directly by stopDownload
-            expect(adapter._activeDownloads.has(processId)).toBe(false);
-        });
-
-        test('should handle null processId', () => {
+        test('should return failure object for null processId', () => {
             const result = adapter.stopDownload(null);
             
-            expect(result).toBe(false);
+            expect(result).toEqual({ success: false, reason: 'invalid_processId' });
+            expect(mockLogger.warn).toHaveBeenCalledWith(
+                expect.stringContaining('Invalid processId')
+            );
         });
 
-        test('should handle empty processId', () => {
+        test('should return failure object for empty processId', () => {
             const result = adapter.stopDownload('');
             
-            expect(result).toBe(false);
+            expect(result).toEqual({ success: false, reason: 'invalid_processId' });
+            expect(mockLogger.warn).toHaveBeenCalledWith(
+                expect.stringContaining('Invalid processId')
+            );
         });
 
-        test('should not delete entry if stopManagedProcess fails', () => {
+        test('should keep entry even when stopManagedProcess fails', () => {
             const mockProcess = createMockChildProcess();
             mockProcessSupervisor.startManagedProcess.mockReturnValue(mockProcess);
             mockProcessSupervisor.stopManagedProcess.mockReturnValue(false);
+            mockProcessSupervisor.hasProcess.mockReturnValue(true);
             
             adapter.startDownload('https://youtube.com/watch?v=test', '137');
             const processId = mockProcessSupervisor.startManagedProcess.mock.calls[0][0].processId;
             
             adapter.stopDownload(processId);
             
-            expect(adapter._activeDownloads.has(processId)).toBe(true);
+            // Entry should be kept in memory for resume capability
+            expect(adapter._downloadManager.getDownloadEntry(processId)).toBeDefined();
         });
 
         test('should handle null windowManager in stopDownload', () => {
             const mockProcess = createMockChildProcess();
             mockProcessSupervisor.startManagedProcess.mockReturnValue(mockProcess);
             mockProcessSupervisor.stopManagedProcess.mockReturnValue(true);
+            mockProcessSupervisor.hasProcess.mockReturnValue(true);
             
             const adapterWithoutWM = new YtdlpAdapter({
                 processSupervisor: mockProcessSupervisor
@@ -898,8 +927,9 @@ describe('YtdlpAdapter', () => {
             
             const result = adapterWithoutWM.stopDownload(processId);
             
-            expect(result).toBe(true);
-            expect(adapterWithoutWM._activeDownloads.has(processId)).toBe(false);
+            expect(result).toEqual({ success: true, wasRunning: true });
+            // Entry should be kept in memory for resume capability
+            expect(adapterWithoutWM._downloadManager.getDownloadEntry(processId)).toBeDefined();
         });
     });
 

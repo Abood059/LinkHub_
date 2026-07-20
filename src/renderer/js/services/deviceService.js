@@ -17,3 +17,23 @@ export async function disconnectDevice(adbTarget) {
     }
     return await linkhub.devices.disconnect(adbTarget);
 }
+
+export async function setDeviceFavorite(deviceId, isFavorite) {
+    return await linkhub.devices.setFavorite(deviceId, isFavorite);
+}
+
+export async function setDeviceTrusted(deviceId, isTrusted) {
+    return await linkhub.devices.setTrusted(deviceId, isTrusted);
+}
+
+export async function getFavoriteDevices() {
+    return await linkhub.devices.getFavorites();
+}
+
+export async function getTrustedDevices() {
+    return await linkhub.devices.getTrusted();
+}
+
+export async function setDeviceCustomName(deviceId, customName) {
+    return await linkhub.devices.setCustomName(deviceId, customName);
+}
