@@ -3,6 +3,7 @@
 
 const EventEmitter = require('events');
 const path = require('path');
+const fs = require('fs').promises;
 
 const YtdlpCommandBuilder = require('./YtdlpCommandBuilder');
 const YtdlpResponseParser = require('./YtdlpResponseParser');
@@ -103,16 +104,24 @@ class YtdlpAdapter extends EventEmitter {
         const { outputPath, onProgress, deviceId, title, formatsData, processId: existingProcessId } = options;
         let finalOutputPath = outputPath;
 
-        // إنشاء مجلد مؤقت داخل المشروع إذا لم يتم تمرير مسار مخصص
-        // ترك yt-dlp تحدد اسم الملف تلقائياً لضمان الاستئناف الصحيح
-        if (!finalOutputPath) {
-            const tempDir = await createTempDirectory();
-            finalOutputPath = path.join(tempDir, '%(title)s.%(ext)s');
-        }
-
         // استخدام processId الموجود للإستئناف، أو إنشاء جديد للتحميل الجديد
         const processId = existingProcessId || `ytdlp-dl-${Date.now()}`;
         const isResuming = !!existingProcessId;
+
+        // عند الاستئناف، استخدام المسار الفعلي المخزن في الإدخال
+        if (isResuming) {
+            const existingEntry = this._downloadManager.getDownloadEntry(processId);
+            if (existingEntry && existingEntry.outputPath) {
+                finalOutputPath = existingEntry.outputPath;
+            }
+        }
+
+        // إنشاء مجلد مؤقت داخل المشروع إذا لم يتم تمرير مسار مخصص
+        // استخدام المجلد فقط (بدون قالب) لضمان الاستئناف الصحيح
+        if (!finalOutputPath) {
+            const tempDir = await createTempDirectory();
+            finalOutputPath = tempDir;
+        }
         const denoPath = this._toolPathResolver ? this._toolPathResolver.getDenoPath() : null;
 
         // حساب الحجم الكلي للتحميل المركب

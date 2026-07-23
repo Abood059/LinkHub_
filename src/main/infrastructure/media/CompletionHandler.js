@@ -23,29 +23,48 @@ class CompletionHandler {
         entry.completedAt = new Date().toISOString();
 
         try {
-            // استخراج المسار الفعلي للملف النهائي
-            const actualOutputPath = finalOutputPath.replace('.%(ext)s', '');
+            let tempFilePath;
 
-            // البحث عن الملف المحمل الفعلي داخل المجلد المؤقت
-            const tempDir = path.dirname(actualOutputPath);
-            const files = await fs.readdir(tempDir);
-            const downloadedFile = files.find(f => f.startsWith(path.basename(actualOutputPath)));
-
-            if (downloadedFile) {
-                const tempFilePath = path.join(tempDir, downloadedFile);
-
-                // نقل الملف إلى مجلد التنزيلات
-                const { finalPath, tempPath } = await moveDownloadedFile(tempFilePath, title, deviceId);
-
-                entry.resolve({
-                    success: true,
-                    outputPath: finalPath,
-                    tempPath: tempPath,
-                    processId
-                });
+            // التحقق مما إذا كان المسار مجلداً (الحالة الجديدة) أو ملفاً (الحالة القديمة)
+            const stats = await fs.stat(finalOutputPath);
+            
+            if (stats.isDirectory()) {
+                // المسار هو مجلد - البحث عن الملف المحمل داخله
+                const files = await fs.readdir(finalOutputPath);
+                
+                // البحث عن ملف تم إنشاؤه مؤخراً (خلال آخر 60 ثانية)
+                let newestFile = null;
+                let newestMtime = 0;
+                
+                for (const file of files) {
+                    const filePath = path.join(finalOutputPath, file);
+                    const fileStats = await fs.stat(filePath);
+                    
+                    if (fileStats.isFile() && fileStats.mtimeMs > newestMtime) {
+                        newestFile = filePath;
+                        newestMtime = fileStats.mtimeMs;
+                    }
+                }
+                
+                if (!newestFile) {
+                    throw new Error('No downloaded file found in temp directory');
+                }
+                
+                tempFilePath = newestFile;
             } else {
-                throw new Error('Downloaded file not found');
+                // المسار هو ملف - استخدامه مباشرة (للتوافق مع الحالة القديمة)
+                tempFilePath = finalOutputPath;
             }
+
+            // نقل الملف إلى مجلد التنزيلات
+            const { finalPath, tempPath } = await moveDownloadedFile(tempFilePath, title, deviceId);
+
+            entry.resolve({
+                success: true,
+                outputPath: finalPath,
+                tempPath: tempPath,
+                processId
+            });
         } catch (err) {
             if (this._logger) {
                 this._logger.error(`Failed to move file: ${err.message}`);

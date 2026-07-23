@@ -40,7 +40,6 @@ export function showFormatSelectionModal(inspectionData, devices) {
                 row.innerHTML = `
                     <td><input type="radio" name="video-format" class="video-format-radio" value="${formatId}"></td>
                     <td>${resolution}</td>
-                    <td>${bitrate}</td>
                     <td>${filesize}</td>
                     <td>${formatId}</td>
                 `;
@@ -56,10 +55,10 @@ export function showFormatSelectionModal(inspectionData, devices) {
                 videoFormatsTbody.appendChild(row);
             });
         } else {
-            videoFormatsTbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">لا توجد جودات فيديو متاحة</td></tr>';
+            videoFormatsTbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">لا توجد جودات فيديو متاحة</td></tr>';
         }
     } else {
-        videoFormatsTbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">لا توجد جودات متاحة</td></tr>';
+        videoFormatsTbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">لا توجد جودات متاحة</td></tr>';
     }
 
     // عرض جودات الصوت
@@ -79,7 +78,6 @@ export function showFormatSelectionModal(inspectionData, devices) {
 
                 row.innerHTML = `
                     <td><input type="radio" name="audio-format" class="audio-format-radio" value="${formatId}"></td>
-                    <td>${abr}</td>
                     <td>${filesize}</td>
                     <td>${formatId}</td>
                 `;
@@ -95,10 +93,10 @@ export function showFormatSelectionModal(inspectionData, devices) {
                 audioFormatsTbody.appendChild(row);
             });
         } else {
-            audioFormatsTbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">لا توجد جودات صوت متاحة</td></tr>';
+            audioFormatsTbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">لا توجد جودات صوت متاحة</td></tr>';
         }
     } else {
-        audioFormatsTbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">لا توجد جودات متاحة</td></tr>';
+        audioFormatsTbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">لا توجد جودات متاحة</td></tr>';
     }
 
     // عرض الأجهزة

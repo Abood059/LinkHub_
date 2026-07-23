@@ -87,45 +87,62 @@ export function addDownloadRow(downloadId, fileName, targetDeviceName, url, form
     if (stopBtn) {
         stopBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
+            console.log('[downloadManager] === ضغط زر الإيقاف/الاستئناف (الجدول الرئيسي) ===');
             const targetUrl = stopBtn.getAttribute('data-url');
             const targetDownloadId = stopBtn.getAttribute('data-download-id');
             const currentStatus = stopBtn.getAttribute('data-status');
             const targetFormatId = row.getAttribute('data-format-id');
             const targetDeviceId = row.getAttribute('data-device-id');
             const targetTitle = row.getAttribute('data-title');
+            console.log('[downloadManager] targetUrl:', targetUrl);
+            console.log('[downloadManager] targetDownloadId:', targetDownloadId);
+            console.log('[downloadManager] currentStatus:', currentStatus);
+            console.log('[downloadManager] targetFormatId:', targetFormatId);
+            console.log('[downloadManager] targetDeviceId:', targetDeviceId);
+            console.log('[downloadManager] targetTitle:', targetTitle);
             
             if (currentStatus === 'active') {
+                console.log('[downloadManager] الحالة: active - إيقاف التحميل');
                 if (targetUrl && confirm('هل تريد إيقاف هذا التحميل؟')) {
                     try {
+                        console.log('[downloadManager] استدعاء stopDownload');
                         await stopDownload(targetDownloadId);
                         showToast(`تم إيقاف التحميل: ${fileName}`);
                         syncStopButtonState(targetDownloadId, 'استئناف', 'stopped', '#388E3C');
                     } catch (err) {
+                        console.log('[downloadManager] خطأ في إيقاف التحميل:', err.message);
                         showToast(`فشل إيقاف التحميل: ${err.message}`, true);
                     }
                 }
             } else if (currentStatus === 'failed') {
+                console.log('[downloadManager] الحالة: failed - إعادة محاولة التحميل');
                 // إعادة محاولة التحميل الفاشل
                 if (targetUrl && targetFormatId) {
                     try {
+                        console.log('[downloadManager] استدعاء resumeDownload لإعادة المحاولة');
                         syncStopButtonState(targetDownloadId, 'جاري إعادة المحاولة...', 'active', '#FF9800', true);
                         await resumeDownload(targetDownloadId, targetUrl, targetFormatId, targetDeviceId, { title: targetTitle });
                         showToast(`جاري إعادة محاولة التحميل: ${fileName}`);
                     } catch (err) {
+                        console.log('[downloadManager] خطأ في إعادة المحاولة:', err.message);
                         showToast(`فشل إعادة المحاولة: ${err.message}`, true);
                         syncStopButtonState(targetDownloadId, 'إعادة المحاولة', 'failed', '#D32F2F');
                     }
                 }
             } else if (currentStatus === 'stopped') {
+                console.log('[downloadManager] الحالة: stopped - استئناف التحميل');
                 // استئناف التحميل - السماح للباك إند بالبحث عن التحميل المتطابق
                 if (targetUrl && targetFormatId) {
                     try {
+                        console.log('[downloadManager] استدعاء resumeDownload للاستئناف');
+                        console.log('[downloadManager] تمرير null كـ processId للسماح للباك إند بالبحث');
                         syncStopButtonState(targetDownloadId, 'إيقاف', 'active', '#D32F2F', false);
                         // تمرير null كـ processId للسماح للباك إند بالبحث عن التحميل المتطابق
                         await resumeDownload(null, targetUrl, targetFormatId, targetDeviceId, { title: targetTitle });
                         showToast(`جاري استئناف التحميل: ${fileName}`);
                         // سيتم تغيير الحالة إلى "إيقاف" عند أول تحديث للتقدم في updateDownloadProgress
                     } catch (err) {
+                        console.log('[downloadManager] خطأ في استئناف التحميل:', err.message);
                         showToast(`فشل استئناف التحميل: ${err.message}`, true);
                         syncStopButtonState(targetDownloadId, 'استئناف', 'stopped', '#388E3C');
                     }
@@ -223,45 +240,62 @@ function addRecentDownloadRow(downloadId, fileName, targetDeviceName, url, forma
     if (stopBtn) {
         stopBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
+            console.log('[downloadManager] === ضغط زر الإيقاف/الاستئناف (الجدول المصغر) ===');
             const targetUrl = stopBtn.getAttribute('data-url');
             const targetDownloadId = stopBtn.getAttribute('data-download-id');
             const currentStatus = stopBtn.getAttribute('data-status');
             const targetFormatId = row.getAttribute('data-format-id');
             const targetDeviceId = row.getAttribute('data-device-id');
             const targetTitle = row.getAttribute('data-title');
+            console.log('[downloadManager] targetUrl:', targetUrl);
+            console.log('[downloadManager] targetDownloadId:', targetDownloadId);
+            console.log('[downloadManager] currentStatus:', currentStatus);
+            console.log('[downloadManager] targetFormatId:', targetFormatId);
+            console.log('[downloadManager] targetDeviceId:', targetDeviceId);
+            console.log('[downloadManager] targetTitle:', targetTitle);
             
             if (currentStatus === 'active') {
+                console.log('[downloadManager] الحالة: active - إيقاف التحميل');
                 if (targetUrl && confirm('هل تريد إيقاف هذا التحميل؟')) {
                     try {
+                        console.log('[downloadManager] استدعاء stopDownload');
                         await stopDownload(targetDownloadId);
                         showToast(`تم إيقاف التحميل: ${fileName}`);
                         syncStopButtonState(targetDownloadId, 'استئناف', 'stopped', '#388E3C');
                     } catch (err) {
+                        console.log('[downloadManager] خطأ في إيقاف التحميل:', err.message);
                         showToast(`فشل إيقاف التحميل: ${err.message}`, true);
                     }
                 }
             } else if (currentStatus === 'failed') {
+                console.log('[downloadManager] الحالة: failed - إعادة محاولة التحميل');
                 // إعادة محاولة التحميل الفاشل
                 if (targetUrl && targetFormatId) {
                     try {
+                        console.log('[downloadManager] استدعاء resumeDownload لإعادة المحاولة');
                         syncStopButtonState(targetDownloadId, 'جاري إعادة المحاولة...', 'active', '#FF9800', true);
                         await resumeDownload(targetDownloadId, targetUrl, targetFormatId, targetDeviceId, { title: targetTitle });
                         showToast(`جاري إعادة محاولة التحميل: ${fileName}`);
                     } catch (err) {
+                        console.log('[downloadManager] خطأ في إعادة المحاولة:', err.message);
                         showToast(`فشل إعادة المحاولة: ${err.message}`, true);
                         syncStopButtonState(targetDownloadId, 'إعادة المحاولة', 'failed', '#D32F2F');
                     }
                 }
             } else if (currentStatus === 'stopped') {
+                console.log('[downloadManager] الحالة: stopped - استئناف التحميل');
                 // استئناف التحميل - السماح للباك إند بالبحث عن التحميل المتطابق
                 if (targetUrl && targetFormatId) {
                     try {
+                        console.log('[downloadManager] استدعاء resumeDownload للاستئناف');
+                        console.log('[downloadManager] تمرير null كـ processId للسماح للباك إند بالبحث');
                         syncStopButtonState(targetDownloadId, 'إيقاف', 'active', '#D32F2F', false);
                         // تمرير null كـ processId للسماح للباك إند بالبحث عن التحميل المتطابق
                         await resumeDownload(null, targetUrl, targetFormatId, targetDeviceId, { title: targetTitle });
                         showToast(`جاري استئناف التحميل: ${fileName}`);
                         // سيتم تغيير الحالة إلى "إيقاف" عند أول تحديث للتقدم في updateDownloadProgress
                     } catch (err) {
+                        console.log('[downloadManager] خطأ في استئناف التحميل:', err.message);
                         showToast(`فشل استئناف التحميل: ${err.message}`, true);
                         syncStopButtonState(targetDownloadId, 'استئناف', 'stopped', '#388E3C');
                     }

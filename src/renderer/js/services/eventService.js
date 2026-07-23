@@ -40,15 +40,4 @@ export function setupEventListeners(handlers) {
     linkhub.on('device:removed', () => handlers.onDeviceRemoved?.());
     linkhub.on('device:added', () => handlers.onDeviceStateChanged?.());
     linkhub.on('device:state:update', () => handlers.onDeviceStateChanged?.());
-    
-    // أحداث النقل للجهاز
-    linkhub.on('download:transferProgress', (event, data) => {
-        if (data?.downloadId) handlers.onTransferProgress?.(data.downloadId, data.percent);
-    });
-    linkhub.on('download:transferComplete', (event, data) => {
-        if (data?.downloadId) handlers.onTransferComplete?.(data.downloadId, data.message);
-    });
-    linkhub.on('download:transferError', (event, data) => {
-        if (data?.downloadId) handlers.onTransferError?.(data.downloadId, data.error);
-    });
 }

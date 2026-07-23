@@ -199,6 +199,34 @@ class DownloadRepository extends BaseRepository {
             retry_count: (current.retry_count || 0) + 1
         });
     }
+
+    /**
+     * Upsert a download (update if exists, insert if not)
+     * Uses "try update first, then insert if fails" strategy for optimal performance
+     * @param {string} downloadId - Download ID (same as processId)
+     * @param {Object} data - Complete download data including all fields
+     * @returns {Object} The updated or inserted download
+     */
+    upsertDownload(downloadId, data) {
+        // Try update first (most downloads already exist)
+        const updated = this.update(this._table, downloadId, data);
+        
+        if (updated !== null) {
+            // Update succeeded - record exists
+            return updated;
+        }
+        
+        // Update failed (changes = 0) - record doesn't exist, insert it
+        // Ensure id is included in the data
+        const insertData = { id: downloadId, ...data };
+        
+        // Set created_at if not provided
+        if (!insertData.created_at) {
+            insertData.created_at = this._db.prepare("SELECT datetime('now')").get()['datetime(\'now\')'];
+        }
+        
+        return this.insert(this._table, insertData);
+    }
 }
 
 module.exports = DownloadRepository;

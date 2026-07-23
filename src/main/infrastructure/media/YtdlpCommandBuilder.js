@@ -53,6 +53,7 @@ class YtdlpCommandBuilder {
                 '-o', outputPath,
                 '--newline',
                 '--progress-template', progressTemplate,
+                '--continue',
                 url
               ]
             : [
@@ -61,6 +62,7 @@ class YtdlpCommandBuilder {
                 '-o', outputPath,
                 '--newline',
                 '--progress-template', progressTemplate,
+                '--continue',
                 url
               ];
         

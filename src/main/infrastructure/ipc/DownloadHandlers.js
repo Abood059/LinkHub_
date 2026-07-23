@@ -23,19 +23,42 @@ class DownloadHandlers {
         }
 
         ipcMain.handle('download:inspect', async (event, url) => {
-            return this._downloadOrchestrator.inspectLink(url);
+            console.log('[DownloadHandlers] === استقبال IPC: download:inspect ===');
+            console.log('[DownloadHandlers] url:', url);
+            const result = this._downloadOrchestrator.inspectLink(url);
+            console.log('[DownloadHandlers] نتيجة inspectLink:', result);
+            return result;
         });
 
         ipcMain.handle('download:start', async (event, url, formatId, deviceId = null, options = {}) => {
-            return this._downloadOrchestrator.startDownload(url, formatId, deviceId, options);
+            console.log('[DownloadHandlers] === استقبال IPC: download:start ===');
+            console.log('[DownloadHandlers] url:', url);
+            console.log('[DownloadHandlers] formatId:', formatId);
+            console.log('[DownloadHandlers] deviceId:', deviceId);
+            console.log('[DownloadHandlers] options:', options);
+            const result = this._downloadOrchestrator.startDownload(url, formatId, deviceId, options);
+            console.log('[DownloadHandlers] نتيجة startDownload:', result);
+            return result;
         });
 
         ipcMain.handle('download:stop', async (event, processId) => {
-            return this._downloadOrchestrator.stopDownload(processId);
+            console.log('[DownloadHandlers] === استقبال IPC: download:stop ===');
+            console.log('[DownloadHandlers] processId:', processId);
+            const result = this._downloadOrchestrator.stopDownload(processId);
+            console.log('[DownloadHandlers] نتيجة stopDownload:', result);
+            return result;
         });
 
         ipcMain.handle('download:resume', async (event, processId, url, formatId, deviceId = null, options = {}) => {
-            return this._downloadOrchestrator.resumeDownload(processId, url, formatId, deviceId, options);
+            console.log('[DownloadHandlers] === استقبال IPC: download:resume ===');
+            console.log('[DownloadHandlers] processId:', processId);
+            console.log('[DownloadHandlers] url:', url);
+            console.log('[DownloadHandlers] formatId:', formatId);
+            console.log('[DownloadHandlers] deviceId:', deviceId);
+            console.log('[DownloadHandlers] options:', options);
+            const result = this._downloadOrchestrator.resumeDownload(processId, url, formatId, deviceId, options);
+            console.log('[DownloadHandlers] نتيجة resumeDownload:', result);
+            return result;
         });
 
         ipcMain.handle('download:metadata', async (event, url) => {

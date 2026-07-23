@@ -77,7 +77,7 @@ class DatabaseManager {
      */
     async _runMigrations() {
         const migrationsDir = path.join(__dirname, 'migrations');
-        const migrationFiles = ['001_init.sql', '003_add_custom_name.sql', '004_add_updated_at.sql'];
+        const migrationFiles = ['001_init.sql', '003_add_custom_name.sql', '004_add_updated_at.sql', '005_add_failed_at.sql'];
 
         for (const migrationFile of migrationFiles) {
             const migrationPath = path.join(migrationsDir, migrationFile);

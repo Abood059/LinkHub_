@@ -181,8 +181,14 @@ class ApplicationBootstrap {
                     }
                 }
 
-                // 2. Flush download sync service to ensure all data is written
+                // 2. Stop download sync service timer to prevent new sync cycles
                 const downloadSyncService = container.resolve('downloadSyncService');
+                if (downloadSyncService) {
+                    console.log('[Bootstrap] Stopping download sync service...');
+                    downloadSyncService.stop();
+                }
+
+                // 3. Flush download sync service to ensure all data is written
                 if (downloadSyncService) {
                     console.log('[Bootstrap] Flushing download sync service...');
                     const flushSuccess = await downloadSyncService.flush();
@@ -193,7 +199,7 @@ class ApplicationBootstrap {
                     }
                 }
 
-                // 3. Close database
+                // 4. Close database
                 const dbManager = container.resolve('databaseManager');
                 if (dbManager && typeof dbManager.close === 'function') {
                     console.log('[Bootstrap] Closing database...');
