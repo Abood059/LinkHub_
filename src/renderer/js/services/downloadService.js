@@ -1,40 +1,21 @@
 // downloadService.js - عمليات التحميل
 export async function inspectUrl(url) {
-    console.log('[downloadService] === استدعاء inspectUrl ===');
-    console.log('[downloadService] url:', url);
     const result = await linkhub.downloads.inspect(url);
-    console.log('[downloadService] نتيجة inspectUrl:', result);
     return result;
 }
 
 export async function startDownload(url, formatId, deviceId, options = {}) {
-    console.log('[downloadService] === استدعاء startDownload ===');
-    console.log('[downloadService] url:', url);
-    console.log('[downloadService] formatId:', formatId);
-    console.log('[downloadService] deviceId:', deviceId);
-    console.log('[downloadService] options:', options);
     const result = await linkhub.downloads.start(url, formatId, deviceId, options);
-    console.log('[downloadService] نتيجة startDownload:', result);
     return result;
 }
 
 export async function stopDownload(processId) {
-    console.log('[downloadService] === استدعاء stopDownload ===');
-    console.log('[downloadService] processId:', processId);
     const result = await linkhub.downloads.stop(processId);
-    console.log('[downloadService] نتيجة stopDownload:', result);
     return result;
 }
 
 export async function resumeDownload(processId, url, formatId, deviceId, options = {}) {
-    console.log('[downloadService] === استدعاء resumeDownload ===');
-    console.log('[downloadService] processId:', processId);
-    console.log('[downloadService] url:', url);
-    console.log('[downloadService] formatId:', formatId);
-    console.log('[downloadService] deviceId:', deviceId);
-    console.log('[downloadService] options:', options);
     const result = await linkhub.downloads.resume(processId, url, formatId, deviceId, options);
-    console.log('[downloadService] نتيجة resumeDownload:', result);
     return result;
 }
 

@@ -160,7 +160,6 @@ class DownloadManager extends EventEmitter {
             // FIX: Added await to ensure data is fetched before passing to StateManager
             const downloadsData = await repository.findAllDownloads();
             this._stateManager.restoreFromRepository(downloadsData);
-            console.log('[DownloadManager] Memory restoration completed');
         } catch (error) {
             console.error('[DownloadManager] Failed to restore memory from database:', error);
         }
@@ -191,8 +190,6 @@ class DownloadManager extends EventEmitter {
 
         // حذف الإدخال من الذاكرة
         this._stateManager.removeDownloadEntry(processId);
-
-        console.log(`[DownloadManager] Cleaned up orphaned entry for ${processId}`);
     }
 
     /**

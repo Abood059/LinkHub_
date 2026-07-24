@@ -213,7 +213,6 @@ class DownloadStateManager {
             existingEntry.manuallyStopped = false;
             existingEntry.process = null;
             // Do NOT clear percent, downloadedBytes, totalSize, retryCount, stderrBuffer
-            console.log(`[DownloadStateManager] Upserted existing entry for resume: ${processId}, preserving progress: ${existingEntry.percent}%`);
             return existingEntry;
         } else {
             // Create new entry (existing logic)
