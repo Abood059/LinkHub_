@@ -11,15 +11,15 @@
 class DownloadOrchestrator {
     constructor({
         ytdlpAdapter,
+        downloadManager,
         deviceRegistry = null,
         fileTransferService = null,
-        downloadRepository = null,
         logger = null
     }) {
         this._ytdlpAdapter = ytdlpAdapter;
+        this._downloadManager = downloadManager;
         this._deviceRegistry = deviceRegistry;
         this._fileTransferService = fileTransferService;
-        this._downloadRepository = downloadRepository;
         this._logger = logger;
     }
 
@@ -38,34 +38,51 @@ class DownloadOrchestrator {
     }
 
     async startDownload(url, formatId, deviceId = null, options = {}) {
+        console.log('[DownloadOrchestrator] === بدء startDownload ===');
+        console.log('[DownloadOrchestrator] url:', url);
+        console.log('[DownloadOrchestrator] formatId:', formatId);
+        console.log('[DownloadOrchestrator] deviceId:', deviceId);
+        console.log('[DownloadOrchestrator] options:', options);
         if (!url || !formatId) {
+            console.log('[DownloadOrchestrator] خطأ: url أو formatId مفقود');
             throw new Error('url and formatId are required');
         }
 
         // إذا كان هناك processId، فهو استئناف - نتجاوز فحص التكرار
         if (options.processId) {
+            console.log('[DownloadOrchestrator] processId موجود - استئناف، تجاوز فحص التكرار');
             const adapterOptions = { ...options, deviceId, formatsData: options.formatsData };
+            console.log('[DownloadOrchestrator] adapterOptions:', adapterOptions);
             const result = this._ytdlpAdapter.startDownload(url, formatId, adapterOptions);
+            console.log('[DownloadOrchestrator] نتيجة startDownload من adapter:', result);
             return result;
         }
 
         // البحث في الذاكرة عن تحميل نشط لنفس الرابط والجودة
         const activeProcessId = this._ytdlpAdapter.findActiveDownload(url, formatId);
+        console.log('[DownloadOrchestrator] البحث عن تحميل نشط في الذاكرة');
+        console.log('[DownloadOrchestrator] activeProcessId:', activeProcessId);
         if (activeProcessId) {
             // تحميل موجود في الذاكرة - منع التكرار
+            console.log('[DownloadOrchestrator] تحميل موجود في الذاكرة');
             const entry = this._ytdlpAdapter.getDownloadEntry(activeProcessId);
+            console.log('[DownloadOrchestrator] entry:', entry);
             const result = {
                 existing: true,
                 downloadId: activeProcessId,
                 status: entry ? entry.status : 'unknown',
                 title: entry ? entry.title : options.title || 'Unknown'
             };
+            console.log('[DownloadOrchestrator] إرجاع نتيجة تحميل موجود:', result);
             return result;
         }
 
         // لا يوجد تحميل في الذاكرة - بدء تحميل جديد
+        console.log('[DownloadOrchestrator] لا يوجد تحميل في الذاكرة - بدء تحميل جديد');
         const adapterOptions = { ...options, deviceId, formatsData: options.formatsData };
+        console.log('[DownloadOrchestrator] adapterOptions:', adapterOptions);
         const result = this._ytdlpAdapter.startDownload(url, formatId, adapterOptions);
+        console.log('[DownloadOrchestrator] نتيجة startDownload من adapter:', result);
         return result;
     }
 
@@ -75,45 +92,66 @@ class DownloadOrchestrator {
      * @returns {Object} كائن نتيجة يوضح حالة الإيقاف من YtdlpAdapter
      */
     stopDownload(fileId) {
+        console.log('[DownloadOrchestrator] === بدء stopDownload ===');
+        console.log('[DownloadOrchestrator] fileId:', fileId);
         if (!fileId) {
+            console.log('[DownloadOrchestrator] خطأ: fileId مفقود');
             throw new Error('fileId is required');
         }
         const result = this._ytdlpAdapter.stopDownload(fileId);
+        console.log('[DownloadOrchestrator] نتيجة stopDownload:', result);
         return result;
     }
 
     async resumeDownload(processId, url, formatId, deviceId = null, options = {}) {
+        console.log('[DownloadOrchestrator] === بدء resumeDownload ===');
+        console.log('[DownloadOrchestrator] processId:', processId);
+        console.log('[DownloadOrchestrator] url:', url);
+        console.log('[DownloadOrchestrator] formatId:', formatId);
+        console.log('[DownloadOrchestrator] deviceId:', deviceId);
+        console.log('[DownloadOrchestrator] options:', options);
         if (!url || !formatId) {
+            console.log('[DownloadOrchestrator] خطأ: url أو formatId مفقود');
             throw new Error('url and formatId are required');
         }
 
         // إذا لم يتم تمرير processId، ابحث عن تحميل متطابق في الذاكرة
         if (!processId) {
+            console.log('[DownloadOrchestrator] processId null - البحث عن تحميل متطابق');
             processId = this._ytdlpAdapter.findActiveDownload(url, formatId);
+            console.log('[DownloadOrchestrator] processId الموجود:', processId);
             if (!processId) {
+                console.log('[DownloadOrchestrator] خطأ: لم يتم العثور على تحميل نشط');
                 throw new Error('لم يتم العثور على تحميل نشط لهذا الرابط والجودة');
             }
         }
 
         // التحقق من وجود الإدخال في الذاكرة
         const entry = this._ytdlpAdapter.getDownloadEntry(processId);
+        console.log('[DownloadOrchestrator] entry:', entry);
         if (!entry) {
+            console.log('[DownloadOrchestrator] خطأ: لم يتم العثور على إدخال');
             throw new Error('لم يتم العثور على تحميل نشط لهذا الرابط والجودة');
         }
 
         // التحقق من حالة العملية قبل الاستئناف
         const isRunning = this._ytdlpAdapter.isProcessRunning(processId);
+        console.log('[DownloadOrchestrator] isProcessRunning:', isRunning);
 
         if (isRunning) {
             // العملية قيد التشغيل - إنهاء العملية الحالية فقط دون تغيير الحالة في الذاكرة
+            console.log('[DownloadOrchestrator] العملية قيد التشغيل - إنهاء العملية الحالية');
             const stopResult = this._ytdlpAdapter.stopProcessOnly(processId);
+            console.log('[DownloadOrchestrator] stopProcessOnly result:', stopResult);
             if (this._logger) {
                 this._logger.info(`resumeDownload: Stopped running process ${processId}`, stopResult);
             }
         }
 
         // بدء التحميل الجديد
+        console.log('[DownloadOrchestrator] بدء التحميل الجديد');
         const result = this.startDownload(url, formatId, deviceId, { ...options, processId });
+        console.log('[DownloadOrchestrator] نتيجة startDownload:', result);
         return result;
     }
 
@@ -219,79 +257,33 @@ class DownloadOrchestrator {
         return this._fileTransferService.transferFromDownloads(localPath, deviceId);
     }
 
-    /**
-     * حذف تحميل من السجل التاريخي
-     * @param {string} downloadId - معرف التحميل
-     * @returns {boolean} تم الحذف بنجاح
-     */
-    deleteDownload(downloadId) {
-        if (!downloadId) {
-            throw new Error('downloadId is required');
-        }
-        if (!this._downloadRepository) {
-            throw new Error('DownloadRepository not available for history operations');
-        }
-        return this._downloadRepository.deleteDownload(downloadId);
-    }
-
-    /**
-     * حذف جميع التحميلات من السجل التاريخي
-     * @returns {number} عدد التحميلات المحذوفة
-     */
-    deleteAllDownloads() {
-        if (!this._downloadRepository) {
-            throw new Error('DownloadRepository not available for history operations');
-        }
-        return this._downloadRepository.deleteAllDownloads();
-    }
-
-    /**
-     * حذف التحميلات الأقدم من تاريخ معين
-     * @param {string} date - التاريخ (ISO format)
-     * @returns {number} عدد التحميلات المحذوفة
-     */
-    deleteDownloadsBeforeDate(date) {
-        if (!date) {
-            throw new Error('date is required');
-        }
-        if (!this._downloadRepository) {
-            throw new Error('DownloadRepository not available for history operations');
-        }
-        return this._downloadRepository.deleteDownloadsBeforeDate(date);
-    }
 
     /**
      * الحصول على السجل التاريخي للتحميلات
      * @returns {Array} قائمة جميع التحميلات
      */
     getDownloadHistory() {
-        if (!this._downloadRepository) {
-            throw new Error('DownloadRepository not available for history operations');
-        }
-        return this._downloadRepository.findAllDownloads();
+        return this._downloadManager.getAllDownloads();
     }
 
     /**
-     * البحث عن تحميل تاريخي قابل للاستئناف
-     * @param {string} url - رابط التحميل
-     * @param {string} formatId - معرف التنسيق
-     * @returns {Object|null} التحميل الموجود أو null
+     * حذف تحميل من الذاكرة فقط (دون حذف من قاعدة البيانات)
+     * @param {string} processId - معرف العملية
+     * @returns {Object} كائن نتيجة يوضح حالة الحذف
      */
-    findHistoricalDownload(url, formatId) {
-        if (!url || !formatId) {
-            throw new Error('url and formatId are required');
+    deleteDownloadFromMemory(processId) {
+        console.log('[DownloadOrchestrator] === بدء deleteDownloadFromMemory ===');
+        console.log('[DownloadOrchestrator] processId:', processId);
+        if (!processId) {
+            console.log('[DownloadOrchestrator] خطأ: processId مفقود');
+            throw new Error('processId is required');
         }
-        if (!this._downloadRepository) {
-            throw new Error('DownloadRepository not available for history operations');
-        }
-        const downloads = this._downloadRepository.findAllDownloads();
-        return downloads.find(d => 
-            d.url === url && 
-            d.format_id === formatId && 
-            d.status !== 'completed' && 
-            d.status !== 'failed'
-        ) || null;
+
+        const result = this._ytdlpAdapter.removeDownloadEntry(processId);
+        console.log('[DownloadOrchestrator] نتيجة deleteDownloadFromMemory:', result);
+        return result;
     }
+
 }
 
 module.exports = DownloadOrchestrator;

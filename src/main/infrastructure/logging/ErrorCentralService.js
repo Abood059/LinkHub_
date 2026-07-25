@@ -15,6 +15,7 @@ class ErrorCentralService {
     constructor() {
         this._initialized = false;
         this._globalHandlersRegistered = false;
+        this._pathService = null;
     }
 
     init(options = {}) {
@@ -23,8 +24,10 @@ class ErrorCentralService {
                 return;
             }
 
+            this._pathService = options.pathService || null;
+
             const {
-                logFilePath = path.join(
+                logFilePath = this._pathService ? this._pathService.getLogPath() : path.join(
                     process.cwd(),
                     'logs',
                     'application.log'

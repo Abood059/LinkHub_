@@ -217,12 +217,8 @@ export function initFormatSelectionModal() {
             return;
         }
 
-        // تغيير حالة الزر إلى "جاري بدأ التحميل" وتعطيله
-        startBtn.textContent = 'جاري بدأ التحميل';
-        startBtn.disabled = true;
-        startBtn.style.opacity = '0.6';
-        startBtn.style.cursor = 'not-allowed';
-
+        // إرسال البيانات للخلفية دون تعطيل الزر
+        // الخلفية هي التي تقرر ما إذا كان التحميل موجوداً أم لا
         if (formatSelectedCallback) {
             formatSelectedCallback({
                 videoFormatId: selectedVideoFormatId || null,

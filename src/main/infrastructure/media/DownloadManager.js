@@ -199,6 +199,14 @@ class DownloadManager extends EventEmitter {
         return this._stateManager.getActiveDownloads();
     }
 
+    /**
+     * الحصول على جميع التحميلات من الذاكرة بتنسيق قاعدة البيانات
+     * @returns {Array} قائمة جميع التحميلات بتنسيق مطابق لقاعدة البيانات
+     */
+    getAllDownloads() {
+        return this._stateManager.getAllDownloads();
+    }
+
 }
 
 module.exports = DownloadManager;

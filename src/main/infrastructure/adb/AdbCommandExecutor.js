@@ -272,8 +272,10 @@ class AdbCommandExecutor {
             process.platform ===
             'win32';
 
+        const appRoot = this._toolPathResolver ? this._toolPathResolver._appRoot : process.cwd();
+        
         return path.join(
-            process.cwd(),
+            appRoot,
             'resources',
             'bin',
             isWin

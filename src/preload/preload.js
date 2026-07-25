@@ -190,7 +190,14 @@ const downloadsAPI = {
      * Get all active downloads.
      * @returns {Promise<Map|Array>}
      */
-    getActive: () => ipcRenderer.invoke('download:active')
+    getActive: () => ipcRenderer.invoke('download:active'),
+
+    /**
+     * Delete a download from memory.
+     * @param {string} processId - Process ID
+     * @returns {Promise<boolean>}
+     */
+    deleteFromMemory: (processId) => ipcRenderer.invoke('download:deleteFromMemory', processId)
 };
 
 // ============================================================================

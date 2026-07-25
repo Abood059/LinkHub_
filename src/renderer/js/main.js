@@ -206,6 +206,8 @@ if (pairBtn) pairBtn.addEventListener('click', () => handlePairDevice(loadDevice
 // أزرار التحكم الجماعي للتحميلات
 const btnStopAll = document.getElementById('btn-stop-all-downloads');
 const btnResumeAll = document.getElementById('btn-resume-all-downloads');
+const btnStopAllHome = document.getElementById('btn-stop-all-downloads-home');
+const btnResumeAllHome = document.getElementById('btn-resume-all-downloads-home');
 
 if (btnStopAll) {
     btnStopAll.addEventListener('click', async () => {
@@ -217,6 +219,22 @@ if (btnStopAll) {
 
 if (btnResumeAll) {
     btnResumeAll.addEventListener('click', async () => {
+        if (confirm('هل تريد استئناف جميع التحميلات المتوقفة/الفاشلة؟')) {
+            await resumeAllDownloads();
+        }
+    });
+}
+
+if (btnStopAllHome) {
+    btnStopAllHome.addEventListener('click', async () => {
+        if (confirm('هل تريد إيقاف جميع التحميلات النشطة؟')) {
+            await stopAllDownloads();
+        }
+    });
+}
+
+if (btnResumeAllHome) {
+    btnResumeAllHome.addEventListener('click', async () => {
         if (confirm('هل تريد استئناف جميع التحميلات المتوقفة/الفاشلة؟')) {
             await resumeAllDownloads();
         }

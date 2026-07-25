@@ -17,7 +17,7 @@ const fs = require('fs');
  * - الحذف التلقائي: التحميلات التي تختفي من الذاكرة تُحذف من قاعدة البيانات
  */
 class DownloadSyncService {
-    constructor(downloadManager, downloadRepository, logger) {
+    constructor(downloadManager, downloadRepository, logger, pathService = null) {
         if (!downloadManager) {
             throw new Error('downloadManager is required for DownloadSyncService');
         }
@@ -28,6 +28,7 @@ class DownloadSyncService {
         this._downloadManager = downloadManager;
         this._downloadRepository = downloadRepository;
         this._logger = logger;
+        this._pathService = pathService;
 
         // إعدادات الدورة الدورية
         this._interval = 300; // 300ms
@@ -51,7 +52,7 @@ class DownloadSyncService {
         };
 
         // مسار ملف سجل الأخطاء
-        this._errorLogPath = path.join(process.cwd(), 'logs', 'sync-errors.log');
+        this._errorLogPath = this._pathService ? this._pathService.getLogPath('sync-errors.log') : path.join(process.cwd(), 'logs', 'sync-errors.log');
         this._ensureLogDirectory();
     }
 

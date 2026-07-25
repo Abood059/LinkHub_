@@ -106,8 +106,8 @@ function adjustProgressForCombinedDownload(currentPercent, currentSize, entry, p
 /**
  * إنشاء مجلد مؤقت للتحميلات
  */
-async function createTempDirectory() {
-    const tempDir = path.join(process.cwd(), 'temp', 'downloads');
+async function createTempDirectory(pathService = null) {
+    const tempDir = pathService ? pathService.getDownloadsTempDir() : path.join(process.cwd(), 'temp', 'downloads');
     try {
         await fs.mkdir(tempDir, { recursive: true });
         return tempDir;

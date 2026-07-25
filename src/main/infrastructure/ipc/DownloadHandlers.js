@@ -54,25 +54,15 @@ class DownloadHandlers {
             return this._downloadOrchestrator.transferFileToDevice(localPath, deviceId);
         });
 
-        ipcMain.handle('download:delete', async (event, downloadId) => {
-            return this._downloadOrchestrator.deleteDownload(downloadId);
-        });
-
-        ipcMain.handle('download:deleteAll', async () => {
-            return this._downloadOrchestrator.deleteAllDownloads();
-        });
-
-        ipcMain.handle('download:deleteBeforeDate', async (event, date) => {
-            return this._downloadOrchestrator.deleteDownloadsBeforeDate(date);
-        });
 
         ipcMain.handle('download:getHistory', async () => {
             return this._downloadOrchestrator.getDownloadHistory();
         });
 
-        ipcMain.handle('download:findExisting', async (event, url, formatId) => {
-            return this._downloadOrchestrator.findHistoricalDownload(url, formatId);
+        ipcMain.handle('download:deleteFromMemory', async (event, processId) => {
+            return this._downloadOrchestrator.deleteDownloadFromMemory(processId);
         });
+
     }
 }
 

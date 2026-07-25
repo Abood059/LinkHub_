@@ -1,7 +1,7 @@
 // src/main/infrastructure/media/CompletionHandler.js
 'use strict';
 
-const { moveDownloadedFile } = require('./YtdlpUtils');
+const { moveDownloadedFile, sanitizeFileName } = require('./YtdlpUtils');
 const fs = require('fs').promises;
 const path = require('path');
 
@@ -29,28 +29,35 @@ class CompletionHandler {
             const stats = await fs.stat(finalOutputPath);
             
             if (stats.isDirectory()) {
-                // المسار هو مجلد - البحث عن الملف المحمل داخله
+                // المسار هو مجلد - البحث عن الملف النهائي باستخدام عنوان الفيديو
+                // yt-dlp يسمي الملف النهائي بناءً على عنوان الفيديو ويحذف الملفات المؤقتة تلقائياً
                 const files = await fs.readdir(finalOutputPath);
                 
-                // البحث عن ملف تم إنشاؤه مؤخراً (خلال آخر 60 ثانية)
-                let newestFile = null;
-                let newestMtime = 0;
+                // تنظيف عنوان الفيديو لمطابقة اسم الملف الذي أنشأه yt-dlp
+                const sanitizedTitle = sanitizeFileName(title);
+                
+                // البحث عن الملف الذي يبدأ بالعنوان المنظف
+                let finalFile = null;
                 
                 for (const file of files) {
                     const filePath = path.join(finalOutputPath, file);
                     const fileStats = await fs.stat(filePath);
                     
-                    if (fileStats.isFile() && fileStats.mtimeMs > newestMtime) {
-                        newestFile = filePath;
-                        newestMtime = fileStats.mtimeMs;
+                    if (fileStats.isFile()) {
+                        // التحقق مما إذا كان اسم الملف يبدأ بالعنوان المنظف
+                        const fileNameWithoutExt = path.basename(file, path.extname(file));
+                        if (fileNameWithoutExt === sanitizedTitle) {
+                            finalFile = filePath;
+                            break;
+                        }
                     }
                 }
                 
-                if (!newestFile) {
-                    throw new Error('No downloaded file found in temp directory');
+                if (!finalFile) {
+                    throw new Error(`No downloaded file found matching title: ${sanitizedTitle}`);
                 }
                 
-                tempFilePath = newestFile;
+                tempFilePath = finalFile;
             } else {
                 // المسار هو ملف - استخدامه مباشرة (للتوافق مع الحالة القديمة)
                 tempFilePath = finalOutputPath;

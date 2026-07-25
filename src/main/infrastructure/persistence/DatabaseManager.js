@@ -24,9 +24,10 @@ const SettingsRepository = require('./repositories/SettingsRepository');
  * No ADB logic. No runtime logic. No business logic.
  */
 class DatabaseManager {
-    constructor({ databasePath } = {}) {
-        this._appRoot = process.cwd();
-        this._databasePath = sanitizePath(this._appRoot, databasePath) || path.join(this._appRoot, 'data', 'linkhub.db');
+    constructor({ databasePath, pathService } = {}) {
+        this._pathService = pathService;
+        this._appRoot = this._pathService ? this._pathService.getAppRoot() : process.cwd();
+        this._databasePath = databasePath || (this._pathService ? this._pathService.getDatabasePath() : path.join(this._appRoot, 'data', 'linkhub.db'));
         this._db = null;
         this._initialized = false;
         this._deviceRepository = null;
@@ -57,8 +58,14 @@ class DatabaseManager {
      */
     async _ensureDirectory() {
         const directory = path.dirname(this._databasePath);
-        if (!fs.existsSync(directory)) {
-            fs.mkdirSync(directory, { recursive: true });
+        try {
+            await fs.promises.access(directory);
+        } catch (error) {
+            if (error.code === 'ENOENT') {
+                await fs.promises.mkdir(directory, { recursive: true });
+            } else {
+                throw error;
+            }
         }
     }
 

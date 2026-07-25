@@ -20,6 +20,7 @@ const DeviceOrchestrator = require('../application/orchestrators/DeviceOrchestra
 const DownloadOrchestrator = require('../application/orchestrators/DownloadOrchestrator');
 const FileTransferService = require('../application/services/FileTransferService');
 const ToolPathResolver = require('../infrastructure/tools/ToolPathResolver');
+const PathService = require('../infrastructure/path/PathService');
 const DeviceEventHandler = require('../application/handlers/DeviceEventHandler');
 
 class BootstrapContainer {
@@ -35,8 +36,15 @@ class BootstrapContainer {
             return this;
         }
 
+        // Initialize PathService first
+        const pathService = new PathService({
+            logger: errorCentralService
+        });
+
         // تهيئة الـ logger أولاً (هام جداً)
-        errorCentralService.init();
+        errorCentralService.init({
+            pathService: pathService
+        });
 
         const processRegistry = new ProcessRegistry();
         const processSupervisor = new ProcessSupervisor({
@@ -45,11 +53,14 @@ class BootstrapContainer {
             logger: errorCentralService
         });
 
-        const databaseManager = new DatabaseManager();
+        const databaseManager = new DatabaseManager({
+            pathService: pathService
+        });
         const deviceRegistry = new DeviceRegistry({ deviceRepository: null }); // Will be set after DB init
 
         const toolPathResolver = new ToolPathResolver({
-            logger: errorCentralService
+            logger: errorCentralService,
+            appRoot: pathService.getAppRoot()
         });
 
         const adbCommandExecutor = new AdbCommandExecutor({
@@ -80,7 +91,8 @@ class BootstrapContainer {
         const ytdlpAdapter = new YtdlpAdapter({
             processSupervisor,
             logger: errorCentralService,
-            toolPathResolver: toolPathResolver
+            toolPathResolver: toolPathResolver,
+            pathService: pathService
         });
 
         const deviceOrchestrator = new DeviceOrchestrator({
@@ -98,6 +110,7 @@ class BootstrapContainer {
 
         const downloadOrchestrator = new DownloadOrchestrator({
             ytdlpAdapter,
+            downloadManager: ytdlpAdapter._downloadManager,
             deviceRegistry,
             fileTransferService,
             logger: errorCentralService
@@ -106,6 +119,7 @@ class BootstrapContainer {
 
         // ==================== تسجيل الخدمات ====================
         this._services.set('errorCentralService', errorCentralService);
+        this._services.set('pathService', pathService);
         this._services.set('processManager', ProcessManager);
         this._services.set('processRegistry', processRegistry);
         this._services.set('processSupervisor', processSupervisor);
@@ -186,20 +200,16 @@ class BootstrapContainer {
             deviceOrchestrator._deviceRepository = deviceRepository;
         }
 
-        // Update DownloadOrchestrator with repository
-        const downloadOrchestrator = this._services.get('downloadOrchestrator');
-        if (downloadOrchestrator) {
-            downloadOrchestrator._downloadRepository = downloadRepository;
-        }
-
         // ==================== تهيئة DownloadSyncService ====================
         // خدمة مزامنة دورية مستقلة للتحميلات بين الذاكرة وقاعدة البيانات
         // تقرأ الذاكرة كل 300ms وتكتب التغييرات فقط إلى قاعدة البيانات
         const ytdlpAdapter = this._services.get('ytdlpAdapter');
+        const pathService = this._services.get('pathService');
         const downloadSyncService = new DownloadSyncService(
             ytdlpAdapter._downloadManager,
             downloadRepository,
-            errorCentralService
+            errorCentralService,
+            pathService
         );
         downloadSyncService.start();
         this._services.set('downloadSyncService', downloadSyncService);

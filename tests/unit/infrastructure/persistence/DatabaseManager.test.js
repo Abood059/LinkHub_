@@ -1,6 +1,7 @@
 'use strict';
 
 const DatabaseManager = require('../../../../src/main/infrastructure/persistence/DatabaseManager');
+const PathService = require('../../../../src/main/infrastructure/path/PathService');
 
 // Mock fs/promises for complete isolation
 jest.mock('fs/promises');
@@ -12,13 +13,17 @@ describe('DatabaseManager', () => {
     let virtualFileSystem;
     let consoleLogSpy;
     let consoleErrorSpy;
+    let pathService;
 
     beforeEach(() => {
         // Reset all mocks
         jest.clearAllMocks();
 
-        // Mock process.cwd() to return /test so /test/data is within appRoot
-        jest.spyOn(process, 'cwd').mockReturnValue('/test');
+        // Create PathService instance with mocked appRoot
+        pathService = new PathService({
+            appRoot: '/test',
+            userData: '/test/data'
+        });
 
         // Create virtual file system state
         virtualFileSystem = {
@@ -60,9 +65,10 @@ describe('DatabaseManager', () => {
         consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
         consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
 
-        // Create fresh DatabaseManager instance with custom path for testing
+        // Create fresh DatabaseManager instance with pathService for testing
         dbManager = new DatabaseManager({
-            databasePath: '/test/data/devices.json'
+            databasePath: '/test/data/devices.json',
+            pathService: pathService
         });
     });
 

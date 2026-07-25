@@ -141,6 +141,36 @@ class DownloadStateManager {
     }
 
     /**
+     * الحصول على جميع التحميلات من الذاكرة بتنسيق قاعدة البيانات (snake_case)
+     * هذه الدالة تُستخدم كبديل لـ findAllDownloads() من DownloadRepository
+     * @returns {Array} قائمة جميع التحميلات بتنسيق مطابق لقاعدة البيانات
+     */
+    getAllDownloads() {
+        const result = [];
+        for (const [id, entry] of this._activeDownloads.entries()) {
+            result.push({
+                id,
+                url: entry.url,
+                format_id: entry.formatId,
+                output_path: entry.outputPath,
+                device_id: entry.deviceId,
+                title: entry.title,
+                status: entry.status,
+                total_size: entry.totalSize,
+                downloaded_bytes: entry.downloadedBytes,
+                percent: entry.percent,
+                speed: entry.speed,
+                eta: entry.eta,
+                retry_count: entry.retryCount,
+                completed_at: entry.completedAt,
+                failed_at: entry.failedAt
+            });
+        }
+        // ترتيب تنازلي حسب المعرف (محاكاة ORDER BY created_at DESC)
+        return result.sort((a, b) => b.id.localeCompare(a.id));
+    }
+
+    /**
      * Restore downloads from repository into memory
      * @param {Array} downloadsArray - Array of download objects from database
      */

@@ -56,6 +56,69 @@
     display: inline-block;
 }
 
+/* تحسينات الأزرار العصرية */
+.btn-modern {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-modern:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.btn-modern:active {
+    transform: translateY(0);
+}
+
+.btn-modern:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* تأثيرات الأزرار المخصصة */
+.btn-stop-download {
+    transition: all 0.2s ease;
+}
+
+.btn-stop-download:hover:not(:disabled) {
+    transform: scale(1.05);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.btn-stop-download:active:not(:disabled) {
+    transform: scale(0.98);
+}
+
+.btn-delete-download {
+    transition: all 0.2s ease;
+}
+
+.btn-delete-download:hover:not(:disabled) {
+    transform: scale(1.05);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    background-color: #616161 !important;
+}
+
+.btn-delete-download:active:not(:disabled) {
+    transform: scale(0.98);
+}
+
+.btn-transfer-device {
+    transition: all 0.2s ease;
+}
+
+.btn-transfer-device:hover:not(:disabled) {
+    transform: scale(1.05);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.btn-transfer-device:active:not(:disabled) {
+    transform: scale(0.98);
+}
+
 /* جدول التحميلات المصغر في الصفحة الرئيسية */
 .recent-downloads-section {
     margin-top: 32px;

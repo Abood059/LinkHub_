@@ -44,3 +44,7 @@ export async function loadDownloadHistory() {
         throw error;
     }
 }
+
+export async function deleteDownloadFromMemory(processId) {
+    return await linkhub.downloads.deleteFromMemory(processId);
+}

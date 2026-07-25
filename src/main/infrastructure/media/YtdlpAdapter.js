@@ -24,12 +24,14 @@ class YtdlpAdapter extends EventEmitter {
         processSupervisor,
         ytdlpPath = null,
         toolPathResolver = null,
-        logger = null
+        logger = null,
+        pathService = null
     }) {
         super();
         this._processSupervisor = processSupervisor;
         this._logger = logger;
         this._toolPathResolver = toolPathResolver;
+        this._pathService = pathService;
         this._ytdlpPath = this._resolveYtdlpPath(ytdlpPath);
         this._windowManager = null;
 
@@ -119,7 +121,7 @@ class YtdlpAdapter extends EventEmitter {
         // إنشاء مجلد مؤقت داخل المشروع إذا لم يتم تمرير مسار مخصص
         // استخدام المجلد فقط (بدون قالب) لضمان الاستئناف الصحيح
         if (!finalOutputPath) {
-            const tempDir = await createTempDirectory();
+            const tempDir = await createTempDirectory(this._pathService);
             finalOutputPath = tempDir;
         }
         const denoPath = this._toolPathResolver ? this._toolPathResolver.getDenoPath() : null;
@@ -404,6 +406,41 @@ class YtdlpAdapter extends EventEmitter {
      */
     getActiveDownloads() {
         return this._downloadManager.getActiveDownloads();
+    }
+
+    /**
+     * حذف إدخال التحميل من الذاكرة فقط
+     * @param {string} processId - معرف العملية
+     * @returns {Object} كائن نتيجة يوضح حالة الحذف
+     */
+    removeDownloadEntry(processId) {
+        // التحقق من صحة processId
+        if (!processId) {
+            if (this._logger) {
+                this._logger.warn('removeDownloadEntry: Invalid processId (null or empty)');
+            }
+            return { success: false, reason: 'invalid_processId' };
+        }
+
+        // التحقق من وجود الإدخال في الذاكرة
+        const entry = this._downloadManager.getDownloadEntry(processId);
+        if (!entry) {
+            if (this._logger) {
+                this._logger.warn(`removeDownloadEntry: Entry not found for processId: ${processId}`);
+            }
+            return { success: false, reason: 'entry_not_found', processId };
+        }
+
+        // إيقاف العملية إذا كانت قيد التشغيل
+        const isProcessAlive = this._processSupervisor.hasProcess(processId);
+        if (isProcessAlive) {
+            this._processSupervisor.stopManagedProcess(processId);
+        }
+
+        // حذف الإدخال من الذاكرة
+        this._downloadManager.removeDownloadEntry(processId);
+
+        return { success: true, processId };
     }
 }
 

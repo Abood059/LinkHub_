@@ -1,7 +1,7 @@
 // downloadManager.js - إدارة جدول التحميلات
 import { escapeHtml } from '../core/utils.js';
 import { showToast } from '../core/utils.js';
-import { stopDownload, resumeDownload, deleteDownload } from '../services/downloadService.js';
+import { stopDownload, resumeDownload, deleteDownload, deleteDownloadFromMemory } from '../services/downloadService.js';
 
 let downloadsTbody = null;
 let recentDownloadsTbody = null;
@@ -180,11 +180,14 @@ export function addDownloadRow(downloadId, fileName, targetDeviceName, url, form
         deleteBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
             const dlId = deleteBtn.getAttribute('data-download-id');
-            if (confirm('هل تريد حذف هذا التحميل من السجل؟')) {
+            if (confirm('هل تريد حذف هذا التحميل من الذاكرة؟')) {
                 try {
-                    await deleteDownload(dlId);
+                    await deleteDownloadFromMemory(dlId);
                     row.remove();
-                    showToast('تم حذف التحميل من السجل');
+                    // إزالة الصف من الجدول المصغر أيضاً
+                    const recentRow = recentDownloadsTbody?.querySelector(`tr[data-download-id="${dlId}"]`);
+                    if (recentRow) recentRow.remove();
+                    showToast('تم حذف التحميل من الذاكرة');
                 } catch (err) {
                     showToast(`فشل الحذف: ${err.message}`, true);
                 }
@@ -229,6 +232,7 @@ function addRecentDownloadRow(downloadId, fileName, targetDeviceName, url, forma
         <td class="download-speed">--</td>
         <td>
             <button class="btn-stop-download" data-url="${escapeHtml(url)}" data-download-id="${downloadId}" data-status="active" style="background: #D32F2F; border: none; color: white; padding: 4px 12px; border-radius: 20px; cursor: pointer; font-size: 0.7rem;">إيقاف</button>
+            <button class="btn-delete-download" data-download-id="${downloadId}" style="background: #757575; border: none; color: white; padding: 4px 12px; border-radius: 20px; cursor: pointer; font-size: 0.7rem; margin-right: 4px; display: none;">حذف</button>
         </td>
     `;
     
@@ -302,6 +306,26 @@ function addRecentDownloadRow(downloadId, fileName, targetDeviceName, url, forma
                 } else {
                     console.error('[downloadManager] Missing data for resume:', { targetUrl, targetFormatId, targetDownloadId, rowAttributes: Array.from(row.attributes).map(a => ({name: a.name, value: a.value})) });
                     showToast('لا يمكن استئناف التحميل - بيانات غير كافية', true);
+                }
+            }
+        });
+    }
+
+    const deleteBtn = row.querySelector('.btn-delete-download');
+    if (deleteBtn) {
+        deleteBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const dlId = deleteBtn.getAttribute('data-download-id');
+            if (confirm('هل تريد حذف هذا التحميل من الذاكرة؟')) {
+                try {
+                    await deleteDownloadFromMemory(dlId);
+                    row.remove();
+                    // إزالة الصف من الجدول الرئيسي أيضاً
+                    const mainRow = downloadsTbody?.querySelector(`tr[data-download-id="${dlId}"]`);
+                    if (mainRow) mainRow.remove();
+                    showToast('تم حذف التحميل من الذاكرة');
+                } catch (err) {
+                    showToast(`فشل الحذف: ${err.message}`, true);
                 }
             }
         });
@@ -419,6 +443,15 @@ export function markDownloadComplete(downloadId) {
     if (deleteBtn) {
         deleteBtn.style.display = 'inline-block';
     }
+
+    // تحديث زر الحذف في الجدول المصغر أيضاً
+    const recentRow = recentDownloadsTbody?.querySelector(`tr[data-download-id="${downloadId}"]`);
+    if (recentRow) {
+        const recentDeleteBtn = recentRow.querySelector('.btn-delete-download');
+        if (recentDeleteBtn) {
+            recentDeleteBtn.style.display = 'inline-block';
+        }
+    }
 }
 
 export function markDownloadStopped(downloadId, data = null) {
@@ -443,6 +476,21 @@ export function markDownloadStopped(downloadId, data = null) {
     
     // تحديث حالة الزر باستخدام الحالة المحلية الموحدة
     updateButtonState(downloadId, 'stopped', false);
+    
+    // إظهار زر الحذف في الجدول الرئيسي
+    const deleteBtn = row.querySelector('.btn-delete-download');
+    if (deleteBtn) {
+        deleteBtn.style.display = 'inline-block';
+    }
+
+    // تحديث زر الحذف في الجدول المصغر أيضاً
+    const recentRow = recentDownloadsTbody?.querySelector(`tr[data-download-id="${downloadId}"]`);
+    if (recentRow) {
+        const recentDeleteBtn = recentRow.querySelector('.btn-delete-download');
+        if (recentDeleteBtn) {
+            recentDeleteBtn.style.display = 'inline-block';
+        }
+    }
     
     // تحديث الجدول المصغر أيضاً
     updateRecentDownloadStopped(downloadId, data);
