@@ -18,6 +18,17 @@ function sanitizeFileName(fileName) {
 }
 
 /**
+ * تنسيق البايتات إلى وحدة مقروءة
+ */
+function formatBytes(bytes) {
+    if (bytes === 0) return '0B';
+    const k = 1024;
+    const sizes = ['B', 'KiB', 'MiB', 'GiB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + sizes[i];
+}
+
+/**
  * حساب الحجم الكلي للتحميل المركب
  */
 function calculateTotalSize(formatId, formatsData) {
@@ -53,61 +64,92 @@ function calculateTotalSize(formatId, formatsData) {
 }
 
 /**
- * تعديل نسبة التقدم للتحميلات المركبة
+ * تعديل نسبة التقدم للتحميلات المركبة (فيديو+صوت متتابعان عبر aria2c)
+ *
+ * aria2c يبلّغ عن كل ملف على حدة، لذلك نجمّع:
+ *   completedBytes (ملفات انتهت) + downloadedBytes للملف الحالي
+ *
+ * إشارات انتقال الملف التالي من المخرجات الفعلية:
+ *   1) سطر yt-dlp: [download] 100% of X.XXiB ...
+ *   2) تغيّر معرّف aria2c (GID) بين [#c817a5 ...] و [#99fd6f ...]
  */
 function adjustProgressForCombinedDownload(currentPercent, currentSize, entry, progressData) {
-    if (!entry.hasSizeInfo) {
-        // إذا لم يتوفر حجم، ثبت عند 99% حتى الانتهاء
-        return {
-            percent: currentPercent > 0 ? Math.min(currentPercent, 99) : 0,
-            size: currentSize
-        };
+    if (!entry.hasSizeInfo || !entry.totalSize) {
+        return { percent: currentPercent, size: currentSize };
     }
-    
-    // تحليل حجم التحميل الحالي
-    const sizeMatch = currentSize ? currentSize.match(/(\d+)\/(\d+)/) : null;
-    if (sizeMatch) {
-        const downloaded = parseInt(sizeMatch[1]) || 0;
-        const total = parseInt(sizeMatch[2]) || 0;
-        
-        // تحديث إجمالي البايتات المحملة
-        if (entry.currentFileIndex === 0) {
-            entry.downloadedBytes = downloaded;
-        } else {
-            entry.downloadedBytes += downloaded;
+
+    if (entry.completedBytes == null) entry.completedBytes = 0;
+    if (entry.lastFileDownloadedBytes == null) entry.lastFileDownloadedBytes = 0;
+    if (entry.lastFileTotalBytes == null) entry.lastFileTotalBytes = 0;
+
+    const toDisplay = (downloaded) => ({
+        percent: Math.min((downloaded / entry.totalSize) * 100, 100),
+        size: `${formatBytes(downloaded)}/${formatBytes(entry.totalSize)}`
+    });
+
+    // اكتمال ملف من ملخص yt-dlp — أضف حجمه للملفات المكتملة
+    if (progressData.fileComplete && progressData.totalBytes > 0) {
+        entry.completedBytes += progressData.totalBytes;
+        entry.lastAriaGid = null;
+        entry.lastFileDownloadedBytes = 0;
+        entry.lastFileTotalBytes = 0;
+        entry.currentFileIndex = (entry.currentFileIndex || 0) + 1;
+        entry.downloadedBytes = entry.completedBytes;
+        entry.lastPercent = 100;
+        return toDisplay(entry.downloadedBytes);
+    }
+
+    const hasByteProgress = progressData.downloadedBytes != null
+        && progressData.totalBytes > 0;
+
+    if (hasByteProgress) {
+        const gid = progressData.gid || null;
+
+        // ملف جديد عبر تغيّر GID (fallback إذا فاتنا سطر 100%)
+        if (gid && entry.lastAriaGid && gid !== entry.lastAriaGid) {
+            const finishedBytes = entry.lastFileTotalBytes || entry.lastFileDownloadedBytes || 0;
+            entry.completedBytes += finishedBytes;
+            entry.currentFileIndex = (entry.currentFileIndex || 0) + 1;
         }
-        
-        // حساب النسبة الكلية
-        const totalPercent = (entry.downloadedBytes / entry.totalSize) * 100;
-        
-        // تحديث حجم العرض
-        const displaySize = `${entry.downloadedBytes}/${entry.totalSize}`;
-        
-        return {
-            percent: Math.min(totalPercent, 100),
-            size: displaySize
-        };
+
+        if (gid) entry.lastAriaGid = gid;
+        entry.lastFileDownloadedBytes = progressData.downloadedBytes;
+        entry.lastFileTotalBytes = progressData.totalBytes;
+        entry.lastPercent = currentPercent;
+
+        entry.downloadedBytes = entry.completedBytes + progressData.downloadedBytes;
+        return toDisplay(entry.downloadedBytes);
     }
-    
-    // إذا لم نتمكن من تحليل الحجم، استخدم النسبة المباشرة مع تعديل
-    if (entry.currentFileIndex === 0) {
-        return {
-            percent: currentPercent / 2,
-            size: currentSize
-        };
-    } else {
-        return {
-            percent: 50 + (currentPercent / 2),
-            size: currentSize
-        };
+
+    // fallback أخير: تقدير بالنسب عند غياب البايتات
+    if (!entry.currentFileIndex) entry.currentFileIndex = 0;
+
+    if (entry.lastPercent && currentPercent < entry.lastPercent - 10) {
+        entry.currentFileIndex++;
     }
+    entry.lastPercent = currentPercent;
+
+    const fileCount = 2;
+    const totalPercent = (entry.currentFileIndex * (100 / fileCount)) + (currentPercent / fileCount);
+    entry.downloadedBytes = Math.floor((Math.min(totalPercent, 100) / 100) * entry.totalSize);
+
+    return {
+        percent: Math.min(totalPercent, 100),
+        size: `${formatBytes(entry.downloadedBytes)}/${formatBytes(entry.totalSize)}`
+    };
 }
 
 /**
  * إنشاء مجلد مؤقت للتحميلات
  */
 async function createTempDirectory(pathService = null) {
-    const tempDir = path.join(process.cwd(), 'temp', 'downloads');
+    let tempDir;
+    if (pathService && typeof pathService.getDownloadsTempDir === 'function') {
+        tempDir = pathService.getDownloadsTempDir();
+    } else {
+        // Fallback to process.cwd() if pathService is not available
+        tempDir = path.join(process.cwd(), 'temp', 'downloads');
+    }
     try {
         await fs.mkdir(tempDir, { recursive: true });
         return tempDir;
@@ -118,12 +160,14 @@ async function createTempDirectory(pathService = null) {
 
 /**
  * الحصول على قالب التقدم المتوافق بصيغة JSON الموحدة
+ * يستخدم متغيرات yt-dlp الصحيحة لاستخراج بيانات الحجم الفعلي
  */
 function getProgressTemplate() {
     return JSON.stringify({
         progress: '%(progress._percent_str)s',
         speed: '%(speed)s',
-        size: '%(downloaded_bytes)s/%(total_bytes)s',
+        downloaded_bytes: '%(downloaded_bytes)s',
+        total_bytes: '%(total_bytes)s',
         eta: '%(eta)s',
         elapsed: '%(elapsed)s'
     });
@@ -173,5 +217,6 @@ module.exports = {
     adjustProgressForCombinedDownload,
     createTempDirectory,
     getProgressTemplate,
-    moveDownloadedFile
+    moveDownloadedFile,
+    formatBytes
 };

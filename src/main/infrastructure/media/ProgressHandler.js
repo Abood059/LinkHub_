@@ -6,6 +6,7 @@ const YtdlpResponseParser = require('./YtdlpResponseParser');
 
 /**
  * فئة مسؤولة عن معالجة بيانات التقدم من البث وحساب النسب المئوية
+ * القيم تُحسب في الخلفية فقط — الواجهة للعرض.
  */
 class ProgressHandler {
     constructor() {
@@ -18,23 +19,19 @@ class ProgressHandler {
     handleProgressData(chunk, streamType, entry, onProgress, formatId) {
         if (!entry) return;
 
-        // تحويل المدخلات القادمة إلى نص
         const text = typeof chunk === 'string' ? chunk : chunk.toString();
 
-        // تجميع أخطاء النظام فقط إذا كان البث قادماً من stderr
         if (streamType === 'stderr') {
             entry.stderrBuffer += text;
         }
 
-        // معالجة السطر
         const progressData = this._responseParser.parseProgressLine(text);
 
         if (progressData) {
             let percent = progressData.percent;
             let size = progressData.size;
 
-            // تعديل النسبة والحجم للتحميلات المركبة
-            if (formatId.includes('+')) {
+            if (formatId && formatId.includes('+')) {
                 const adjustedProgress = adjustProgressForCombinedDownload(
                     percent,
                     size,
@@ -43,21 +40,25 @@ class ProgressHandler {
                 );
                 percent = adjustedProgress.percent;
                 size = adjustedProgress.size;
+            } else {
+                if (progressData.fileComplete) {
+                    percent = 100;
+                    if (progressData.totalBytes > 0) {
+                        entry.downloadedBytes = progressData.totalBytes;
+                    }
+                } else if (progressData.downloadedBytes != null) {
+                    entry.downloadedBytes = progressData.downloadedBytes;
+                } else if (entry.totalSize && percent) {
+                    entry.downloadedBytes = Math.floor((percent / 100) * entry.totalSize);
+                }
             }
 
-            // تحديث downloadedBytes بناءً على النسبة المئوية والحجم الكلي
-            if (entry.totalSize && percent) {
-                entry.downloadedBytes = Math.floor((percent / 100) * entry.totalSize);
-            }
-
-            // تحديث بيانات التقدم في الذاكرة
             entry.percent = percent;
             entry.speed = progressData.speed;
             entry.size = size;
             entry.eta = progressData.eta;
             entry.elapsed = progressData.elapsed;
 
-            // تحديث الواجهة عبر دالة التغذية الراجعة
             if (onProgress) {
                 onProgress({
                     percent,

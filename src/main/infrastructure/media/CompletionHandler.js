@@ -19,7 +19,13 @@ class CompletionHandler {
     async handleDownloadSuccess(entry, processId, finalOutputPath, deviceId, url, title) {
         if (!entry) return;
 
+        // اكتمال التحميل يُحدد بخروج العملية بنجاح (exit 0) + وجود الملف لاحقاً.
+        // نسبة التقدم مقياس عرض من الخلفية وليست شرط إكمال.
         entry.status = 'completed';
+        entry.percent = 100;
+        if (entry.totalSize && entry.downloadedBytes < entry.totalSize) {
+            entry.downloadedBytes = entry.totalSize;
+        }
         entry.completedAt = new Date().toISOString();
 
         try {
@@ -46,10 +52,43 @@ class CompletionHandler {
                     if (fileStats.isFile()) {
                         // التحقق مما إذا كان اسم الملف يبدأ بالعنوان المنظف
                         const fileNameWithoutExt = path.basename(file, path.extname(file));
-                        if (fileNameWithoutExt === sanitizedTitle) {
+                        // تطبيع اسم الملف الفعلي لاستبدال المسافات بـ underscores مثل sanitizeFileName
+                        const normalizedFileName = fileNameWithoutExt.replace(/\s+/g, '_');
+                        // استخدام مطابقة جزئية للتعامل مع الأحرف الخاصة والاختلافات في التنسيق
+                        if (normalizedFileName === sanitizedTitle || 
+                            normalizedFileName.includes(sanitizedTitle) ||
+                            sanitizedTitle.includes(normalizedFileName)) {
                             finalFile = filePath;
                             break;
                         }
+                    }
+                }
+                
+                // إذا لم يتم العثور على الملف في المجلد المحدد، ابحث في المجلد الأب
+                // yt-dlp قد يضع الملف المدموج في المجلد الأب عند الدمج
+                if (!finalFile) {
+                    const parentDir = path.dirname(finalOutputPath);
+                    try {
+                        const parentFiles = await fs.readdir(parentDir);
+                        for (const file of parentFiles) {
+                            const filePath = path.join(parentDir, file);
+                            const fileStats = await fs.stat(filePath);
+                            
+                            if (fileStats.isFile()) {
+                                const fileNameWithoutExt = path.basename(file, path.extname(file));
+                                // تطبيع اسم الملف الفعلي لاستبدال المسافات بـ underscores مثل sanitizeFileName
+                                const normalizedFileName = fileNameWithoutExt.replace(/\s+/g, '_');
+                                // استخدام مطابقة جزئية للتعامل مع الأحرف الخاصة والاختلافات في التنسيق
+                                if (normalizedFileName === sanitizedTitle || 
+                                    normalizedFileName.includes(sanitizedTitle) ||
+                                    sanitizedTitle.includes(normalizedFileName)) {
+                                    finalFile = filePath;
+                                    break;
+                                }
+                            }
+                        }
+                    } catch (err) {
+                        // تجاهل الأخطاء عند البحث في المجلد الأب
                     }
                 }
                 

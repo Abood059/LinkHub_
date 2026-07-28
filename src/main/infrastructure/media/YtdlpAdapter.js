@@ -36,7 +36,7 @@ class YtdlpAdapter extends EventEmitter {
         this._windowManager = null;
 
         // Initialize helper modules
-        this._commandBuilder = new YtdlpCommandBuilder();
+        this._commandBuilder = new YtdlpCommandBuilder(this._pathService);
         this._responseParser = new YtdlpResponseParser();
         this._downloadManager = new DownloadManager({ logger });
 
@@ -135,6 +135,27 @@ class YtdlpAdapter extends EventEmitter {
         let lineBuffer = '';
         let downloadProcess = null;
 
+        const flushProgressLines = (streamType, flushRemainder = false) => {
+            // تطبيع \r و \r\n إلى \n — مع --newline تصل أسطر كاملة بـ \n
+            const normalized = lineBuffer.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            const lines = normalized.split('\n');
+
+            if (flushRemainder) {
+                lineBuffer = '';
+                for (const line of lines) {
+                    if (line.trim()) {
+                        this._downloadManager.handleProgressData(line, streamType, processId, onProgress, formatId);
+                    }
+                }
+                return;
+            }
+
+            lineBuffer = lines.pop() || '';
+            for (const line of lines) {
+                this._downloadManager.handleProgressData(line, streamType, processId, onProgress, formatId);
+            }
+        };
+
         try {
             // الخطوة 1: بدء العملية أولاً (قبل إنشاء الإدخال في الذاكرة)
             // هذا يضمن ذرية العملية: إما نجاح كامل أو فشل كامل
@@ -146,20 +167,8 @@ class YtdlpAdapter extends EventEmitter {
                 metadata: { url, formatId, outputPath: finalOutputPath, deviceId },
                 onData: (chunk, streamType) => {
                     const text = typeof chunk === 'string' ? chunk : chunk.toString();
-
-                    // دمج النص الجديد مع المتبقي من المرة السابقة لمعالجته بشكل آمن
                     lineBuffer += text;
-
-                    // تقسيم البث الحي إلى أسطر بناءً على رمز السطر الجديد
-                    const lines = lineBuffer.split('\n');
-
-                    // إخراج السطر الأخير والاحتفاظ به مؤقتاً لأنه قد يكون غير مكتمل
-                    lineBuffer = lines.pop();
-
-                    // معالجة الأسطر المكتملة فقط
-                    for (const line of lines) {
-                        this._downloadManager.handleProgressData(line, streamType, processId, onProgress, formatId);
-                    }
+                    flushProgressLines(streamType, false);
                 }
             });
 
@@ -209,6 +218,11 @@ class YtdlpAdapter extends EventEmitter {
                 // تسجيل معالجات انتهاء العملية
                 if (downloadProcess && downloadProcess.once) {
                     downloadProcess.once('exit', async (code) => {
+                        // تفريغ أي سطر تقدم متبقٍ في الـ buffer قبل تقييم الإكمال
+                        if (lineBuffer.trim()) {
+                            flushProgressLines('stdout', true);
+                        }
+
                         const entry = this._downloadManager.getDownloadEntry(processId);
                         if (!entry) return;
 
