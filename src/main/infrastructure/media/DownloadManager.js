@@ -112,12 +112,12 @@ class DownloadManager extends EventEmitter {
     /**
      * معالجة اكتمال التحميل بنجاح
      */
-    async handleDownloadSuccess(processId, finalOutputPath, deviceId, url, title) {
+    async handleDownloadSuccess(processId, finalOutputPath, deviceId, url, title, actualFilename = null) {
         const entry = this._stateManager.getDownloadEntry(processId);
         if (!entry) return;
 
         await this._completionHandler.handleDownloadSuccess(
-            entry, processId, finalOutputPath, deviceId, url, title
+            entry, processId, finalOutputPath, deviceId, url, title, actualFilename
         );
     }
 

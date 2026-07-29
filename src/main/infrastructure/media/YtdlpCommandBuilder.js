@@ -62,6 +62,7 @@ class YtdlpCommandBuilder {
                 '-o', outputTemplate,
                 '--newline',
                 '--continue',
+                '--print', 'filename',
                 url
               ]
             : [
@@ -72,6 +73,7 @@ class YtdlpCommandBuilder {
                 '-o', outputTemplate,
                 '--newline',
                 '--continue',
+                '--print', 'filename',
                 url
               ];
 

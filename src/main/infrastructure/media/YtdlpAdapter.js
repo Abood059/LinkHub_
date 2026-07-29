@@ -134,6 +134,7 @@ class YtdlpAdapter extends EventEmitter {
 
         let lineBuffer = '';
         let downloadProcess = null;
+        let actualFilename = null; // لتخزين اسم الملف الفعلي من --print filename
 
         const flushProgressLines = (streamType, flushRemainder = false) => {
             // تطبيع \r و \r\n إلى \n — مع --newline تصل أسطر كاملة بـ \n
@@ -144,6 +145,12 @@ class YtdlpAdapter extends EventEmitter {
                 lineBuffer = '';
                 for (const line of lines) {
                     if (line.trim()) {
+                        // التحقق مما إذا كان السطر يحتوي على اسم الملف من --print filename
+                        // --print filename يطبع المسار الكامل للملف النهائي
+                        if (line.trim() && !line.includes('[download]') && !line.includes('[#') && !line.includes('{')) {
+                            // هذا السطر قد يكون اسم الملف
+                            actualFilename = line.trim();
+                        }
                         this._downloadManager.handleProgressData(line, streamType, processId, onProgress, formatId);
                     }
                 }
@@ -152,6 +159,9 @@ class YtdlpAdapter extends EventEmitter {
 
             lineBuffer = lines.pop() || '';
             for (const line of lines) {
+                if (line.trim() && !line.includes('[download]') && !line.includes('[#') && !line.includes('{')) {
+                    actualFilename = line.trim();
+                }
                 this._downloadManager.handleProgressData(line, streamType, processId, onProgress, formatId);
             }
         };
@@ -234,7 +244,7 @@ class YtdlpAdapter extends EventEmitter {
                         }
 
                         if (code === 0) {
-                            await this._downloadManager.handleDownloadSuccess(processId, finalOutputPath, deviceId, url, title);
+                            await this._downloadManager.handleDownloadSuccess(processId, finalOutputPath, deviceId, url, title, actualFilename);
                             this._downloadManager.updateDownloadStatus(processId, 'completed');
                             // الاحتفاظ بالإدخال في الذاكرة مع الحالة completed
                         } else {
