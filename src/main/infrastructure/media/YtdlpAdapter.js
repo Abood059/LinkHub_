@@ -124,13 +124,12 @@ class YtdlpAdapter extends EventEmitter {
             const tempDir = await createTempDirectory(this._pathService);
             finalOutputPath = tempDir;
         }
-        const denoPath = this._toolPathResolver ? this._toolPathResolver.getDenoPath() : null;
 
         // حساب الحجم الكلي للتحميل المركب
         let { totalSize, hasSizeInfo } = calculateTotalSize(formatId, formatsData);
 
         // بناء أمر التحميل
-        const command = this._commandBuilder.buildDownloadCommand(url, formatId, finalOutputPath, denoPath);
+        const command = this._commandBuilder.buildDownloadCommand(url, formatId, finalOutputPath);
 
         let lineBuffer = '';
         let downloadProcess = null;
@@ -145,11 +144,18 @@ class YtdlpAdapter extends EventEmitter {
                 lineBuffer = '';
                 for (const line of lines) {
                     if (line.trim()) {
-                        // التحقق مما إذا كان السطر يحتوي على اسم الملف من --print filename
+                        // استخراج اسم الملف من سطر [Merger] أو --print filename
+                        // [Merger] Merging formats into "/path/to/file.ext"
+                        const mergerMatch = line.match(/\[Merger\]\s+Merging formats into\s+"([^"]+)"/);
+                        if (mergerMatch) {
+                            actualFilename = mergerMatch[1];
+                        }
                         // --print filename يطبع المسار الكامل للملف النهائي
-                        if (line.trim() && !line.includes('[download]') && !line.includes('[#') && !line.includes('{')) {
-                            // هذا السطر قد يكون اسم الملف
-                            actualFilename = line.trim();
+                        else if (line.trim() && !line.includes('[download]') && !line.includes('[#') && !line.includes('{') && !line.includes('Deleting') && !line.includes('Merger')) {
+                            // التحقق من أن السطر يحتوي على مسار ملف صالح
+                            if (line.includes('/') || line.includes('\\')) {
+                                actualFilename = line.trim();
+                            }
                         }
                         this._downloadManager.handleProgressData(line, streamType, processId, onProgress, formatId);
                     }
@@ -159,8 +165,14 @@ class YtdlpAdapter extends EventEmitter {
 
             lineBuffer = lines.pop() || '';
             for (const line of lines) {
-                if (line.trim() && !line.includes('[download]') && !line.includes('[#') && !line.includes('{')) {
-                    actualFilename = line.trim();
+                const mergerMatch = line.match(/\[Merger\]\s+Merging formats into\s+"([^"]+)"/);
+                if (mergerMatch) {
+                    actualFilename = mergerMatch[1];
+                }
+                else if (line.trim() && !line.includes('[download]') && !line.includes('[#') && !line.includes('{') && !line.includes('Deleting') && !line.includes('Merger')) {
+                    if (line.includes('/') || line.includes('\\')) {
+                        actualFilename = line.trim();
+                    }
                 }
                 this._downloadManager.handleProgressData(line, streamType, processId, onProgress, formatId);
             }
@@ -175,6 +187,7 @@ class YtdlpAdapter extends EventEmitter {
                 args: command.args,
                 type: 'ytdlp-download',
                 metadata: { url, formatId, outputPath: finalOutputPath, deviceId },
+                cwd: command.outputPath, // تشغيل yt-dlp في مجلد التنزيلات
                 onData: (chunk, streamType) => {
                     const text = typeof chunk === 'string' ? chunk : chunk.toString();
                     lineBuffer += text;

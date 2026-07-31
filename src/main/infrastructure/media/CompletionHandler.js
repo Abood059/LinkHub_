@@ -21,7 +21,7 @@ class CompletionHandler {
 
         // اكتمال التحميل يُحدد بخروج العملية بنجاح (exit 0) + وجود الملف لاحقاً.
         // نسبة التقدم مقياس عرض من الخلفية وليست شرط إكمال.
-        entry.status = 'completed';
+        // ملاحظة: لا نحدد الحالة كـ completed هنا إلا بعد التأكد من وجود الملف
         entry.percent = 100;
         if (entry.totalSize && entry.downloadedBytes < entry.totalSize) {
             entry.downloadedBytes = entry.totalSize;
@@ -33,24 +33,30 @@ class CompletionHandler {
 
             // إذا تم توفير اسم الملف الفعلي من yt-dlp (--print filename)، استخدمه مباشرة
             if (actualFilename) {
-                // التحقق من وجود الملف
-                try {
-                    const fileStats = await fs.stat(actualFilename);
-                    if (fileStats.isFile()) {
-                        tempFilePath = actualFilename;
-                        if (this._logger) {
-                            this._logger.info(`Using actual filename from yt-dlp: ${actualFilename}`);
+                // التحقق من وجود الملف مع إعادة محاولة قصيرة للتعامل مع توقيت إنشاء الملف
+                let fileExists = false;
+                for (let i = 0; i < 5; i++) {
+                    try {
+                        const fileStats = await fs.stat(actualFilename);
+                        if (fileStats.isFile()) {
+                            tempFilePath = actualFilename;
+                            fileExists = true;
+                            if (this._logger) {
+                                this._logger.info(`Using actual filename from yt-dlp: ${actualFilename}`);
+                            }
+                            break;
                         }
-                    } else {
-                        if (this._logger) {
-                            this._logger.warn(`Actual filename exists but is not a file: ${actualFilename}`);
+                    } catch (err) {
+                        // الملف غير موجود بعد، انتظر قليلاً
+                        if (i < 4) {
+                            await new Promise(resolve => setTimeout(resolve, 100));
                         }
-                        // السقوط إلى منطق البحث
-                        tempFilePath = await this._findFileBySearch(finalOutputPath, title);
                     }
-                } catch (err) {
+                }
+
+                if (!fileExists) {
                     if (this._logger) {
-                        this._logger.warn(`Actual filename not found, falling back to search: ${actualFilename}`);
+                        this._logger.warn(`Actual filename not found after retries, falling back to search: ${actualFilename}`);
                     }
                     // السقوط إلى منطق البحث
                     tempFilePath = await this._findFileBySearch(finalOutputPath, title);
@@ -61,11 +67,16 @@ class CompletionHandler {
             }
 
             if (!tempFilePath) {
-                throw new Error(`No downloaded file found. yt-dlp may have failed to create the file.`);
+                // حالة خاصة: yt-dlp خرج بكود 0 لكن لم ينشئ ملف
+                // هذا يحدث عادةً عند فشل إعداد deno أو مشاكل أخرى
+                throw new Error(`No downloaded file found. yt-dlp exited with code 0 but failed to create the file. This may indicate a Deno runtime issue or download failure.`);
             }
 
             // نقل الملف إلى مجلد التنزيلات
             const { finalPath, tempPath } = await moveDownloadedFile(tempFilePath, title, deviceId);
+
+            // التأكد من نجاح النقل قبل تعيين الحالة كـ completed
+            entry.status = 'completed';
 
             entry.resolve({
                 success: true,

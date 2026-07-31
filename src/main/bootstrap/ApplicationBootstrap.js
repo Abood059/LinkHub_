@@ -28,7 +28,7 @@ class ApplicationBootstrap {
             console.log('[Bootstrap] ErrorCentralService initialized.');
         }
 
-        // 2.5. Verify required tools (adb, scrcpy, yt-dlp)
+        // 2.5. Verify required tools (adb, scrcpy, yt-dlp, deno)
         const toolPathResolver = container.resolve('toolPathResolver');
         if (toolPathResolver && typeof toolPathResolver.verifyAll === 'function') {
             const toolsStatus = toolPathResolver.verifyAll();
@@ -53,6 +53,33 @@ class ApplicationBootstrap {
                     errorService.warn('yt-dlp binary not found. Please ensure resources/bin/win/yt-dlp.exe or LINKHUB_YTDLP_PATH is set.', {
                         source: 'ApplicationBootstrap'
                     });
+                }
+            }
+            if (!toolsStatus.deno) {
+                if (errorService) {
+                    errorService.warn('Deno binary not found. Please ensure resources/bin/linux/deno or LINKHUB_DENO_PATH is set. Downloads may fail without Deno.', {
+                        source: 'ApplicationBootstrap'
+                    });
+                }
+            }
+
+            // التحقق من أن deno يعمل بشكل صحيح
+            if (toolsStatus.deno && typeof toolPathResolver.verifyDeno === 'function') {
+                const denoCheck = await toolPathResolver.verifyDeno();
+                if (denoCheck.valid) {
+                    console.log('[Bootstrap] Deno verification successful:', denoCheck.version);
+                    if (errorService) {
+                        errorService.info(`Deno verified successfully: ${denoCheck.version}`, {
+                            source: 'ApplicationBootstrap'
+                        });
+                    }
+                } else {
+                    console.error('[Bootstrap] Deno verification failed:', denoCheck.error);
+                    if (errorService) {
+                        errorService.error(`Deno verification failed: ${denoCheck.error}. Downloads may fail without working Deno.`, {
+                            source: 'ApplicationBootstrap'
+                        });
+                    }
                 }
             }
         }

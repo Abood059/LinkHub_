@@ -26,7 +26,8 @@ class ProcessSupervisor {
             type = 'generic',
             metadata = {},
             onData = null,
-            maxBufferSize = 100
+            maxBufferSize = 100,
+            cwd = null
         } = processConfig;
 
         if (!processId) {
@@ -54,8 +55,17 @@ class ProcessSupervisor {
         );
 
         try {
-            const result =
-                this._processManager.execute(
+            const result = cwd
+                ? this._processManager.executeWithCwd(
+                    processId,
+                    binPath,
+                    args,
+                    type,
+                    onData,
+                    maxBufferSize,
+                    cwd
+                )
+                : this._processManager.execute(
                     processId,
                     binPath,
                     args,

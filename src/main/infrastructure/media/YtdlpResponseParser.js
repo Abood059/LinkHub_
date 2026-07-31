@@ -111,6 +111,41 @@ class YtdlpResponseParser {
     }
 
     /**
+     * تحليل سطر تقدم yt-dlp المباشر (بدون aria2c)
+     * النمط: [download] 0.0% of 4.47MiB at 56.71KiB/s ETA 01:20
+     */
+    _parseYtdlpDirectProgress(trimmedLine) {
+        const progressMatch = trimmedLine.match(
+            /\[download\]\s+([\d.]+)%\s+of\s+([\d.]+)\s*([KMGTP]?iB)\s+at\s+([0-9.]+)\s*([KMGTP]?iB\/s)(?:\s+ETA\s+([0-9mhs:]+))?/i
+        );
+        if (!progressMatch) return null;
+
+        const percent = parseFloat(progressMatch[1]);
+        const totalSize = parseFloat(progressMatch[2]);
+        const totalUnit = progressMatch[3];
+        const speed = parseFloat(progressMatch[4]);
+        const speedUnit = progressMatch[5];
+        const eta = progressMatch[6] || null;
+        const totalBytes = this._unitToBytes(totalSize, totalUnit);
+        const speedBytes = this._unitToBytes(speed, speedUnit);
+        const downloadedBytes = (percent / 100) * totalBytes;
+
+        return {
+            percent,
+            size: `${downloadedBytes > 0 ? (downloadedBytes / 1024 / 1024).toFixed(2) + 'MiB' : '0MiB'}/${totalSize}${totalUnit}`,
+            downloadedBytes,
+            totalBytes,
+            speed: `${speed}${speedUnit}`,
+            speedBytes,
+            eta,
+            elapsed: null,
+            gid: null,
+            fileComplete: percent >= 100,
+            raw: trimmedLine
+        };
+    }
+
+    /**
      * تحليل ملخص اكتمال ملف من yt-dlp بعد انتهاء aria2c
      * النمط: [download] 100% of    4.47MiB in 00:00:41 at 110.24KiB/s
      */
@@ -149,15 +184,19 @@ class YtdlpResponseParser {
         const trimmedLine = line.trim();
         if (!trimmedLine) return null;
 
-        // أولاً: تنسيق aria2c (المستخدم مع --downloader aria2c --newline)
+        // أولاً: تنسيق yt-dlp المباشر (بدون aria2c)
+        const ytdlpDirectProgress = this._parseYtdlpDirectProgress(trimmedLine);
+        if (ytdlpDirectProgress) return ytdlpDirectProgress;
+
+        // ثانياً: تنسيق aria2c (المستخدم مع --downloader aria2c --newline)
         const aria2cProgress = this._parseAria2cProgress(trimmedLine);
         if (aria2cProgress) return aria2cProgress;
 
-        // ثانياً: ملخص اكتمال الملف من yt-dlp
+        // ثالثاً: ملخص اكتمال الملف من yt-dlp
         const downloadSummary = this._parseYtdlpDownloadSummary(trimmedLine);
         if (downloadSummary) return downloadSummary;
 
-        // ثالثاً: تنسيق JSON القديم (للتوافق)
+        // رابعاً: تنسيق JSON القديم (للتوافق)
         const jsonMatch = trimmedLine.match(/\{[^}]+\}/);
         if (jsonMatch) {
             try {

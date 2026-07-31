@@ -88,11 +88,80 @@ class ToolPathResolver {
     }
 
     verifyAll() {
-        const result = { adb: false, scrcpy: false, ytdlp: false };
+        const result = { adb: false, scrcpy: false, ytdlp: false, deno: false };
         try { result.adb = !!this.getAdbPath(); } catch (e) { /* ignore */ }
         try { result.scrcpy = !!this.getScrcpyPath(); } catch (e) { /* ignore */ }
         try { result.ytdlp = !!this.getYtDlpPath(); } catch (e) { /* ignore */ }
+        try { result.deno = !!this.getDenoPath(); } catch (e) { /* ignore */ }
         return result;
+    }
+
+    /**
+     * التحقق من أن deno يعمل بشكل صحيح
+     * @returns {Promise<{valid: boolean, path: string|null, version: string|null, error: string|null}>}
+     */
+    async verifyDeno() {
+        const denoPath = this.getDenoPath();
+        if (!denoPath) {
+            return { valid: false, path: null, version: null, error: 'Deno binary not found' };
+        }
+
+        const { spawn } = require('child_process');
+        
+        return new Promise((resolve) => {
+            try {
+                const child = spawn(denoPath, ['--version'], { timeout: 5000 });
+                let stdout = '';
+                let stderr = '';
+
+                child.stdout.on('data', (data) => { stdout += data.toString(); });
+                child.stderr.on('data', (data) => { stderr += data.toString(); });
+
+                child.on('close', (code) => {
+                    if (code === 0 && stdout.trim()) {
+                        resolve({ 
+                            valid: true, 
+                            path: denoPath, 
+                            version: stdout.trim(), 
+                            error: null 
+                        });
+                    } else {
+                        resolve({ 
+                            valid: false, 
+                            path: denoPath, 
+                            version: null, 
+                            error: stderr.trim() || `Deno exited with code ${code}` 
+                        });
+                    }
+                });
+
+                child.on('error', (err) => {
+                    resolve({ 
+                        valid: false, 
+                        path: denoPath, 
+                        version: null, 
+                        error: err.message 
+                    });
+                });
+
+                setTimeout(() => {
+                    child.kill();
+                    resolve({ 
+                        valid: false, 
+                        path: denoPath, 
+                        version: null, 
+                        error: 'Deno verification timeout' 
+                    });
+                }, 5000);
+            } catch (err) {
+                resolve({ 
+                    valid: false, 
+                    path: denoPath, 
+                    version: null, 
+                    error: err.message 
+                });
+            }
+        });
     }
 }
 

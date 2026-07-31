@@ -43,42 +43,22 @@ class YtdlpCommandBuilder {
      * بناء أمر التحميل
      */
     buildDownloadCommand(url, formatId, outputPath, denoPath = null) {
-        // استخدام pathService للحصول على مسار aria2c الصحيح
-        const aria2cPath = this._pathService
-            ? this._pathService.getBinaryPath('aria2c')
-            : path.join(process.cwd(), 'resources', 'bin', 'linux', 'aria2c');
+        // استخدام اسم ملف بسيط فقط (بدون مسار كامل)
+        // المسار سيتم تحديده عبر cwd عند تشغيل العملية
+        const outputTemplate = '%(title)s.%(ext)s';
 
-        // استخدام قالب اسم ملف صريح لضمان أن الملف المدموج يبقى في المجلد المحدد
-        // yt-dlp عند الدمج يضع الملف المدموج في المجلد الأب إذا لم يكن هناك قالب اسم ملف
-        const outputTemplate = path.join(outputPath, '%(title)s.%(ext)s');
-
-        const baseArgs = denoPath
-            ? [
-                '--js-runtimes', `deno:${denoPath}`,
-                '--ignore-config',
-                '--downloader', aria2cPath,
-                '--downloader-args', 'aria2c:-x 16 -s 16 --ca-certificate=/etc/ssl/certs/ca-certificates.crt',
-                '-f', formatId,
-                '-o', outputTemplate,
-                '--newline',
-                '--continue',
-                '--print', 'filename',
-                url
-              ]
-            : [
-                '--ignore-config',
-                '--downloader', aria2cPath,
-                '--downloader-args', 'aria2c:-x 16 -s 16 --ca-certificate=/etc/ssl/certs/ca-certificates.crt',
-                '-f', formatId,
-                '-o', outputTemplate,
-                '--newline',
-                '--continue',
-                '--print', 'filename',
-                url
-              ];
+        const baseArgs = [
+            '--ignore-config',
+            '-f', formatId,
+            '-o', outputTemplate,
+            '--newline',
+            '--print', 'filename',
+            url
+        ];
 
         return {
-            args: baseArgs
+            args: baseArgs,
+            outputPath: outputPath // نحتاج هذا لتمريره كـ cwd
         };
     }
 }

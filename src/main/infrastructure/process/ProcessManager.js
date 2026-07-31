@@ -95,6 +95,93 @@ class ProcessManager {
     }
 
     /**
+     * Execute a long-running process with custom working directory (cwd)
+     */
+    executeWithCwd(id, binPath, args = [], type = 'generic', onData = null, maxBufferSize = 100, cwd = null) {
+        if (!id) throw new Error('Process id is required');
+        if (this.activeProcesses.has(id)) this.terminate(id);
+
+        let child;
+        try {
+            const spawnOptions = {};
+            if (cwd) {
+                spawnOptions.cwd = cwd;
+            }
+            child = spawn(binPath, Array.isArray(args) ? args : [], spawnOptions);
+        } catch (error) {
+            errorCentralService.report({
+                type: 'PROCESS',
+                severity: 'HIGH',
+                message: `Failed to spawn process ${id}: ${error.message}`,
+                source: 'ProcessManager'
+            });
+            throw error;
+        }
+
+        const entity = new ProcessEntity({ pid: child.pid, type, serial: id, maxBufferSize });
+        const processRecord = {
+            instance: child,
+            data: entity,
+            type,
+            startedAt: Date.now(),
+            finishedAt: null
+        };
+        this.activeProcesses.set(id, processRecord);
+
+        const feed = (chunk, streamType) => {
+            const text = chunk.toString();
+            entity.addLog(text, streamType);
+            if (typeof onData === 'function') {
+                try {
+                    onData(text, streamType);
+                } catch (err) {
+                    errorCentralService.report({
+                        type: 'PROCESS',
+                        severity: 'LOW',
+                        message: `Consumer callback failed for ${id}: ${err.message}`,
+                        source: 'ProcessManager'
+                    });
+                }
+            }
+        };
+
+        child.stdout?.on('data', data => feed(data, 'stdout'));
+        child.stderr?.on('data', data => feed(data, 'stderr'));
+
+        // Cleanup on error
+        child.once('error', error => {
+            entity.markAsFailed(error.message);
+            processRecord.instance = null;
+            processRecord.finishedAt = Date.now();
+            // Remove from map to prevent memory leak
+            this.activeProcesses.delete(id);
+            errorCentralService.report({
+                type: 'PROCESS',
+                severity: 'HIGH',
+                message: `Process ${id} error: ${error.message}`,
+                source: 'ProcessManager'
+            });
+        });
+
+        // Cleanup on exit
+        child.once('exit', code => {
+            entity.markAsExited(code);
+            processRecord.instance = null;
+            processRecord.finishedAt = Date.now();
+            // Remove from map to prevent memory leak
+            this.activeProcesses.delete(id);
+            errorCentralService.report({
+                type: 'PROCESS',
+                severity: 'INFO',
+                message: `Process ${id} exited with code ${code}`,
+                source: 'ProcessManager'
+            });
+        });
+
+        return child;
+    }
+
+    /**
      * Execute a process and watch for a success sentinel in output.
      */
     executeAndWatch(id, binPath, args, successSentinel, timeoutMs = PROCESS_TIMEOUTS.WATCH_DEFAULT_TIMEOUT_MS) {

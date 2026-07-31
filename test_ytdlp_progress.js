@@ -10,8 +10,8 @@ const fs = require('fs');
 const YtdlpResponseParser = require('./src/main/infrastructure/media/YtdlpResponseParser');
 const ProgressHandler = require('./src/main/infrastructure/media/ProgressHandler');
 
-const url = 'https://youtu.be/_xjxwl1zLMc?si=He0Uus_-kLCJB_MT';
-const formatId = '139+394';
+const url = 'https://youtu.be/PyVIR3GJLMc?si=n4z-b7J1WsgX_Lml';
+const formatId = '251+396';
 const tempDir = path.join(process.cwd(), 'temp', 'test-download');
 fs.mkdirSync(tempDir, { recursive: true });
 
@@ -35,15 +35,13 @@ const entry = {
     elapsed: null
 };
 
-const aria2cPath = path.join(process.cwd(), 'resources', 'bin', 'linux', 'aria2c');
+const denoPath = path.join(process.cwd(), 'resources', 'bin', 'linux', 'deno');
 const ytdlpArgs = [
+    '--js-runtimes', `deno:${denoPath}`,
     '--ignore-config',
-    '--downloader', aria2cPath,
-    '--downloader-args', 'aria2c:-x 16 -s 16 --ca-certificate=/etc/ssl/certs/ca-certificates.crt',
     '-f', formatId,
     '-o', path.join(tempDir, '%(title)s.%(ext)s'),
     '--newline',
-    '--continue',
     url
 ];
 

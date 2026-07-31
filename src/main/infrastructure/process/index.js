@@ -24,6 +24,14 @@ module.exports = Object.freeze({
         ),
 
     /**
+     * Execute with custom working directory (cwd)
+     */
+    executeWithCwd:
+        ProcessManager.executeWithCwd.bind(
+            ProcessManager
+        ),
+
+    /**
      * Quick Task
      */
     executeQuickTaskArray:
