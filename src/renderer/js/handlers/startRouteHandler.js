@@ -2,6 +2,7 @@
 import { showToast } from '../core/utils.js';
 import { inspectUrl, startDownload, resumeDownload } from '../services/downloadService.js';
 import { addDownloadRow } from '../ui/downloadManager.js';
+import { getAllDevices } from '../services/deviceService.js';
 
 let registeredDevices = []; // سيتم ربطها من main
 let currentInspectionData = null;
@@ -66,19 +67,26 @@ export async function handleUrlInspection(url, urlInputElement, buttonElement) {
     currentInspectionData = inspection;
     currentUrl = trimmedUrl;
 
-    // تجهيز قائمة الأجهزة
-    const devicesList = (typeof registeredDevices === 'function') ? registeredDevices() : registeredDevices;
-    const connectedDevices = [];
-    if (devicesList && devicesList.length > 0) {
-        devicesList.forEach(deviceData => {
-            if (deviceData.device && deviceData.device.connected) {
-                connectedDevices.push({
-                    id: deviceData.device.id,
-                    name: deviceData.device.deviceFriendlyName || deviceData.device.model || deviceData.device.id,
-                    connected: true
-                });
-            }
-        });
+    // تجهيز قائمة الأجهزة - جلبها مباشرة من الخادم
+    let connectedDevices = [];
+    try {
+        const devicesList = await getAllDevices();
+        
+        if (devicesList && devicesList.length > 0) {
+            devicesList.forEach(deviceData => {
+                // التحقق من حالة الاتصال من runtimeState.status
+                const isConnected = deviceData.runtimeState && deviceData.runtimeState.status === 'connected';
+                if (isConnected) {
+                    connectedDevices.push({
+                        id: deviceData.device.id,
+                        name: deviceData.device.deviceFriendlyName || deviceData.device.model || deviceData.device.id,
+                        connected: true
+                    });
+                }
+            });
+        }
+    } catch (err) {
+        console.error('[startRouteHandler] Failed to get devices:', err);
     }
 
     // عرض نافذة اختيار الجودة

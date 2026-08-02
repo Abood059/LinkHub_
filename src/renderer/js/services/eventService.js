@@ -40,4 +40,10 @@ export function setupEventListeners(handlers) {
     linkhub.on('device:removed', () => handlers.onDeviceRemoved?.());
     linkhub.on('device:added', () => handlers.onDeviceStateChanged?.());
     linkhub.on('device:state:update', () => handlers.onDeviceStateChanged?.());
+    linkhub.on('transfer:complete', (event, data) => {
+        if (data?.downloadId) handlers.onTransferComplete?.(data.downloadId, data.message);
+    });
+    linkhub.on('transfer:error', (event, data) => {
+        if (data?.downloadId) handlers.onTransferError?.(data.downloadId, data.error);
+    });
 }

@@ -3,7 +3,6 @@
 
 const EventEmitter = require('events');
 const DownloadStateManager = require('./DownloadStateManager');
-const ProgressHandler = require('./ProgressHandler');
 const RetryHandler = require('./RetryHandler');
 const CompletionHandler = require('./CompletionHandler');
 const FailureHandler = require('./FailureHandler');
@@ -18,16 +17,16 @@ const FailureHandler = require('./FailureHandler');
  * - المزامنة مع قاعدة البيانات مسؤولية DownloadSyncService (خدمة خارجية مستقلة)
  */
 class DownloadManager extends EventEmitter {
-    constructor({ logger = null } = {}) {
+    constructor({ logger = null, pathService = null, adbPushService = null }) {
         super();
         this._logger = logger;
+        this._pathService = pathService;
 
         // Initialize all components
         this._stateManager = new DownloadStateManager();
-        this._progressHandler = new ProgressHandler();
-        this._retryHandler = new RetryHandler(logger);
-        this._completionHandler = new CompletionHandler(logger);
-        this._failureHandler = new FailureHandler(logger);
+        this._retryHandler = new RetryHandler();
+        this._completionHandler = new CompletionHandler(pathService, logger, adbPushService);
+        this._failureHandler = new FailureHandler({ logger });
     }
 
     /**
@@ -80,15 +79,16 @@ class DownloadManager extends EventEmitter {
     }
 
     /**
-     * معالجة بيانات التقدم من البث
+     * معالجة بيانات التقدم من stdout/stderr
+     * ملاحظة: التقدم يُعالج الآن مباشرة في YtdlpAdapter عبر _handleProgress
+     * هذه الدالة محفوظة للتوافق فقط
      */
     handleProgressData(chunk, streamType, processId, onProgress, formatId) {
         const entry = this._stateManager.getDownloadEntry(processId);
         if (!entry) return;
 
-        this._progressHandler.handleProgressData(
-            chunk, streamType, entry, onProgress, formatId
-        );
+        // التقدم يُعالج الآن مباشرة في YtdlpAdapter عبر _handleProgress
+        // هذه الدالة محفوظة للتوافق فقط
     }
 
     /**

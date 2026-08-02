@@ -18,7 +18,7 @@ const DownloadStateSyncService = require('../infrastructure/sync/DownloadStateSy
 const DownloadSyncService = require('../infrastructure/sync/DownloadSyncService');
 const DeviceOrchestrator = require('../application/orchestrators/DeviceOrchestrator');
 const DownloadOrchestrator = require('../application/orchestrators/DownloadOrchestrator');
-const FileTransferService = require('../application/services/FileTransferService');
+const AdbPushService = require('../infrastructure/adb/AdbPushService');
 const ToolPathResolver = require('../infrastructure/tools/ToolPathResolver');
 const PathService = require('../infrastructure/path/PathService');
 const DeviceEventHandler = require('../application/handlers/DeviceEventHandler');
@@ -88,11 +88,17 @@ class BootstrapContainer {
             toolPathResolver: toolPathResolver
         });
 
+        const adbPushService = new AdbPushService({
+            adbExecutor: adbCommandExecutor,
+            logger: errorCentralService
+        });
+
         const ytdlpAdapter = new YtdlpAdapter({
             processSupervisor,
             logger: errorCentralService,
             toolPathResolver: toolPathResolver,
-            pathService: pathService
+            pathService: pathService,
+            adbPushService: adbPushService
         });
 
         const deviceOrchestrator = new DeviceOrchestrator({
@@ -103,16 +109,11 @@ class BootstrapContainer {
             logger: errorCentralService
         });
 
-        const fileTransferService = new FileTransferService({
-            adbExecutor: adbCommandExecutor,
-            logger: errorCentralService
-        });
-
         const downloadOrchestrator = new DownloadOrchestrator({
             ytdlpAdapter,
             downloadManager: ytdlpAdapter._downloadManager,
             deviceRegistry,
-            fileTransferService,
+            adbPushService,
             logger: errorCentralService
         });
 
@@ -131,7 +132,7 @@ class BootstrapContainer {
         this._services.set('ytdlpAdapter', ytdlpAdapter);
         this._services.set('deviceOrchestrator', deviceOrchestrator);
         this._services.set('downloadOrchestrator', downloadOrchestrator);
-        this._services.set('fileTransferService', fileTransferService);
+        this._services.set('adbPushService', adbPushService);
         this._services.set('toolPathResolver', toolPathResolver);
         this._services.set('deviceEventHandler', deviceEventHandler);
 

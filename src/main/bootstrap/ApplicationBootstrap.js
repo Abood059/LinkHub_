@@ -18,8 +18,13 @@ class ApplicationBootstrap {
         console.log('[Bootstrap] Starting application...');
 
         // 1. Initialize dependency container
-        container.initialize();
-        console.log('[Bootstrap] Container initialized.');
+        try {
+            container.initialize();
+            console.log('[Bootstrap] Container initialized.');
+        } catch (error) {
+            console.error('[Bootstrap] Failed to initialize container:', error);
+            throw error;
+        }
 
         // 2. Initialize error central service (logger)
         const errorService = container.resolve('errorCentralService');

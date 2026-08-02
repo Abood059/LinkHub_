@@ -120,10 +120,73 @@ class ProcessSupervisor {
             return false;
         }
 
-        return this._processManager
-            .terminate(
-                processId
+        // التعامل مع العمليات الخارجية المسجلة عبر registerExternalProcess
+        if (process._controller) {
+            process._controller.abort();
+        }
+
+        if (process._process) {
+            try {
+                process._process.kill('SIGTERM');
+                
+                // Force kill after timeout if still alive
+                setTimeout(() => {
+                    if (process._process.exitCode === null) {
+                        try {
+                            process._process.kill('SIGKILL');
+                        } catch { }
+                    }
+                }, 5000); // 5 seconds graceful timeout
+            } catch (error) {
+                if (this._logger) {
+                    this._logger.error(`Failed to stop external process ${processId}: ${error.message}`);
+                }
+                return false;
+            }
+        } else {
+            // للعمليات العادية، استخدم ProcessManager
+            return this._processManager.terminate(processId);
+        }
+
+        // تحديث الحالة في السجل
+        this._processRegistry.updateStatus(processId, 'STOPPED');
+        
+        return true;
+    }
+
+    /**
+     * تسجيل عملية خارجية في السجل (للعمليات التي تُدار بواسطة مكتبات خارجية)
+     * @param {string} processId - معرف العملية
+     * @param {ChildProcess} process - كائن العملية
+     * @param {AbortController} controller - للتحكم في الإلغاء
+     * @param {Object} metadata - بيانات وصفية
+     */
+    registerExternalProcess(processId, process, controller, metadata) {
+        if (!processId) {
+            throw new Error('processId is required');
+        }
+
+        this._processRegistry.register(processId, {
+            id: processId,
+            type: 'external',
+            metadata,
+            status: 'RUNNING',
+            startedAt: Date.now(),
+            _process: process,
+            _controller: controller
+        });
+
+        // ربط حدث exit لتحديث الحالة في السجل
+        process.once('exit', (code) => {
+            this._processRegistry.updateStatus(
+                processId,
+                code === 0 ? 'EXITED' : 'FAILED'
             );
+        });
+
+        process.once('error', () => {
+            this._processRegistry.updateStatus(processId, 'FAILED');
+        });
     }
 
     getProcessStatus(

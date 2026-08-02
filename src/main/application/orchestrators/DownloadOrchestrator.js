@@ -13,13 +13,13 @@ class DownloadOrchestrator {
         ytdlpAdapter,
         downloadManager,
         deviceRegistry = null,
-        fileTransferService = null,
+        adbPushService = null,
         logger = null
     }) {
         this._ytdlpAdapter = ytdlpAdapter;
         this._downloadManager = downloadManager;
         this._deviceRegistry = deviceRegistry;
-        this._fileTransferService = fileTransferService;
+        this._adbPushService = adbPushService;
         this._logger = logger;
     }
 
@@ -188,14 +188,14 @@ class DownloadOrchestrator {
             return;
         }
 
-        if (!deviceId || !this._fileTransferService) {
+        if (!deviceId || !this._adbPushService) {
             // لا يوجد جهاز للنقل، الملف تم نقله بالفعل لمجلد التحميلات
             return;
         }
 
         try {
             // نقل الملف للجهاز
-            const result = await this._fileTransferService.transferToDevice(tempPath, deviceId);
+            const result = await this._adbPushService.pushAndDelete(tempPath, deviceId);
             
             if (result.success) {
                 if (this._logger) {
@@ -251,10 +251,10 @@ class DownloadOrchestrator {
         if (!deviceId) {
             throw new Error('Device ID is required');
         }
-        if (!this._fileTransferService) {
-            throw new Error('FileTransferService not available');
+        if (!this._adbPushService) {
+            throw new Error('AdbPushService not available');
         }
-        return this._fileTransferService.transferFromDownloads(localPath, deviceId);
+        return this._adbPushService.pushFromDownloads(localPath, deviceId);
     }
 
 

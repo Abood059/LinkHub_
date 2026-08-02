@@ -253,7 +253,8 @@ class AdbCommandExecutor {
                 ]
             );
 
-        return result.join('\n');
+        // executeQuickTaskArray returns a string, not an array
+        return result;
     }
 
     async _executeQuickAdbCommand(

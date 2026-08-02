@@ -18,12 +18,14 @@ const title = 'ثبتت نظام زورين واختبرته في 10 مهام! |
 const tempDir = '/home/abood/.config/linkhub_/temp/downloads';
 fs.mkdirSync(tempDir, { recursive: true });
 
+// استخدام الأمر المبسط النهائي من YtdlpCommandBuilder
 const denoPath = path.join(process.cwd(), 'resources', 'bin', 'linux', 'deno');
+const outputTemplate = '%(title)s.%(ext)s';
 const ytdlpArgs = [
     '--js-runtimes', `deno:${denoPath}`,
     '--ignore-config',
     '-f', formatId,
-    '-o', path.join(tempDir, '%(title)s.%(ext)s'),
+    '-o', outputTemplate,
     '--newline',
     url
 ];
@@ -36,7 +38,7 @@ console.log('Output Dir:', tempDir);
 console.log('Command: yt-dlp', ytdlpArgs.join(' '));
 console.log('');
 
-const ytdlp = spawn('yt-dlp', ytdlpArgs);
+const ytdlp = spawn('yt-dlp', ytdlpArgs, { cwd: tempDir });
 let lineBuffer = '';
 let actualFilename = null;
 let progressCount = 0;
@@ -49,6 +51,11 @@ const flushProgressLines = (streamType, flushRemainder = false) => {
         lineBuffer = '';
         for (const line of lines) {
             if (line.trim()) {
+                // استخراج اسم الملف من --print filename (سطر منفصل بدون بادئة)
+                if (!line.includes('[') && !line.includes('WARNING') && !line.includes('ERROR')) {
+                    actualFilename = line.trim();
+                    console.log('[FILENAME] Extracted from --print filename:', actualFilename);
+                }
                 // استخراج اسم الملف من سطر [Merger]
                 const mergerMatch = line.match(/\[Merger\]\s+Merging formats into\s+"([^"]+)"/);
                 if (mergerMatch) {
@@ -63,6 +70,10 @@ const flushProgressLines = (streamType, flushRemainder = false) => {
 
     lineBuffer = lines.pop() || '';
     for (const line of lines) {
+        if (!line.includes('[') && !line.includes('WARNING') && !line.includes('ERROR')) {
+            actualFilename = line.trim();
+            console.log('[FILENAME] Extracted from --print filename:', actualFilename);
+        }
         const mergerMatch = line.match(/\[Merger\]\s+Merging formats into\s+"([^"]+)"/);
         if (mergerMatch) {
             actualFilename = mergerMatch[1];

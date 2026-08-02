@@ -37,7 +37,7 @@ describe('DownloadOrchestrator.getDownloadHistory() - Format Compatibility', () 
             ytdlpAdapter,
             downloadManager,
             deviceRegistry: null,
-            fileTransferService: null,
+            adbPushService: null,
             logger: null
         });
     });

@@ -2,20 +2,21 @@
 'use strict';
 
 const EventEmitter = require('events');
-const path = require('path');
-const fs = require('fs').promises;
 
-const YtdlpCommandBuilder = require('./YtdlpCommandBuilder');
-const YtdlpResponseParser = require('./YtdlpResponseParser');
+const YTDlpWrap = require('yt-dlp-wrap-plus').default;
 const DownloadManager = require('./DownloadManager');
+const NetworkChecker = require('./NetworkChecker');
+const MetadataExtractor = require('./MetadataExtractor');
+const DownloadEventHandler = require('./DownloadEventHandler');
+const ProcessManager = require('./ProcessManager');
 const { createTempDirectory, calculateTotalSize } = require('./YtdlpUtils');
 
 /**
  * YtdlpAdapter
- * مسؤول عن تنفيذ عمليات التحميل باستخدام yt-dlp
+ * مسؤول عن تنسيق عمليات التحميل باستخدام yt-dlp-wrap-plus
  * المبادئ:
- * - ينفذ العمليات التقنية فقط (بدء العملية، معالجة المخرجات)
- * - يضمن ذرية العملية: إما نجاح كامل (إدخال صحيح) أو فشل كامل (بدون إدخال)
+ * - ينسق بين المكونات المختلفة (NetworkChecker, MetadataExtractor, ProcessManager, DownloadEventHandler)
+ * - يدير دورة حياة التحميل الكاملة
  * - يستخدم DownloadManager لإدارة الحالة في الذاكرة
  * - لا يصل إلى قاعدة البيانات مباشرة
  */
@@ -25,20 +26,23 @@ class YtdlpAdapter extends EventEmitter {
         ytdlpPath = null,
         toolPathResolver = null,
         logger = null,
-        pathService = null
+        pathService = null,
+        adbPushService = null
     }) {
         super();
-        this._processSupervisor = processSupervisor;
         this._logger = logger;
-        this._toolPathResolver = toolPathResolver;
         this._pathService = pathService;
-        this._ytdlpPath = this._resolveYtdlpPath(ytdlpPath);
         this._windowManager = null;
 
+        // Initialize yt-dlp-wrap-plus
+        this._ytDlpWrap = new YTDlpWrap(ytdlpPath || 'yt-dlp');
+
         // Initialize helper modules
-        this._commandBuilder = new YtdlpCommandBuilder(this._pathService);
-        this._responseParser = new YtdlpResponseParser();
-        this._downloadManager = new DownloadManager({ logger });
+        this._downloadManager = new DownloadManager({ logger, pathService, adbPushService });
+        this._networkChecker = new NetworkChecker(logger);
+        this._metadataExtractor = new MetadataExtractor(this._ytDlpWrap, this._networkChecker, logger);
+        this._processManager = new ProcessManager(processSupervisor, toolPathResolver, logger);
+        this._eventHandler = new DownloadEventHandler(this._downloadManager, logger, null);
 
         // ملاحظة: تم إزالة forward events من DownloadManager
         // DownloadStateSyncService هو المصدر الوحيد للحقيقة لمزامنة الحالة
@@ -47,50 +51,34 @@ class YtdlpAdapter extends EventEmitter {
 
     setWindowManager(windowManager) {
         this._windowManager = windowManager;
+        this._eventHandler.setWindowManager(windowManager);
     }
 
-    _resolveYtdlpPath(explicitPath) {
-        if (explicitPath) return explicitPath;
-        if (this._toolPathResolver) return this._toolPathResolver.getYtDlpPath();
-        const fallbackPath = 'yt-dlp';
-        if (this._logger) {
-            this._logger.warn(`YtdlpAdapter: No toolPathResolver provided, using fallback: ${fallbackPath}`);
-        }
-        return fallbackPath;
+    /**
+     * التحقق من الاتصال بالإنترنت
+     * @param {number} timeout - مهلة التحقق بالميلي ثانية (الافتراضي 5000)
+     * @returns {Promise<boolean>} true إذا كان هناك اتصال، false إذا لم يكن
+     */
+    async checkInternetConnection(timeout = 5000) {
+        return this._networkChecker.checkInternetConnection(timeout);
     }
 
+    /**
+     * فحص التنسيقات المتاحة للفيديو
+     * @param {string} url - رابط الفيديو
+     * @returns {Promise<Object>} معلومات التنسيقات
+     */
     async inspectFormats(url) {
-        if (!url) {
-            throw new Error('URL is required');
-        }
-
-        const denoPath = this._toolPathResolver ? this._toolPathResolver.getDenoPath() : null;
-        const command = this._commandBuilder.buildInspectCommand(url, denoPath);
-        
-        const output = await this._processSupervisor.executeQuickTaskArray(
-            this._ytdlpPath,
-            command.args,
-            { timeout: command.timeout }
-        );
-
-        return this._responseParser.parseFormats(output);
+        return this._metadataExtractor.inspectFormats(url);
     }
 
+    /**
+     * استخراج المعلومات الأساسية للفيديو
+     * @param {string} url - رابط الفيديو
+     * @returns {Promise<Object>} معلومات الفيديو
+     */
     async extractMetadata(url) {
-        if (!url) {
-            throw new Error('URL is required');
-        }
-
-        const denoPath = this._toolPathResolver ? this._toolPathResolver.getDenoPath() : null;
-        const command = this._commandBuilder.buildMetadataCommand(url, denoPath);
-        
-        const output = await this._processSupervisor.executeQuickTaskArray(
-            this._ytdlpPath,
-            command.args,
-            { timeout: command.timeout }
-        );
-
-        return this._responseParser.parseMetadata(output);
+        return this._metadataExtractor.extractMetadata(url);
     }
 
     async startDownload(url, formatId, options = {}) {
@@ -103,12 +91,19 @@ class YtdlpAdapter extends EventEmitter {
             throw new Error(`Invalid formatId: ${formatId}. Format ID must contain only letters, numbers, +, or -`);
         }
 
-        const { outputPath, onProgress, deviceId, title, formatsData, processId: existingProcessId } = options;
-        let finalOutputPath = outputPath;
+        // التحقق من الاتصال بالإنترنت
+        const isConnected = await this.checkInternetConnection();
+        if (!isConnected) {
+            throw new Error('No internet connection. Please check your network connection and try again.');
+        }
 
-        // استخدام processId الموجود للإستئناف، أو إنشاء جديد للتحميل الجديد
+        const { outputPath, onProgress, deviceId, title, formatsData, processId: existingProcessId } = options;
+
+        // استخدام processId الموجود للاستئناف، أو إنشاء جديد للتحميل الجديد
         const processId = existingProcessId || `ytdlp-dl-${Date.now()}`;
         const isResuming = !!existingProcessId;
+
+        let finalOutputPath = outputPath;
 
         // عند الاستئناف، استخدام المسار الفعلي المخزن في الإدخال
         if (isResuming) {
@@ -119,104 +114,102 @@ class YtdlpAdapter extends EventEmitter {
         }
 
         // إنشاء مجلد مؤقت داخل المشروع إذا لم يتم تمرير مسار مخصص
-        // استخدام المجلد فقط (بدون قالب) لضمان الاستئناف الصحيح
         if (!finalOutputPath) {
             const tempDir = await createTempDirectory(this._pathService);
             finalOutputPath = tempDir;
         }
 
-        // حساب الحجم الكلي للتحميل المركب
+        // التحقق من أن المسار موجود وقابل للكتابة
+        try {
+            const fs = require('fs').promises;
+            await fs.access(finalOutputPath, fs.constants.W_OK);
+            if (this._logger) {
+                this._logger.info(`Output path is writable: ${finalOutputPath}`);
+            }
+        } catch (err) {
+            const error = new Error(`Cannot write to output path: ${finalOutputPath}. Error: ${err.message}`);
+            if (this._logger) {
+                this._logger.error(error.message);
+            }
+            throw error;
+        }
+
+        // حساب الحجم الكلي للتحميل
         let { totalSize, hasSizeInfo } = calculateTotalSize(formatId, formatsData);
 
-        // بناء أمر التحميل
-        const command = this._commandBuilder.buildDownloadCommand(url, formatId, finalOutputPath);
+        // بناء الوسائط مباشرة (بدون YtdlpCommandBuilder)
+        // استخدام مسار مطلق في -o بدلاً من الاعتماد على cwd
+        const outputTemplate = require('path').join(finalOutputPath, '%(title)s.%(ext)s');
+        const args = [
+            '--ignore-config',
+            '-f', formatId,
+            '-o', outputTemplate,
+            '--newline',
+            url
+        ];
 
-        let lineBuffer = '';
-        let downloadProcess = null;
-        let actualFilename = null; // لتخزين اسم الملف الفعلي من --print filename
-
-        const flushProgressLines = (streamType, flushRemainder = false) => {
-            // تطبيع \r و \r\n إلى \n — مع --newline تصل أسطر كاملة بـ \n
-            const normalized = lineBuffer.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-            const lines = normalized.split('\n');
-
-            if (flushRemainder) {
-                lineBuffer = '';
-                for (const line of lines) {
-                    if (line.trim()) {
-                        // استخراج اسم الملف من سطر [Merger] أو --print filename
-                        // [Merger] Merging formats into "/path/to/file.ext"
-                        const mergerMatch = line.match(/\[Merger\]\s+Merging formats into\s+"([^"]+)"/);
-                        if (mergerMatch) {
-                            actualFilename = mergerMatch[1];
-                        }
-                        // --print filename يطبع المسار الكامل للملف النهائي
-                        else if (line.trim() && !line.includes('[download]') && !line.includes('[#') && !line.includes('{') && !line.includes('Deleting') && !line.includes('Merger')) {
-                            // التحقق من أن السطر يحتوي على مسار ملف صالح
-                            if (line.includes('/') || line.includes('\\')) {
-                                actualFilename = line.trim();
-                            }
-                        }
-                        this._downloadManager.handleProgressData(line, streamType, processId, onProgress, formatId);
-                    }
-                }
-                return;
-            }
-
-            lineBuffer = lines.pop() || '';
-            for (const line of lines) {
-                const mergerMatch = line.match(/\[Merger\]\s+Merging formats into\s+"([^"]+)"/);
-                if (mergerMatch) {
-                    actualFilename = mergerMatch[1];
-                }
-                else if (line.trim() && !line.includes('[download]') && !line.includes('[#') && !line.includes('{') && !line.includes('Deleting') && !line.includes('Merger')) {
-                    if (line.includes('/') || line.includes('\\')) {
-                        actualFilename = line.trim();
-                    }
-                }
-                this._downloadManager.handleProgressData(line, streamType, processId, onProgress, formatId);
-            }
-        };
+        // إنشاء AbortController للإيقاف
+        const controller = new AbortController();
 
         try {
-            // الخطوة 1: بدء العملية أولاً (قبل إنشاء الإدخال في الذاكرة)
-            // هذا يضمن ذرية العملية: إما نجاح كامل أو فشل كامل
-            downloadProcess = this._processSupervisor.startManagedProcess({
-                processId,
-                binPath: this._ytdlpPath,
-                args: command.args,
-                type: 'ytdlp-download',
-                metadata: { url, formatId, outputPath: finalOutputPath, deviceId },
-                cwd: command.outputPath, // تشغيل yt-dlp في مجلد التنزيلات
-                onData: (chunk, streamType) => {
-                    const text = typeof chunk === 'string' ? chunk : chunk.toString();
-                    lineBuffer += text;
-                    flushProgressLines(streamType, false);
-                }
+            // تنفيذ التحميل باستخدام yt-dlp-wrap-plus
+            // لا حاجة لـ cwd عند استخدام مسار مطلق في -o
+            const emitter = this._ytDlpWrap.exec(args, {}, controller.signal);
+
+            // تسجيل العملية في ProcessSupervisor
+            this._processManager.registerProcessWithSupervisor(processId, emitter.ytDlpProcess, controller, {
+                url, formatId, outputPath: finalOutputPath, deviceId
             });
 
-            // التحقق من نجاح بدء العملية
-            if (!downloadProcess) {
-                throw new Error('Failed to start process: processSupervisor returned null');
-            }
-
-            // الخطوة 2: إنشاء أو تحديث إدخال التحميل في DownloadManager
-            // يتم هذا بعد نجاح بدء العملية
+            // إنشاء إدخال في DownloadManager
             this._downloadManager.upsertDownloadEntry(processId, {
-                resolve: null, // سيتم تعيينها لاحقاً
-                reject: null,  // سيتم تعيينها لاحقاً
+                resolve: null,
+                reject: null,
                 url,
                 formatId,
                 outputPath: finalOutputPath,
+                controller,
+                process: emitter.ytDlpProcess,
                 deviceId,
                 title,
                 totalSize,
                 hasSizeInfo
             }, isResuming);
 
-            // تحديث مرجع العملية وحالتها
-            this._downloadManager.updateDownloadProcess(processId, downloadProcess);
+            // تحديث حالة التحميل
             this._downloadManager.updateDownloadStatus(processId, 'downloading');
+
+            // ربط الأحداث
+            emitter.on('progress', (progress) => {
+                this._eventHandler.handleProgress(processId, progress, onProgress);
+            });
+
+            emitter.on('ytDlpEvent', (eventType, eventData) => {
+                if (eventType === 'download') {
+                    const match = eventData.match(/Destination: (.+)$/);
+                    if (match) {
+                        this._eventHandler.handleFilename(processId, match[1]);
+                    }
+                }
+            });
+
+            emitter.on('close', (code) => {
+                this._eventHandler.handleClose(processId, finalOutputPath, code, deviceId, url, title, this.startDownload.bind(this));
+            });
+
+            emitter.on('error', (err) => {
+                this._eventHandler.handleError(processId, err, deviceId, url);
+            });
+
+            return new Promise((resolve, reject) => {
+                const entry = this._downloadManager.getDownloadEntry(processId);
+                if (entry) {
+                    entry.resolve = resolve;
+                    entry.reject = reject;
+                } else {
+                    reject(new Error('Download entry not found after process start'));
+                }
+            });
 
         } catch (error) {
             // في حالة فشل بدء العملية، تنظيف أي إدخال عالق
@@ -225,71 +218,6 @@ class YtdlpAdapter extends EventEmitter {
             }
             throw error;
         }
-
-        return new Promise((resolve, reject) => {
-            try {
-                // تحديث resolve/reject في إدخال التحميل
-                const entry = this._downloadManager.getDownloadEntry(processId);
-                if (entry) {
-                    entry.resolve = resolve;
-                    entry.reject = reject;
-                } else {
-                    reject(new Error('Download entry not found after process start'));
-                    return;
-                }
-
-                // تسجيل معالجات انتهاء العملية
-                if (downloadProcess && downloadProcess.once) {
-                    downloadProcess.once('exit', async (code) => {
-                        // تفريغ أي سطر تقدم متبقٍ في الـ buffer قبل تقييم الإكمال
-                        if (lineBuffer.trim()) {
-                            flushProgressLines('stdout', true);
-                        }
-
-                        const entry = this._downloadManager.getDownloadEntry(processId);
-                        if (!entry) return;
-
-                        // التعامل مع الإيقاف اليدوي - لا ترسل خطأ
-                        if (entry.manuallyStopped) {
-                            this._downloadManager.updateDownloadStatus(processId, 'stopped');
-                            // الاحتفاظ بالإدخال في الذاكرة للسماح بالاستئناف
-                            return;
-                        }
-
-                        if (code === 0) {
-                            await this._downloadManager.handleDownloadSuccess(processId, finalOutputPath, deviceId, url, title, actualFilename);
-                            this._downloadManager.updateDownloadStatus(processId, 'completed');
-                            // الاحتفاظ بالإدخال في الذاكرة مع الحالة completed
-                        } else {
-                            if (this._downloadManager.shouldRetry(entry, code)) {
-                                this._downloadManager.handleRetry(entry, processId, url, formatId, options, this.startDownload.bind(this), code);
-                                return;
-                            } else {
-                                this._downloadManager.handleDownloadFailure(processId, code, deviceId, url, title);
-                                this._downloadManager.updateDownloadStatus(processId, 'failed');
-                                // الاحتفاظ بالإدخال في الذاكرة مع الحالة failed
-                            }
-                        }
-                    });
-
-                    downloadProcess.once('error', (err) => {
-                        const entry = this._downloadManager.getDownloadEntry(processId);
-                        if (entry) {
-                            this._downloadManager.handleProcessError(processId, err, deviceId, url);
-                            this._downloadManager.removeDownloadEntry(processId);
-                        }
-                    });
-                } else {
-                    // فشل في ربط مستمعات العملية - تنظيف الإدخال
-                    this._downloadManager.cleanupOrphanedEntry(processId);
-                    reject(new Error('Failed to attach process event listeners'));
-                }
-            } catch (error) {
-                // فشل في إعداد Promise - تنظيف الإدخال
-                this._downloadManager.cleanupOrphanedEntry(processId);
-                reject(error);
-            }
-        });
     }
 
     /**
@@ -321,26 +249,20 @@ class YtdlpAdapter extends EventEmitter {
 
         // تعيين علامة التوقف اليدوي لمنع إعادة المحاولة
         entry.manuallyStopped = true;
-        
+
+        // إيقاف من المكتبة عبر AbortController
+        if (entry.controller) {
+            entry.controller.abort();
+        }
+
+        // إيقاف من ProcessManager
+        this._processManager.stopProcess(processId, entry);
+
         // تحديث حالة التحميل إلى متوقف
         this._downloadManager.updateDownloadStatus(processId, 'stopped');
 
-        // التحقق من وجود العملية الحية في ProcessSupervisor
-        const isProcessAlive = this._processSupervisor.hasProcess(processId);
-
-        if (isProcessAlive) {
-            // العملية حية - إيقافها بشكل طبيعي
-            const stopped = this._processSupervisor.stopManagedProcess(processId);
-            // الاحتفاظ بالإدخال في الذاكرة للسماح بالاستئناف
-            return { success: stopped, wasRunning: true };
-        } else {
-            // العملية ليست حية - تسجيل الحدث والعودة بنجاح (لا داعي للإيقاف)
-            if (this._logger) {
-                this._logger.info(`stopDownload: Process ${processId} was not alive, skipping stopManagedProcess`);
-            }
-            // الاحتفاظ بالإدخال في الذاكرة للسماح بالاستئناف
-            return { success: true, wasRunning: false };
-        }
+        // الاحتفاظ بالإدخال في الذاكرة للسماح بالاستئناف
+        return { success: true, wasRunning: true };
     }
 
     /**
@@ -350,15 +272,7 @@ class YtdlpAdapter extends EventEmitter {
      */
     isProcessRunning(processId) {
         const entry = this._downloadManager.getDownloadEntry(processId);
-        if (!entry) return false;
-        
-        // التحقق من وجود العملية وحالتها
-        if (entry.process) {
-            // إذا كانت العملية موجودة، تحقق من حالتها
-            return entry.status === 'downloading' || entry.status === 'starting';
-        }
-        
-        return false;
+        return this._processManager.isProcessRunning(processId, entry);
     }
 
     getDownloadStatus(processId) {
@@ -396,16 +310,12 @@ class YtdlpAdapter extends EventEmitter {
     /**
      * إيقاف عملية التحميل فقط دون تغيير الحالة في الذاكرة
      * @param {string} processId - معرف العملية
-     * @returns {Object} كائن نتيجة يوضح حالة الإيقاف:
-     *   - { success: true, wasRunning: true } - تم إيقاف عملية حية
-     *   - { success: true, wasRunning: false } - العملية لم تكن حية
-     *   - { success: false, reason: 'entry_not_found', processId } - الإدخال غير موجود
-     *   - { success: false, reason: 'invalid_processId' } - processId غير صالح
+     * @returns {Object} كائن نتيجة يوضح حالة الإيقاف
      */
     stopProcessOnly(processId) {
         // التحقق من صحة processId
         if (!processId) {
-            if (this._logger) {
+            if (this._logger && typeof this._logger.warn === 'function') {
                 this._logger.warn('stopProcessOnly: Invalid processId (null or empty)');
             }
             return { success: false, reason: 'invalid_processId' };
@@ -414,27 +324,14 @@ class YtdlpAdapter extends EventEmitter {
         // التحقق من وجود الإدخال في الذاكرة
         const entry = this._downloadManager.getDownloadEntry(processId);
         if (!entry) {
-            if (this._logger) {
+            if (this._logger && typeof this._logger.warn === 'function') {
                 this._logger.warn(`stopProcessOnly: Entry not found for processId: ${processId}`);
             }
             return { success: false, reason: 'entry_not_found', processId };
         }
 
-        // التحقق من وجود العملية الحية في ProcessSupervisor
-        const isProcessAlive = this._processSupervisor.hasProcess(processId);
-
-        if (isProcessAlive) {
-            // العملية حية - إيقافها بشكل طبيعي
-            const stopped = this._processSupervisor.stopManagedProcess(processId);
-            // لا نقوم بتغيير manuallyStopped ولا حالة الإدخال
-            return { success: stopped, wasRunning: true };
-        } else {
-            // العملية ليست حية - لا داعي للإيقاف
-            if (this._logger) {
-                this._logger.info(`stopProcessOnly: Process ${processId} was not alive, skipping stopManagedProcess`);
-            }
-            return { success: true, wasRunning: false };
-        }
+        // إيقاف من ProcessManager
+        return this._processManager.stopProcess(processId, entry, false);
     }
 
     /**
@@ -453,7 +350,7 @@ class YtdlpAdapter extends EventEmitter {
     removeDownloadEntry(processId) {
         // التحقق من صحة processId
         if (!processId) {
-            if (this._logger) {
+            if (this._logger && typeof this._logger.warn === 'function') {
                 this._logger.warn('removeDownloadEntry: Invalid processId (null or empty)');
             }
             return { success: false, reason: 'invalid_processId' };
@@ -462,17 +359,14 @@ class YtdlpAdapter extends EventEmitter {
         // التحقق من وجود الإدخال في الذاكرة
         const entry = this._downloadManager.getDownloadEntry(processId);
         if (!entry) {
-            if (this._logger) {
+            if (this._logger && typeof this._logger.warn === 'function') {
                 this._logger.warn(`removeDownloadEntry: Entry not found for processId: ${processId}`);
             }
             return { success: false, reason: 'entry_not_found', processId };
         }
 
         // إيقاف العملية إذا كانت قيد التشغيل
-        const isProcessAlive = this._processSupervisor.hasProcess(processId);
-        if (isProcessAlive) {
-            this._processSupervisor.stopManagedProcess(processId);
-        }
+        this._processManager.stopProcess(processId, entry, false);
 
         // حذف الإدخال من الذاكرة
         this._downloadManager.removeDownloadEntry(processId);

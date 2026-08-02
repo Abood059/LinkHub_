@@ -60,10 +60,18 @@ class DeviceRegistry {
             );
         }
 
-        // Sync with repository only if device is favorite
-        if (this._deviceRepository && device.isFavorite) {
+        // Sync with repository for all devices (not just favorites)
+        // This is required for foreign key constraints in downloads table
+        if (this._deviceRepository) {
             try {
-                this._deviceRepository.insertDevice(device.toJSON());
+                const existingDevice = this._deviceRepository.findDeviceById(device.id);
+                if (existingDevice) {
+                    // Device exists, update it
+                    this._deviceRepository.updateDevice(device.id, device.toJSON());
+                } else {
+                    // Device does not exist, insert it
+                    this._deviceRepository.insertDevice(device.toJSON());
+                }
             } catch (error) {
                 console.error('[DeviceRegistry] Failed to sync device to repository:', error);
             }

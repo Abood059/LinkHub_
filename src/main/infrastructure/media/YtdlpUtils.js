@@ -11,8 +11,9 @@ const os = require('os');
 function sanitizeFileName(fileName) {
     if (!fileName) return 'download';
     // إزالة أو استبدال الأحرف غير الصالحة لأسماء الملفات
+    // يشمل الأحرف المحظورة في Windows/Linux بالإضافة إلى أحرف خاصة شائعة
     return fileName
-        .replace(/[<>:"/\\|?*]/g, '_')  // استبدال الأحرف المحظورة
+        .replace(/[<>:"/\\|?*｜«»""''—–]/g, '_')  // استبدال الأحرف المحظورة والخاصة
         .replace(/\s+/g, '_')           // استبدال المسافات بـ underscore
         .substring(0, 200);             // تحديد طول أقصى 200 حرف
 }
@@ -72,18 +73,21 @@ function calculateTotalSize(formatId, formatsData) {
  * إشارات انتقال الملف التالي من المخرجات الفعلية:
  *   1) سطر yt-dlp: [download] 100% of X.XXiB ...
  *   2) تغيّر معرّف aria2c (GID) بين [#c817a5 ...] و [#99fd6f ...]
+ *   3) انخفاض النسبة المئوية (fallback من yt-dlp-wrap-plus)
  */
 function adjustProgressForCombinedDownload(currentPercent, currentSize, entry, progressData) {
-    if (!entry.hasSizeInfo || !entry.totalSize) {
+    // إذا لم يكن تحميل مركب أو لا تتوفر معلومات الحجم، أرجع القيمة كما هي
+    if (!entry.hasSizeInfo || !entry.totalSize || !entry.formatId.includes('+')) {
         return { percent: currentPercent, size: currentSize };
     }
 
     if (entry.completedBytes == null) entry.completedBytes = 0;
     if (entry.lastFileDownloadedBytes == null) entry.lastFileDownloadedBytes = 0;
     if (entry.lastFileTotalBytes == null) entry.lastFileTotalBytes = 0;
+    if (entry.currentFileIndex == null) entry.currentFileIndex = 0;
 
     const toDisplay = (downloaded) => ({
-        percent: Math.min((downloaded / entry.totalSize) * 100, 100),
+        percent: Math.round(Math.min((downloaded / entry.totalSize) * 100, 100) * 10) / 10,
         size: `${formatBytes(downloaded)}/${formatBytes(entry.totalSize)}`
     });
 
@@ -93,12 +97,13 @@ function adjustProgressForCombinedDownload(currentPercent, currentSize, entry, p
         entry.lastAriaGid = null;
         entry.lastFileDownloadedBytes = 0;
         entry.lastFileTotalBytes = 0;
-        entry.currentFileIndex = (entry.currentFileIndex || 0) + 1;
+        entry.currentFileIndex++;
         entry.downloadedBytes = entry.completedBytes;
         entry.lastPercent = 100;
         return toDisplay(entry.downloadedBytes);
     }
 
+    // التحقق من توفر بيانات البايتات من yt-dlp-wrap-plus
     const hasByteProgress = progressData.downloadedBytes != null
         && progressData.totalBytes > 0;
 
@@ -109,7 +114,7 @@ function adjustProgressForCombinedDownload(currentPercent, currentSize, entry, p
         if (gid && entry.lastAriaGid && gid !== entry.lastAriaGid) {
             const finishedBytes = entry.lastFileTotalBytes || entry.lastFileDownloadedBytes || 0;
             entry.completedBytes += finishedBytes;
-            entry.currentFileIndex = (entry.currentFileIndex || 0) + 1;
+            entry.currentFileIndex++;
         }
 
         if (gid) entry.lastAriaGid = gid;
@@ -121,11 +126,12 @@ function adjustProgressForCombinedDownload(currentPercent, currentSize, entry, p
         return toDisplay(entry.downloadedBytes);
     }
 
-    // fallback أخير: تقدير بالنسب عند غياب البايتات
-    if (!entry.currentFileIndex) entry.currentFileIndex = 0;
-
+    // Fallback: استخدام النسب المئوية عند غياب بيانات البايتات
+    // هذا يحدث مع yt-dlp-wrap-plus عند عدم توفير بيانات البايتات
     if (entry.lastPercent && currentPercent < entry.lastPercent - 10) {
+        // انتقال من ملف إلى آخر (انخفاض كبير في النسبة)
         entry.currentFileIndex++;
+        entry.completedBytes = Math.floor((entry.currentFileIndex / 2) * entry.totalSize);
     }
     entry.lastPercent = currentPercent;
 
@@ -134,7 +140,7 @@ function adjustProgressForCombinedDownload(currentPercent, currentSize, entry, p
     entry.downloadedBytes = Math.floor((Math.min(totalPercent, 100) / 100) * entry.totalSize);
 
     return {
-        percent: Math.min(totalPercent, 100),
+        percent: Math.round(Math.min(totalPercent, 100) * 10) / 10,
         size: `${formatBytes(entry.downloadedBytes)}/${formatBytes(entry.totalSize)}`
     };
 }
@@ -176,8 +182,11 @@ function getProgressTemplate() {
 /**
  * نقل الملف المحمل إلى مجلد التنزيلات
  */
-async function moveDownloadedFile(tempFilePath, title, deviceId) {
-    const downloadsDir = path.join(os.homedir(), 'Downloads');
+async function moveDownloadedFile(tempFilePath, title, deviceId, downloadsDir = null) {
+    // استخدام المسار المحدد أو المسار الافتراضي (~/Downloads)
+    if (!downloadsDir) {
+        downloadsDir = path.join(os.homedir(), 'Downloads');
+    }
     
     try {
         await fs.mkdir(downloadsDir, { recursive: true });
@@ -196,15 +205,13 @@ async function moveDownloadedFile(tempFilePath, title, deviceId) {
         const finalFilePath = path.join(downloadsDir, newFileName);
         
         await fs.copyFile(tempFilePath, finalFilePath);
-        
-        // إذا لم يكن هناك deviceId، يتم مسح الملف المؤقت فوراً
-        if (!deviceId) {
-            await fs.unlink(tempFilePath);
-        }
-        
+
+        // حذف الملف المؤقت بعد نجاح النقل
+        await fs.unlink(tempFilePath);
+
         return {
             finalPath: finalFilePath,
-            tempPath: deviceId ? tempFilePath : null
+            tempPath: tempFilePath
         };
     } catch (err) {
         throw new Error(`Failed to move file: ${err.message}`);

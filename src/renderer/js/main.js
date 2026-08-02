@@ -8,7 +8,7 @@ import { renderDevices, setShowModalCallback } from './ui/deviceManager.js';
 import { initModal, showDeviceModal } from './ui/modalManager.js';
 import { initTabs, switchTab } from './ui/tabManager.js';
 import { getSelectedDeviceIds, clearSelected } from './ui/selectionManager.js';
-import { handleStartRoute } from './handlers/startRouteHandler.js';
+import { handleStartRoute, setRegisteredDevicesGetter } from './handlers/startRouteHandler.js';
 import { handlePairDevice } from './handlers/pairHandler.js';
 import { initFormatSelectionModal, resetStartButtonState } from './ui/formatSelectionModal.js';
 import { loadDownloadHistory } from './services/downloadService.js';
@@ -63,6 +63,9 @@ if (recentDownloadsTbody) {
 
 // تهيئة نافذة اختيار الجودة
 initFormatSelectionModal();
+
+// ربط دالة getter للأجهزة مع startRouteHandler
+setRegisteredDevicesGetter(() => registeredDevices);
 
 // دالة تحميل الأجهزة
 export async function loadDevices() {
